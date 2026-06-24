@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
+#include <stdint.h>
 
 #define nullptr ((void *)0)
 #define FSM_TOKENIZER "[FSM Tokenizer]: "
@@ -82,14 +84,18 @@ void read_string(SV *str, SV *input) {
 
 #define TOKEN_LIST \
     X(TOK_keyword_fn) \
-    X(TOK_keyword_print) \
     X(TOK_lparen) \
     X(TOK_rparen) \
     X(TOK_lbrace) \
     X(TOK_rbrace) \
+    X(TOK_asterisk) \
+    X(TOK_plus) \
+    X(TOK_komma) \
     X(TOK_semicolon) \
     X(TOK_identifier) \
     X(TOK_string) \
+    X(TOK_number) \
+    X(TOK_eof) \
 
 enum TokenType {
 #define X(name) name,
@@ -114,7 +120,6 @@ typedef struct {
 
 Token tokens[1000];
 int num_tokens;
-
 
 void push_token(int type, SV *value, int line_number) {
     tokens[num_tokens].type = type;
@@ -176,12 +181,12 @@ void tokenizer() {
             read_string(&str, &code);
             push_token(TOK_string, &str, line_number);
         }
-
         else {
             fprintf(stderr, FSM_TOKENIZER "encountered unhandled character '%c' = 0x%02X. Quitting.\n", c, c);
             exit(EXIT_FAILURE);
         }
     }
+    push_token(TOK_eof, nullptr, line_number);
 }
 
 void dump_tokens() {
@@ -195,7 +200,258 @@ void dump_tokens() {
     }
 }
 
+#define IL_LIST \
+    X(OP_begin_fn) \
+    X(OP_end_fn) \
+    X(OP_add) \
+    X(OP_mul) \
+    X(OP_number) \
+    X(OP_string) \
+    X(OP_call) \
+
+enum Op_Type {
+#define X(name) name,
+    IL_LIST
+#undef X
+};
+
+const char *opcode_type_name(enum Op_Type type) {
+    switch (type) {
+#define X(name) case name: return #name;
+        IL_LIST
+#undef X
+    }
+}
+
+typedef struct {
+    int type;
+    SV string_value;
+    uint64_t u64_value;
+} Opcode;
+
+Opcode opcodes[1000];
+size_t num_opcodes;
+
+void push_opcode(int type, SV *value, uint64_t u64_value) {
+    opcodes[num_opcodes].type = type;
+    sv_clone(&opcodes[num_opcodes].string_value, value);
+    opcodes[num_opcodes].u64_value = u64_value;
+    num_opcodes++;
+}
+
+void dump_opcodes() {
+    for (int i=0; i<num_opcodes; i++) {
+        Opcode *t = &opcodes[i];
+        if (t->string_value.begin) {
+            printf("[%s, \"" SV_FMT "\"]\n", opcode_type_name(t->type), SV_prnt(t->string_value));
+        } else {
+            printf("[%s, %lu]\n", token_type_name(t->type), t->u64_value);
+        }
+    }
+}
+
+typedef struct {
+
+} Function;
+
+Function builtin_print;
+
+Function *get_function_by_name(SV *name)
+{
+    if(sv_compare_cstr(name, "print")) {
+        return &builtin_print;
+    }
+    return nullptr;
+}
+
+Token *current_token = tokens;
+
+#define CURRENT_TOKEN current_token
+#define MOVE_NEXT() (current_token++)
+
+void parse_expression();
+
+void parse_call() {
+    printf("Entering %s\n", __func__);
+    SV function_name;
+    sv_clone(&function_name, &CURRENT_TOKEN->value);
+    MOVE_NEXT();
+
+    if (CURRENT_TOKEN->type != TOK_lparen) {
+        fprintf(stderr, "[FSM Parser] Line %d Error: Expected '(' but got %s\n",
+        CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+        exit(EXIT_FAILURE);
+    }
+    MOVE_NEXT();
+
+    int num_vars = 0;
+
+    while (1) {
+        if (CURRENT_TOKEN->type == TOK_rparen) {
+            push_opcode(OP_call, &function_name, num_vars);
+            MOVE_NEXT();
+            return;
+        } else {
+            parse_expression();
+            num_vars++;
+            while (CURRENT_TOKEN->type == TOK_komma) {
+                MOVE_NEXT();
+                parse_expression();
+                num_vars++;
+            }
+        }
+    }
+}
+
+void parse_primary()
+{
+    printf("Entering %s\n", __func__);
+    if (CURRENT_TOKEN->type == TOK_number) {   
+        push_opcode(OP_number, &CURRENT_TOKEN->value, 0);
+        MOVE_NEXT();
+    }
+    else if (CURRENT_TOKEN->type == TOK_string) {
+        push_opcode(OP_string, &CURRENT_TOKEN->value, 0);
+        MOVE_NEXT();
+    }
+    else if (CURRENT_TOKEN->type == TOK_identifier && get_function_by_name(&CURRENT_TOKEN->value)) {
+        parse_call();
+    }
+    else if (CURRENT_TOKEN->type == TOK_lparen) {
+        MOVE_NEXT();
+        parse_expression();
+
+        if (CURRENT_TOKEN->type != TOK_rparen)
+        {
+            fprintf(stderr, "[FSM Parser] Line %d Error: Expected ')' but got %s\n",
+                CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+            exit(EXIT_FAILURE);
+        }
+    }
+    else {
+
+        fprintf(stderr, "[FSM Parser] Line %d Error: Expected expression\n",
+                CURRENT_TOKEN->line_number);
+            exit(EXIT_FAILURE);
+    }
+}
+
+void parse_multiplicative(void)
+{
+    printf("Entering %s\n", __func__);
+    parse_primary();
+
+    while (CURRENT_TOKEN->type == TOK_asterisk)
+    {
+        parse_primary();
+
+        push_opcode(OP_mul, nullptr, 0);
+        MOVE_NEXT();
+    }
+}
+
+void parse_additive()
+{
+    printf("Entering %s\n", __func__);
+    parse_multiplicative();
+
+    while (CURRENT_TOKEN->type == TOK_plus)
+    {
+        parse_multiplicative();
+
+        push_opcode(OP_add, nullptr, 0);
+        MOVE_NEXT();
+    }
+}
+
+void parse_expression()
+{
+    printf("Entering %s\n", __func__);
+    parse_additive();
+}
+
+void parse_function() {
+    printf("Entering %s\n", __func__);
+    assert(CURRENT_TOKEN->type == TOK_keyword_fn);
+    MOVE_NEXT();
+
+    if (CURRENT_TOKEN->type != TOK_identifier) {
+        fprintf(stderr, "[FSM Parser] Line %d Error: Expected function name but got %s\n",
+            CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+        exit(EXIT_FAILURE);
+    }
+    SV *function_name = &CURRENT_TOKEN->value;
+    MOVE_NEXT();
+
+    if (CURRENT_TOKEN->type != TOK_lparen) {
+        fprintf(stderr, "[FSM Parser] Line %d Error: Expected '(' but got %s\n",
+            CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+        exit(EXIT_FAILURE);
+    }
+    MOVE_NEXT();
+
+    if (CURRENT_TOKEN->type != TOK_rparen) {
+        fprintf(stderr, "[FSM Parser] Line %d Error: Expected ')' but got %s\n",
+            CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+        exit(EXIT_FAILURE);
+    }
+    MOVE_NEXT();
+
+    int num_args = 0;
+    // TODO: Parse function arguments
+    
+    if (CURRENT_TOKEN->type != TOK_lbrace) {
+        fprintf(stderr, "[FSM Parser] Line %d Error: Expected '{' but got %s\n",
+            CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+        exit(EXIT_FAILURE);
+    }
+    MOVE_NEXT();
+
+    push_opcode(OP_begin_fn, function_name, num_args);
+
+    // function body
+    while(1) {
+        if (CURRENT_TOKEN->type == TOK_eof) {
+            fprintf(stderr, "[FSM Parser] Line %d Error: encountered EOF while parsing function body\n", CURRENT_TOKEN->line_number);
+        }
+        else if (CURRENT_TOKEN->type == TOK_semicolon) {
+            MOVE_NEXT();
+        }
+        else if (CURRENT_TOKEN->type == TOK_rbrace) {
+            MOVE_NEXT();
+            push_opcode(OP_end_fn, function_name, 0);
+            return;
+        }
+        else {
+            parse_expression();
+            if (CURRENT_TOKEN->type != TOK_semicolon) {
+                fprintf(stderr, "[FSM Parser] Line %d Error: missing ';'\n", CURRENT_TOKEN->line_number);
+                exit(EXIT_FAILURE);
+            } else {
+                MOVE_NEXT();
+            }
+        }
+    }
+}
+
+void parse_program() {
+    printf("Entering %s\n", __func__);
+    while (1) {
+        if (CURRENT_TOKEN->type == TOK_keyword_fn) {
+            parse_function();
+        }
+        else if (CURRENT_TOKEN->type == TOK_eof) {
+            return;
+        } else {
+            fprintf(stderr, "[FSM Parser] Line %d Error: Expected 'fn' or EOF but got %s\n",
+                CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+        }
+    }
+}
+
 int main (int argc, const char *argv[]) {
     tokenizer();
     dump_tokens();
+    parse_program();
+    dump_opcodes();
 }
