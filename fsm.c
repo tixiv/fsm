@@ -14,7 +14,8 @@
 const char test_code[] =
 "fn main()\n"
 "{\n"
-"    print(\"Hello, World\");"
+"   puts(\"Hello, World\");\n"
+"   print(5 + 4*3 + (7 + 8)*9);\n"
 "}\n";
 
 typedef struct {
@@ -66,6 +67,16 @@ void read_word(SV *word, SV *input) {
     }
 }
 
+void read_number(SV *num, SV *input) {
+    num->begin = input->begin;
+    num->len = 0;
+    while(input->len && is_numeric(*input->begin)) {
+        sv_pop(input);
+        num->len++;
+    }
+}
+
+
 void read_string(SV *str, SV *input) {
     sv_pop(input); // initial '"'
     str->begin = input->begin;
@@ -88,8 +99,10 @@ void read_string(SV *str, SV *input) {
     X(TOK_rparen) \
     X(TOK_lbrace) \
     X(TOK_rbrace) \
-    X(TOK_asterisk) \
     X(TOK_plus) \
+    X(TOK_minus) \
+    X(TOK_asterisk) \
+    X(TOK_slash) \
     X(TOK_komma) \
     X(TOK_semicolon) \
     X(TOK_identifier) \
@@ -149,6 +162,11 @@ void tokenizer() {
             read_word(&word, &code);
             handle_word(&word, line_number);
         }
+        else if (is_numeric(c)) {
+            SV num;
+            read_number(&num, &code);
+            push_token(TOK_number, &num, line_number);
+        }
         else if (is_whitespace(c)) {
             sv_pop(&code);
         }
@@ -175,6 +193,26 @@ void tokenizer() {
         else if (';' == c) {
             sv_pop(&code);
             push_token(TOK_semicolon, nullptr, line_number);
+        }
+        else if (',' == c) {
+            sv_pop(&code);
+            push_token(TOK_komma, nullptr, line_number);
+        }
+        else if ('+' == c) {
+            sv_pop(&code);
+            push_token(TOK_plus, nullptr, line_number);
+        }
+        else if ('-' == c) {
+            sv_pop(&code);
+            push_token(TOK_minus, nullptr, line_number);
+        }
+        else if ('*' == c) {
+            sv_pop(&code);
+            push_token(TOK_asterisk, nullptr, line_number);
+        }
+        else if ('/' == c) {
+            sv_pop(&code);
+            push_token(TOK_slash, nullptr, line_number);
         }
         else if ('"' == c) {
             SV str;
@@ -204,7 +242,9 @@ void dump_tokens() {
     X(OP_begin_fn) \
     X(OP_end_fn) \
     X(OP_add) \
+    X(OP_sub) \
     X(OP_mul) \
+    X(OP_div) \
     X(OP_number) \
     X(OP_string) \
     X(OP_call) \
@@ -234,8 +274,8 @@ size_t num_opcodes;
 
 void push_opcode(int type, SV *value, uint64_t u64_value) {
     opcodes[num_opcodes].type = type;
-    sv_clone(&opcodes[num_opcodes].string_value, value);
     opcodes[num_opcodes].u64_value = u64_value;
+    if (value) sv_clone(&opcodes[num_opcodes].string_value, value);
     num_opcodes++;
 }
 
@@ -245,7 +285,7 @@ void dump_opcodes() {
         if (t->string_value.begin) {
             printf("[%s, \"" SV_FMT "\"]\n", opcode_type_name(t->type), SV_prnt(t->string_value));
         } else {
-            printf("[%s, %lu]\n", token_type_name(t->type), t->u64_value);
+            printf("[%s, %lu]\n", opcode_type_name(t->type), t->u64_value);
         }
     }
 }
@@ -259,6 +299,8 @@ Function builtin_print;
 Function *get_function_by_name(SV *name)
 {
     if(sv_compare_cstr(name, "print")) {
+        return &builtin_print;
+    } else if (sv_compare_cstr(name, "puts")) {
         return &builtin_print;
     }
     return nullptr;
@@ -314,8 +356,14 @@ void parse_primary()
         push_opcode(OP_string, &CURRENT_TOKEN->value, 0);
         MOVE_NEXT();
     }
-    else if (CURRENT_TOKEN->type == TOK_identifier && get_function_by_name(&CURRENT_TOKEN->value)) {
-        parse_call();
+    else if (CURRENT_TOKEN->type == TOK_identifier) {
+        if (get_function_by_name(&CURRENT_TOKEN->value)) {
+            parse_call();
+        } else {
+            fprintf(stderr, "[FSM Parser] Line %d Error: Undefined identifier '" SV_FMT "'\n",
+                CURRENT_TOKEN->line_number, SV_prnt(CURRENT_TOKEN->value));
+            exit(EXIT_FAILURE);
+        }
     }
     else if (CURRENT_TOKEN->type == TOK_lparen) {
         MOVE_NEXT();
@@ -327,13 +375,15 @@ void parse_primary()
                 CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
             exit(EXIT_FAILURE);
         }
+        MOVE_NEXT();
     }
     else {
 
-        fprintf(stderr, "[FSM Parser] Line %d Error: Expected expression\n",
-                CURRENT_TOKEN->line_number);
+        fprintf(stderr, "[FSM Parser] Line %d Error: Expected expression but got %s\n",
+                CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
             exit(EXIT_FAILURE);
     }
+    printf("Leaving %s\n", __func__);
 }
 
 void parse_multiplicative(void)
@@ -341,13 +391,19 @@ void parse_multiplicative(void)
     printf("Entering %s\n", __func__);
     parse_primary();
 
-    while (CURRENT_TOKEN->type == TOK_asterisk)
-    {
+    while (CURRENT_TOKEN->type == TOK_asterisk || CURRENT_TOKEN->type == TOK_slash) {
+        int type = CURRENT_TOKEN->type;
+
+        MOVE_NEXT();
         parse_primary();
 
-        push_opcode(OP_mul, nullptr, 0);
-        MOVE_NEXT();
+        if (type == TOK_asterisk) {
+            push_opcode(OP_mul, nullptr, 0);
+        } else {
+            push_opcode(OP_div, nullptr, 0);
+        }
     }
+    printf("Leaving %s\n", __func__);
 }
 
 void parse_additive()
@@ -355,19 +411,26 @@ void parse_additive()
     printf("Entering %s\n", __func__);
     parse_multiplicative();
 
-    while (CURRENT_TOKEN->type == TOK_plus)
-    {
+    while (CURRENT_TOKEN->type == TOK_plus || CURRENT_TOKEN->type == TOK_minus) {
+        int type = CURRENT_TOKEN->type;
+
+        MOVE_NEXT();
         parse_multiplicative();
 
-        push_opcode(OP_add, nullptr, 0);
-        MOVE_NEXT();
+        if (type == TOK_plus) {
+            push_opcode(OP_add, nullptr, 0);
+        } else {
+            push_opcode(OP_sub, nullptr, 0);
+        }
     }
+    printf("Leaving %s\n", __func__);
 }
 
 void parse_expression()
 {
     printf("Entering %s\n", __func__);
     parse_additive();
+    printf("Leaving %s\n", __func__);
 }
 
 void parse_function() {
@@ -420,7 +483,7 @@ void parse_function() {
         else if (CURRENT_TOKEN->type == TOK_rbrace) {
             MOVE_NEXT();
             push_opcode(OP_end_fn, function_name, 0);
-            return;
+            break;
         }
         else {
             parse_expression();
@@ -432,6 +495,8 @@ void parse_function() {
             }
         }
     }
+
+    printf("Leaving %s\n", __func__);
 }
 
 void parse_program() {
@@ -447,6 +512,7 @@ void parse_program() {
                 CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
         }
     }
+    printf("Leaving %s\n", __func__);
 }
 
 int main (int argc, const char *argv[]) {
