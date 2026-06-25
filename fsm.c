@@ -14,8 +14,9 @@
 const char test_code[] =
 "fn main()\n"
 "{\n"
-"   puts(\"Hello, World\");\n"
-"   print(5 + 4*3 + (7 + 8)*9);\n"
+//"   puts(\"Hello, World\");\n"
+//"   print(5 + 4*3 + (7 + 8)*9);\n"
+"   print(42);\n"
 "}\n";
 
 typedef struct {
@@ -515,9 +516,117 @@ void parse_program() {
     printf("Leaving %s\n", __func__);
 }
 
+
+
+
+void output_asm() {
+    FILE *file = fopen("out.asm", "w");
+
+    const char* header =
+    "format ELF64 executable"
+    "segment readable executable"
+    "entry main";
+
+    // Print function borrowed from Porth compiler
+    const char *print_function =
+    "print:\n"
+    "mov rdi, [rsp+8]"
+    "mov     r9, -3689348814741910323\n"
+    "sub     rsp, 40\n"                 
+    "mov     BYTE [rsp+31], 10\n"       
+    "lea     rcx, [rsp+30]\n"           
+    ".L2:\n"                            
+    "mov     rax, rdi\n"                
+    "lea     r8, [rsp+32]\n"            
+    "mul     r9\n"                      
+    "mov     rax, rdi\n"                
+    "sub     r8, rcx\n"                 
+    "shr     rdx, 3\n"                  
+    "lea     rsi, [rdx+rdx*4]\n"        
+    "add     rsi, rsi\n"                
+    "sub     rax, rsi\n"                
+    "add     eax, 48\n"                 
+    "mov     BYTE [rcx], al\n"          
+    "mov     rax, rdi\n"                
+    "mov     rdi, rdx\n"                
+    "mov     rdx, rcx\n"                
+    "sub     rcx, 1\n"                  
+    "cmp     rax, 9\n"                  
+    "ja      .L2\n"                     
+    "lea     rax, [rsp+32]\n"           
+    "mov     edi, 1\n"                  
+    "sub     rdx, rax\n"                
+    "xor     eax, eax\n"                
+    "lea     rsi, [rsp+32+rdx]\n"       
+    "mov     rdx, r8\n"                 
+    "mov     rax, 1\n"                  
+    "syscall\n"                         
+    "add     rsp, 40\n"                 
+    "ret\n";
+
+    fprintf(file, "%s", header);
+    fprintf(file, "%s", print_function);
+
+    for (int i=0; i<num_opcodes; i++) {
+        Opcode *t = &opcodes[i];
+
+        switch(t->type) {
+            case OP_begin_fn:
+                fprintf(file,"; ------- begin_fn ---------\n");
+                fprintf(file,"fn_" SV_FMT ":\n", SV_prnt(t->string_value));
+                break;
+            case OP_end_fn:
+                fprintf(file,"; -------- end_fn ----------\n");
+                fprintf(file,"\t" "ret\n");
+                break;
+            case OP_add:
+                fprintf(file,"; ---------- add -----------\n");
+                fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "pop rbx\n");
+                fprintf(file,"\t" "add rax, rbx\n");
+                fprintf(file,"\t" "push rax\n");
+                break;
+            case OP_sub:
+                fprintf(file,"; ---------- sub -----------\n");
+                fprintf(stderr, "%s:%d Generating OP_sub not implemented yet.\n", __FILE__, __LINE__);
+                exit(EXIT_FAILURE);
+                break;
+            case OP_mul:
+                fprintf(file,"; ---------- mul -----------\n");
+                fprintf(stderr, "%s:%d Generating OP_mul not implemented yet.\n", __FILE__, __LINE__);
+                exit(EXIT_FAILURE);
+                break;
+            case OP_div:
+                fprintf(file,"; ---------- div -----------\n");
+                fprintf(stderr, "%s:%d Generating OP_div not implemented yet.\n", __FILE__, __LINE__);
+                exit(EXIT_FAILURE);
+                break;
+            case OP_number:
+                fprintf(file,"; --------- number ---------\n");
+                fprintf(file,"\t" "mov rax,%lu\n", strtoul(t->string_value.begin, 0, 10));
+                fprintf(file,"\t" "push rax\n");
+                exit(EXIT_FAILURE);
+                break;
+            case OP_string:
+                fprintf(file,"; --------- string ---------\n");
+                fprintf(stderr, "%s:%d Generating OP_string not implemented yet.\n", __FILE__, __LINE__);
+                exit(EXIT_FAILURE);
+                break;
+            case OP_call:
+                fprintf(file,"; ---------- call ----------\n");
+                fprintf(file,"\t" "call fn_" SV_FMT "\n", SV_prnt(t->string_value));
+                break;
+        }
+    }
+
+    fclose(file);
+}
+
+
 int main (int argc, const char *argv[]) {
     tokenizer();
     dump_tokens();
     parse_program();
     dump_opcodes();
+    output_asm();
 }
