@@ -1,0 +1,14 @@
+
+fn foo() {
+    return 2 + 3;
+}
+
+fn bar(a, b) {
+    print(a);
+    print(b);
+    return a * b;
+}
+
+fn main() {
+    print(1 + bar(2,3) + 4 + foo());
+}

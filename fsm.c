@@ -276,6 +276,7 @@ void dump_tokens() {
     X(OP_string) \
     X(OP_call) \
     X(OP_push_result) \
+    X(OP_push_arg) \
 
 enum Op_Type {
 #define X(name) name,
@@ -377,8 +378,9 @@ void parse_expression(bool result_used);
 
 void parse_call(bool result_used) {
     printf("Entering %s\n", __func__);
-    SV function_name;
-    sv_clone(&function_name, &CURRENT_TOKEN->value);
+    Function *fun = get_function_by_name(&CURRENT_TOKEN->value);
+    assert(fun && "Error: parse_call called without current token pointing to fn");
+
     MOVE_NEXT();
 
     if (CURRENT_TOKEN->type != TOK_lparen) {
@@ -388,22 +390,26 @@ void parse_call(bool result_used) {
     }
     MOVE_NEXT();
 
-    int num_vars = 0;
+    int num_args = 0;
 
     while (1) {
         if (CURRENT_TOKEN->type == TOK_rparen) {
+            if (num_args != fun->num_arguments) {
+                fprintf(stderr, "[FSM Parser] Line %d Error: Incorrect number of function arguments to '" SV_FMT "'. Expected %d but got %d\n",
+                    CURRENT_TOKEN->line_number, SV_prnt(fun->name), fun->num_arguments, num_args);
+                exit(EXIT_FAILURE);
+            }
             MOVE_NEXT();
-            push_opcode(OP_call, &function_name, num_vars);
+            push_opcode(OP_call, &fun->name, num_args);
             if (result_used) push_opcode(OP_push_result, nullptr, 0);
-            
             return;
         } else {
             parse_expression(true);
-            num_vars++;
+            num_args++;
             while (CURRENT_TOKEN->type == TOK_komma) {
                 MOVE_NEXT();
                 parse_expression(true);
-                num_vars++;
+                num_args++;
             }
         }
     }
@@ -423,7 +429,13 @@ void parse_primary(bool result_used)
     else if (CURRENT_TOKEN->type == TOK_identifier) {
         if (get_function_by_name(&CURRENT_TOKEN->value)) {
             parse_call(result_used);
-        } else {
+        }
+        else if (get_arg_by_name(&CURRENT_TOKEN->value) != -1) {
+            int offset = get_arg_by_name(&CURRENT_TOKEN->value);
+            if (result_used) push_opcode(OP_push_arg, &CURRENT_TOKEN->value, num_args -1 - offset);
+            MOVE_NEXT();
+        }
+        else {
             fprintf(stderr, "[FSM Parser] Line %d Error: Undefined identifier '" SV_FMT "'\n",
                 CURRENT_TOKEN->line_number, SV_prnt(CURRENT_TOKEN->value));
             exit(EXIT_FAILURE);
@@ -531,6 +543,10 @@ void parse_function() {
         }
         else if(CURRENT_TOKEN->type == TOK_identifier) {
             push_arg(&CURRENT_TOKEN->value);
+            MOVE_NEXT();
+            if(CURRENT_TOKEN->type == TOK_komma) {
+                MOVE_NEXT();
+            }
         }
         else {
             fprintf(stderr, "[FSM Parser] Line %d Error: Expected ')' or function argument but got %s\n",
@@ -665,10 +681,13 @@ void output_asm() {
             case OP_begin_fn:
                 fprintf(file,"; ------- begin_fn ---------\n");
                 fprintf(file,"fn_" SV_FMT ":\n", SV_prnt(t->string_value));
+                fprintf(file,"\t" "push rbp\n");
+                fprintf(file,"\t" "mov  rbp, rsp\n");
                 break;
             case OP_return:
                 fprintf(file,"; -------- return ----------\n");
                 if (t->u64_value) fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "pop rbp\n");
                 fprintf(file,"\t" "ret\n");
                 break;
             case OP_add:
@@ -711,6 +730,11 @@ void output_asm() {
                 break;
             case OP_push_result:
                 fprintf(file,"; ------- push_result ------\n");
+                fprintf(file,"\t" "push rax\n");
+                break;
+            case OP_push_arg:
+                fprintf(file,"; --------- push_arg -------\n");
+                fprintf(file,"\t" "mov rax, [rbp+%lu]\n", 16 + 8 * t->u64_value);
                 fprintf(file,"\t" "push rax\n");
                 break;
         }
