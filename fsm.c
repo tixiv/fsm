@@ -14,9 +14,9 @@
 const char test_code[] =
 "fn main()\n"
 "{\n"
-//"   puts(\"Hello, World\");\n"
-//"   print(5 + 4*3 + (7 + 8)*9);\n"
 "   print(42);\n"
+"   print(5 + 4*3 + (7 + 8)*9);\n"
+//"   puts(\"Hello, World\");\n"
 "}\n";
 
 typedef struct {
@@ -523,14 +523,19 @@ void output_asm() {
     FILE *file = fopen("out.asm", "w");
 
     const char* header =
-    "format ELF64 executable"
-    "segment readable executable"
-    "entry main";
+    "format ELF64 executable\n"
+    "segment readable executable\n"
+    "entry _start\n"
+    "_start:\n"
+    "call fn_main\n"
+    "mov rax, 60\n"
+    "mov rdi, 0\n"
+    "syscall\n";
 
     // Print function borrowed from Porth compiler
     const char *print_function =
-    "print:\n"
-    "mov rdi, [rsp+8]"
+    "fn_print:\n"
+    "mov rdi, [rsp+8]\n"
     "mov     r9, -3689348814741910323\n"
     "sub     rsp, 40\n"                 
     "mov     BYTE [rsp+31], 10\n"       
@@ -593,8 +598,9 @@ void output_asm() {
                 break;
             case OP_mul:
                 fprintf(file,"; ---------- mul -----------\n");
-                fprintf(stderr, "%s:%d Generating OP_mul not implemented yet.\n", __FILE__, __LINE__);
-                exit(EXIT_FAILURE);
+                fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "mul QWORD [rsp]\n");
+                fprintf(file,"\t" "mov [rsp], rax\n");
                 break;
             case OP_div:
                 fprintf(file,"; ---------- div -----------\n");
@@ -605,7 +611,6 @@ void output_asm() {
                 fprintf(file,"; --------- number ---------\n");
                 fprintf(file,"\t" "mov rax,%lu\n", strtoul(t->string_value.begin, 0, 10));
                 fprintf(file,"\t" "push rax\n");
-                exit(EXIT_FAILURE);
                 break;
             case OP_string:
                 fprintf(file,"; --------- string ---------\n");
@@ -615,6 +620,7 @@ void output_asm() {
             case OP_call:
                 fprintf(file,"; ---------- call ----------\n");
                 fprintf(file,"\t" "call fn_" SV_FMT "\n", SV_prnt(t->string_value));
+                fprintf(file,"\t" "add rsp, %lu\n", t->u64_value * 8);
                 break;
         }
     }
