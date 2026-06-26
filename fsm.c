@@ -117,6 +117,7 @@ void read_string(SV *str, SV *input) {
     X(TOK_keyword_let) \
     X(TOK_keyword_return) \
     X(TOK_keyword_if) \
+    X(TOK_keyword_while) \
     X(TOK_lparen) \
     X(TOK_rparen) \
     X(TOK_lbrace) \
@@ -180,6 +181,9 @@ void handle_word(SV *word, int line_number) {
     }
     else if (sv_compare_cstr(word, "if")) {
         push_token(TOK_keyword_if, nullptr, line_number);
+    }
+    else if (sv_compare_cstr(word, "while")) {
+        push_token(TOK_keyword_while, nullptr, line_number);
     }
     else {
         push_token(TOK_identifier, word, line_number);
@@ -306,7 +310,10 @@ void dump_tokens() {
     X(OP_assign_local_var) \
     X(OP_if) \
     X(OP_end_if) \
-    
+    X(OP_while_loop) \
+    X(OP_while_check) \
+    X(OP_while_end) \
+
 enum Op_Kind {
 #define X(name) name,
     OPCODE_LIST
@@ -455,6 +462,37 @@ int get_local_var_by_name(SV *name) {
 
 void parse_expression(bool result_used);
 
+int num_while_loops;
+void parse_while(bool result_used) {
+    debug_log_parser("Entering %s\n", __func__);
+    if (CURRENT_TOKEN->kind != TOK_lparen) {
+        parser_error(CURRENT_TOKEN->line_number, "Expected '(' but got %s",
+            token_kind_name(CURRENT_TOKEN->kind));
+    }
+    MOVE_NEXT();
+
+    int while_num = num_while_loops++;
+    push_opcode(OP_while_loop, nullptr, while_num);
+
+    // parse conditional
+    parse_expression(true);
+
+    push_opcode(OP_while_check, nullptr, while_num);
+
+    if (CURRENT_TOKEN->kind != TOK_rparen) {
+        parser_error(CURRENT_TOKEN->line_number, "Expected ')' but got %s",
+            token_kind_name(CURRENT_TOKEN->kind));
+    }
+    MOVE_NEXT();
+
+    // parse body
+    parse_expression(false);
+
+    push_opcode(OP_while_end, nullptr, while_num);
+    
+    debug_log_parser("Leaving %s\n", __func__);
+}
+
 int num_ifs;
 
 void parse_if(bool result_used) {
@@ -567,6 +605,10 @@ void parse_primary(bool result_used)
         MOVE_NEXT();
         parse_if(result_used);
     }
+    else if (CURRENT_TOKEN->kind == TOK_keyword_while) {
+        MOVE_NEXT();
+        parse_while(result_used);
+    }
     else {
 
         parser_error(CURRENT_TOKEN->line_number, "Expected expression but got %s",
@@ -642,6 +684,45 @@ void parse_equality(bool result_used)
     debug_log_parser("Leaving %s\n", __func__);
 }
 
+SV current_function_name;
+
+void parse_scope_body(bool result_used)
+{
+    // function body
+    while(1) {
+        if (CURRENT_TOKEN->kind == TOK_eof) {
+            parser_error(CURRENT_TOKEN->line_number, "encountered EOF while parsing function body");
+        }
+        else if (CURRENT_TOKEN->kind == TOK_semicolon) {
+            MOVE_NEXT();
+        }
+        else if (CURRENT_TOKEN->kind == TOK_rbrace) {
+            MOVE_NEXT();
+            break;
+        }
+        else if (CURRENT_TOKEN->kind == TOK_keyword_return) {
+            MOVE_NEXT();
+            if (CURRENT_TOKEN->kind == TOK_semicolon)
+            {
+                push_opcode(OP_return, &current_function_name, 0);
+            }
+            else{
+                parse_expression(true);
+                push_opcode(OP_return, &current_function_name, 1);
+            }
+        }
+        else {
+            bool require_semicolon = CURRENT_TOKEN->kind != TOK_lbrace;
+            parse_expression(false);
+            if (CURRENT_TOKEN->kind != TOK_semicolon) {
+                if (require_semicolon) parser_error(CURRENT_TOKEN->line_number, "missing ';'");
+            } else {
+                MOVE_NEXT();
+            }
+        }
+    }
+}
+
 void parse_return_and_assignment(bool result_used)
 {
     debug_log_parser("Entering %s\n", __func__);
@@ -678,6 +759,10 @@ void parse_return_and_assignment(bool result_used)
             parser_error(CURRENT_TOKEN->line_number, "Expected '=' or ';', but got %s",
                 token_kind_name(CURRENT_TOKEN->kind));
         }
+    }
+    else if (CURRENT_TOKEN->kind == TOK_lbrace) {
+        MOVE_NEXT();
+        parse_scope_body(result_used);
     }
     else {
         parse_equality(result_used);
@@ -735,48 +820,19 @@ void parse_function() {
         }
     }
     
+    push_function(function_name, num_args);
+    Opcode *begin_fn_opcode = push_opcode(OP_begin_fn, function_name, 0);
+
     if (CURRENT_TOKEN->kind != TOK_lbrace) {
         parser_error(CURRENT_TOKEN->line_number, "Expected '{' but got %s",
             token_kind_name(CURRENT_TOKEN->kind));
     }
     MOVE_NEXT();
 
-    push_function(function_name, num_args);
-    Opcode *begin_fn_opcode = push_opcode(OP_begin_fn, function_name, 0);
+    current_function_name = *function_name;
 
-    // function body
-    while(1) {
-        if (CURRENT_TOKEN->kind == TOK_eof) {
-            parser_error(CURRENT_TOKEN->line_number, "encountered EOF while parsing function body");
-        }
-        else if (CURRENT_TOKEN->kind == TOK_semicolon) {
-            MOVE_NEXT();
-        }
-        else if (CURRENT_TOKEN->kind == TOK_rbrace) {
-            MOVE_NEXT();
-            push_opcode(OP_return, function_name, 0);
-            break;
-        }
-        else if (CURRENT_TOKEN->kind == TOK_keyword_return) {
-            MOVE_NEXT();
-            if (CURRENT_TOKEN->kind == TOK_semicolon)
-            {
-                push_opcode(OP_return, function_name, 0);
-            }
-            else{
-                parse_expression(true);
-                push_opcode(OP_return, function_name, 1);
-            }
-        }
-        else {
-            parse_expression(false);
-            if (CURRENT_TOKEN->kind != TOK_semicolon) {
-                parser_error(CURRENT_TOKEN->line_number, "missing ';'");
-            } else {
-                MOVE_NEXT();
-            }
-        }
-    }
+    parse_scope_body(0);
+    push_opcode(OP_return, function_name, 0);
 
     begin_fn_opcode->u64_value = num_local_vars;
 
@@ -955,6 +1011,23 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "jne @f\n");
                 fprintf(file,"\t" "jmp end_if_%lu\n", t->u64_value);
                 fprintf(file,"@@:\n");
+                break;
+            case OP_while_loop:
+                fprintf(file,"; -------- while loop ------\n");
+                fprintf(file,"while_loop_%lu:\n", t->u64_value);
+                break;
+            case OP_while_check:
+                fprintf(file,"; -------- while check -----\n");
+                fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "or rax, rax\n");
+                fprintf(file,"\t" "jne @f\n");
+                fprintf(file,"\t" "jmp end_while_%lu\n", t->u64_value);
+                fprintf(file,"@@:\n");
+                break;
+            case OP_while_end:
+                fprintf(file,"; --------- while_end -----\n");
+                fprintf(file,"\t" "jmp while_loop_%lu\n", t->u64_value);
+                fprintf(file,"end_while_%lu:\n", t->u64_value);
                 break;
             case OP_end_if:
                 fprintf(file,"; --------- end_if ---------\n");
