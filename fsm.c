@@ -1,4 +1,5 @@
 
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -366,6 +367,21 @@ Function *get_function_by_name(const SV *name)
     return nullptr;
 }
 
+const bool enable_debug_parser = false;
+
+void debug_log_parser(const char * fmt, ...) {
+    if (!enable_debug_parser)
+        return;
+
+    va_list args;
+    va_start(args, fmt);
+
+    printf("[FSM debug parser] ");
+    vprintf(fmt, args);
+
+    va_end(args);
+}
+
 Token *current_token = tokens;
 
 #define CURRENT_TOKEN current_token
@@ -397,7 +413,7 @@ void parse_expression(bool result_used);
 int num_ifs;
 
 void parse_if(bool result_used) {
-    printf("Entering %s\n", __func__);
+    debug_log_parser("Entering %s\n", __func__);
     if (CURRENT_TOKEN->type != TOK_lparen) {
         fprintf(stderr, "[FSM Parser] Line %d Error: Expected '(' but got %s\n",
             CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
@@ -422,11 +438,11 @@ void parse_if(bool result_used) {
 
     push_opcode(OP_end_if, nullptr, if_num);
 
-    printf("Leaving %s\n", __func__);
+    debug_log_parser("Leaving %s\n", __func__);
 }
 
 void parse_call(bool result_used) {
-    printf("Entering %s\n", __func__);
+    debug_log_parser("Entering %s\n", __func__);
     Function *fun = get_function_by_name(&CURRENT_TOKEN->value);
     assert(fun && "Error: parse_call called without current token pointing to fn");
 
@@ -451,7 +467,7 @@ void parse_call(bool result_used) {
             MOVE_NEXT();
             push_opcode(OP_call, &fun->name, num_args);
             if (result_used) push_opcode(OP_push_result, nullptr, 0);
-            printf("Leaving %s\n", __func__);
+            debug_log_parser("Leaving %s\n", __func__);
             return;
         } else {
             parse_expression(true);
@@ -467,7 +483,7 @@ void parse_call(bool result_used) {
 
 void parse_primary(bool result_used)
 {
-    printf("Entering %s\n", __func__);
+    debug_log_parser("Entering %s\n", __func__);
     if (CURRENT_TOKEN->type == TOK_number) {
         if (result_used) push_opcode(OP_number, &CURRENT_TOKEN->value, 0);
         MOVE_NEXT();
@@ -513,12 +529,12 @@ void parse_primary(bool result_used)
                 CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
             exit(EXIT_FAILURE);
     }
-    printf("Leaving %s\n", __func__);
+    debug_log_parser("Leaving %s\n", __func__);
 }
 
 void parse_multiplicative(bool result_used)
 {
-    printf("Entering %s\n", __func__);
+    debug_log_parser("Entering %s\n", __func__);
     parse_primary(result_used);
 
     while (CURRENT_TOKEN->type == TOK_asterisk || CURRENT_TOKEN->type == TOK_slash) {
@@ -535,12 +551,12 @@ void parse_multiplicative(bool result_used)
             }
         }
     }
-    printf("Leaving %s\n", __func__);
+    debug_log_parser("Leaving %s\n", __func__);
 }
 
 void parse_additive(bool result_used)
 {
-    printf("Entering %s\n", __func__);
+    debug_log_parser("Entering %s\n", __func__);
     parse_multiplicative(result_used);
 
     while (CURRENT_TOKEN->type == TOK_plus || CURRENT_TOKEN->type == TOK_minus) {
@@ -557,12 +573,12 @@ void parse_additive(bool result_used)
             }
         }
     }
-    printf("Leaving %s\n", __func__);
+    debug_log_parser("Leaving %s\n", __func__);
 }
 
 void parse_equality(bool result_used)
 {
-    printf("Entering %s\n", __func__);
+    debug_log_parser("Entering %s\n", __func__);
     parse_additive(result_used);
 
     while (CURRENT_TOKEN->type == TOK_equal || CURRENT_TOKEN->type == TOK_unequal) {
@@ -580,12 +596,12 @@ void parse_equality(bool result_used)
         }
     }
 
-    printf("Leaving %s\n", __func__);
+    debug_log_parser("Leaving %s\n", __func__);
 }
 
 void parse_return_and_assignment(bool result_used)
 {
-    printf("Entering %s\n", __func__);
+    debug_log_parser("Entering %s\n", __func__);
     
     if (CURRENT_TOKEN->type == TOK_keyword_return) {
         MOVE_NEXT();
@@ -601,18 +617,18 @@ void parse_return_and_assignment(bool result_used)
         parse_equality(result_used);
     }
 
-    printf("Leaving %s\n", __func__);
+    debug_log_parser("Leaving %s\n", __func__);
 }
 
 void parse_expression(bool result_used)
 {
-    printf("Entering %s\n", __func__);
+    debug_log_parser("Entering %s\n", __func__);
     parse_return_and_assignment(result_used);
-    printf("Leaving %s\n", __func__);
+    debug_log_parser("Leaving %s\n", __func__);
 }
 
 void parse_function() {
-    printf("Entering %s\n", __func__);
+    debug_log_parser("Entering %s\n", __func__);
     assert(CURRENT_TOKEN->type == TOK_keyword_fn);
     MOVE_NEXT();
 
@@ -699,11 +715,11 @@ void parse_function() {
         }
     }
 
-    printf("Leaving %s\n", __func__);
+    debug_log_parser("Leaving %s\n", __func__);
 }
 
 void parse_program() {
-    printf("Entering %s\n", __func__);
+    debug_log_parser("Entering %s\n", __func__);
     while (1) {
         if (CURRENT_TOKEN->type == TOK_keyword_fn) {
             parse_function();
@@ -716,11 +732,11 @@ void parse_program() {
             exit(EXIT_FAILURE);
         }
     }
-    printf("Leaving %s\n", __func__);
+    debug_log_parser("Leaving %s\n", __func__);
 }
 
-void output_asm() {
-    FILE *file = fopen("out.asm", "w");
+void output_asm(const char *asm_file_name) {
+    FILE *file = fopen(asm_file_name, "w");
 
     const char* header =
     "format ELF64 executable\n"
@@ -735,7 +751,7 @@ void output_asm() {
     // The print function and some other assembly snippets are copied
     // from the Porth compiler https://gitlab.com/tsoding/porth which
     // was also the main inspiration for me to start this project.
-    
+
     const char *print_function =
     "fn_print:\n"
     "mov rdi, [rsp+8]\n"
@@ -874,6 +890,8 @@ void output_asm() {
     fclose(file);
 }
 
+bool debug_tokens = false;
+bool debug_opcodes = false;
 
 int main (int argc, const char *argv[]) {
     
@@ -886,8 +904,18 @@ int main (int argc, const char *argv[]) {
     read_file(&input, argv[1]);
 
     tokenizer(&input);
-    dump_tokens();
+
+    if(debug_tokens)
+        dump_tokens();
+
     parse_program();
-    dump_opcodes();
-    output_asm();
+    
+    if (debug_opcodes)
+        dump_opcodes();
+
+    const char *asm_file_name = "out.asm";
+    output_asm(asm_file_name);
+
+    printf ("Compilation of '%s' to '%s' was succesfull. You can now run 'fasm %s' to generate the executable.\n",
+        argv[1], asm_file_name, asm_file_name);
 }
