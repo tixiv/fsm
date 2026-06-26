@@ -134,14 +134,14 @@ void read_string(SV *str, SV *input) {
     X(TOK_number) \
     X(TOK_eof) \
 
-enum TokenType {
+enum TokenKind {
 #define X(name) name,
     TOKEN_LIST
 #undef X
 };
 
-const char *token_type_name(enum TokenType type) {
-    switch (type) {
+const char *token_kind_name(enum TokenKind kind) {
+    switch (kind) {
 #define X(name) case name: return #name;
         TOKEN_LIST
 #undef X
@@ -149,7 +149,7 @@ const char *token_type_name(enum TokenType type) {
 }
 
 typedef struct {
-    int type;
+    int kind;
     SV value;
     int line_number;
 } Token;
@@ -158,8 +158,8 @@ typedef struct {
 Token tokens[1000];
 int num_tokens;
 
-void push_token(int type, SV *value, int line_number) {
-    tokens[num_tokens].type = type;
+void push_token(int kind, SV *value, int line_number) {
+    tokens[num_tokens].kind = kind;
     if (value)
         sv_clone(&tokens[num_tokens].value, value);
     
@@ -273,9 +273,9 @@ void dump_tokens() {
     for (int i=0; i<num_tokens; i++) {
         Token *t = &tokens[i];
         if (t->value.begin) {
-            printf("[%2d: %s, \"" SV_FMT "\"]\n", t->line_number, token_type_name(t->type), SV_prnt(t->value));
+            printf("[%2d: %s, \"" SV_FMT "\"]\n", t->line_number, token_kind_name(t->kind), SV_prnt(t->value));
         } else {
-            printf("[%2d: %s]\n", t->line_number, token_type_name(t->type));
+            printf("[%2d: %s]\n", t->line_number, token_kind_name(t->kind));
         }
     }
 }
@@ -414,9 +414,9 @@ int num_ifs;
 
 void parse_if(bool result_used) {
     debug_log_parser("Entering %s\n", __func__);
-    if (CURRENT_TOKEN->type != TOK_lparen) {
+    if (CURRENT_TOKEN->kind != TOK_lparen) {
         fprintf(stderr, "[FSM Parser] Line %d Error: Expected '(' but got %s\n",
-            CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+            CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
         exit(EXIT_FAILURE);
     }
     MOVE_NEXT();
@@ -424,9 +424,9 @@ void parse_if(bool result_used) {
     // parse if clause
     parse_expression(true);
 
-    if (CURRENT_TOKEN->type != TOK_rparen) {
+    if (CURRENT_TOKEN->kind != TOK_rparen) {
         fprintf(stderr, "[FSM Parser] Line %d Error: Expected ')' but got %s\n",
-            CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+            CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
         exit(EXIT_FAILURE);
     }
     MOVE_NEXT();
@@ -448,9 +448,9 @@ void parse_call(bool result_used) {
 
     MOVE_NEXT();
 
-    if (CURRENT_TOKEN->type != TOK_lparen) {
+    if (CURRENT_TOKEN->kind != TOK_lparen) {
         fprintf(stderr, "[FSM Parser] Line %d Error: Expected '(' but got %s\n",
-            CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+            CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
         exit(EXIT_FAILURE);
     }
     MOVE_NEXT();
@@ -458,7 +458,7 @@ void parse_call(bool result_used) {
     int num_args = 0;
 
     while (1) {
-        if (CURRENT_TOKEN->type == TOK_rparen) {
+        if (CURRENT_TOKEN->kind == TOK_rparen) {
             if (num_args != fun->num_arguments) {
                 fprintf(stderr, "[FSM Parser] Line %d Error: Incorrect number of function arguments to '" SV_FMT "'. Expected %d but got %d\n",
                     CURRENT_TOKEN->line_number, SV_prnt(fun->name), fun->num_arguments, num_args);
@@ -472,7 +472,7 @@ void parse_call(bool result_used) {
         } else {
             parse_expression(true);
             num_args++;
-            while (CURRENT_TOKEN->type == TOK_komma) {
+            while (CURRENT_TOKEN->kind == TOK_komma) {
                 MOVE_NEXT();
                 parse_expression(true);
                 num_args++;
@@ -484,15 +484,15 @@ void parse_call(bool result_used) {
 void parse_primary(bool result_used)
 {
     debug_log_parser("Entering %s\n", __func__);
-    if (CURRENT_TOKEN->type == TOK_number) {
+    if (CURRENT_TOKEN->kind == TOK_number) {
         if (result_used) push_opcode(OP_number, &CURRENT_TOKEN->value, 0);
         MOVE_NEXT();
     }
-    else if (CURRENT_TOKEN->type == TOK_string) {
+    else if (CURRENT_TOKEN->kind == TOK_string) {
         if (result_used) push_opcode(OP_string, &CURRENT_TOKEN->value, 0);
         MOVE_NEXT();
     }
-    else if (CURRENT_TOKEN->type == TOK_identifier) {
+    else if (CURRENT_TOKEN->kind == TOK_identifier) {
         if (get_function_by_name(&CURRENT_TOKEN->value)) {
             parse_call(result_used);
         }
@@ -507,26 +507,26 @@ void parse_primary(bool result_used)
             exit(EXIT_FAILURE);
         }
     }
-    else if (CURRENT_TOKEN->type == TOK_lparen) {
+    else if (CURRENT_TOKEN->kind == TOK_lparen) {
         MOVE_NEXT();
         parse_expression(result_used);
 
-        if (CURRENT_TOKEN->type != TOK_rparen)
+        if (CURRENT_TOKEN->kind != TOK_rparen)
         {
             fprintf(stderr, "[FSM Parser] Line %d Error: Expected ')' but got %s\n",
-                CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+                CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
             exit(EXIT_FAILURE);
         }
         MOVE_NEXT();
     }
-    else if (CURRENT_TOKEN->type == TOK_keyword_if) {
+    else if (CURRENT_TOKEN->kind == TOK_keyword_if) {
         MOVE_NEXT();
         parse_if(result_used);
     }
     else {
 
         fprintf(stderr, "[FSM Parser] Line %d Error: Expected expression but got %s\n",
-                CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+                CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
             exit(EXIT_FAILURE);
     }
     debug_log_parser("Leaving %s\n", __func__);
@@ -537,8 +537,8 @@ void parse_multiplicative(bool result_used)
     debug_log_parser("Entering %s\n", __func__);
     parse_primary(result_used);
 
-    while (CURRENT_TOKEN->type == TOK_asterisk || CURRENT_TOKEN->type == TOK_slash) {
-        int type = CURRENT_TOKEN->type;
+    while (CURRENT_TOKEN->kind == TOK_asterisk || CURRENT_TOKEN->kind == TOK_slash) {
+        int type = CURRENT_TOKEN->kind;
 
         MOVE_NEXT();
         parse_primary(result_used);
@@ -559,8 +559,8 @@ void parse_additive(bool result_used)
     debug_log_parser("Entering %s\n", __func__);
     parse_multiplicative(result_used);
 
-    while (CURRENT_TOKEN->type == TOK_plus || CURRENT_TOKEN->type == TOK_minus) {
-        int type = CURRENT_TOKEN->type;
+    while (CURRENT_TOKEN->kind == TOK_plus || CURRENT_TOKEN->kind == TOK_minus) {
+        int type = CURRENT_TOKEN->kind;
 
         MOVE_NEXT();
         parse_multiplicative(result_used);
@@ -581,8 +581,8 @@ void parse_equality(bool result_used)
     debug_log_parser("Entering %s\n", __func__);
     parse_additive(result_used);
 
-    while (CURRENT_TOKEN->type == TOK_equal || CURRENT_TOKEN->type == TOK_unequal) {
-        int type = CURRENT_TOKEN->type;
+    while (CURRENT_TOKEN->kind == TOK_equal || CURRENT_TOKEN->kind == TOK_unequal) {
+        int type = CURRENT_TOKEN->kind;
 
         MOVE_NEXT();
         parse_additive(result_used);
@@ -603,9 +603,9 @@ void parse_return_and_assignment(bool result_used)
 {
     debug_log_parser("Entering %s\n", __func__);
     
-    if (CURRENT_TOKEN->type == TOK_keyword_return) {
+    if (CURRENT_TOKEN->kind == TOK_keyword_return) {
         MOVE_NEXT();
-        if (CURRENT_TOKEN->type == TOK_semicolon)
+        if (CURRENT_TOKEN->kind == TOK_semicolon)
         {
             push_opcode(OP_return, nullptr, 0);
         }
@@ -629,21 +629,21 @@ void parse_expression(bool result_used)
 
 void parse_function() {
     debug_log_parser("Entering %s\n", __func__);
-    assert(CURRENT_TOKEN->type == TOK_keyword_fn);
+    assert(CURRENT_TOKEN->kind == TOK_keyword_fn);
     MOVE_NEXT();
 
-    if (CURRENT_TOKEN->type != TOK_identifier) {
+    if (CURRENT_TOKEN->kind != TOK_identifier) {
         fprintf(stderr, "[FSM Parser] Line %d Error: Expected function name but got %s\n",
-            CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+            CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
         exit(EXIT_FAILURE);
     }
 
     SV *function_name = &CURRENT_TOKEN->value;
     MOVE_NEXT();
 
-    if (CURRENT_TOKEN->type != TOK_lparen) {
+    if (CURRENT_TOKEN->kind != TOK_lparen) {
         fprintf(stderr, "[FSM Parser] Line %d Error: Expected '(' but got %s\n",
-            CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+            CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
         exit(EXIT_FAILURE);
     }
     MOVE_NEXT();
@@ -651,27 +651,27 @@ void parse_function() {
     // Function arguments
     reset_args();
     while (1) {
-        if (CURRENT_TOKEN->type == TOK_rparen) {
+        if (CURRENT_TOKEN->kind == TOK_rparen) {
             MOVE_NEXT();
             break;
         }
-        else if(CURRENT_TOKEN->type == TOK_identifier) {
+        else if(CURRENT_TOKEN->kind == TOK_identifier) {
             push_arg(&CURRENT_TOKEN->value);
             MOVE_NEXT();
-            if(CURRENT_TOKEN->type == TOK_komma) {
+            if(CURRENT_TOKEN->kind == TOK_komma) {
                 MOVE_NEXT();
             }
         }
         else {
             fprintf(stderr, "[FSM Parser] Line %d Error: Expected ')' or function argument but got %s\n",
-                CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+                CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
             exit(EXIT_FAILURE);
         }
     }
     
-    if (CURRENT_TOKEN->type != TOK_lbrace) {
+    if (CURRENT_TOKEN->kind != TOK_lbrace) {
         fprintf(stderr, "[FSM Parser] Line %d Error: Expected '{' but got %s\n",
-            CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+            CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
         exit(EXIT_FAILURE);
     }
     MOVE_NEXT();
@@ -681,21 +681,21 @@ void parse_function() {
 
     // function body
     while(1) {
-        if (CURRENT_TOKEN->type == TOK_eof) {
+        if (CURRENT_TOKEN->kind == TOK_eof) {
             fprintf(stderr, "[FSM Parser] Line %d Error: encountered EOF while parsing function body\n", CURRENT_TOKEN->line_number);
             exit(EXIT_FAILURE);
         }
-        else if (CURRENT_TOKEN->type == TOK_semicolon) {
+        else if (CURRENT_TOKEN->kind == TOK_semicolon) {
             MOVE_NEXT();
         }
-        else if (CURRENT_TOKEN->type == TOK_rbrace) {
+        else if (CURRENT_TOKEN->kind == TOK_rbrace) {
             MOVE_NEXT();
             push_opcode(OP_return, function_name, 0);
             break;
         }
-        else if (CURRENT_TOKEN->type == TOK_keyword_return) {
+        else if (CURRENT_TOKEN->kind == TOK_keyword_return) {
             MOVE_NEXT();
-            if (CURRENT_TOKEN->type == TOK_semicolon)
+            if (CURRENT_TOKEN->kind == TOK_semicolon)
             {
                 push_opcode(OP_return, function_name, 0);
             }
@@ -706,7 +706,7 @@ void parse_function() {
         }
         else {
             parse_expression(false);
-            if (CURRENT_TOKEN->type != TOK_semicolon) {
+            if (CURRENT_TOKEN->kind != TOK_semicolon) {
                 fprintf(stderr, "[FSM Parser] Line %d Error: missing ';'\n", CURRENT_TOKEN->line_number);
                 exit(EXIT_FAILURE);
             } else {
@@ -721,14 +721,14 @@ void parse_function() {
 void parse_program() {
     debug_log_parser("Entering %s\n", __func__);
     while (1) {
-        if (CURRENT_TOKEN->type == TOK_keyword_fn) {
+        if (CURRENT_TOKEN->kind == TOK_keyword_fn) {
             parse_function();
         }
-        else if (CURRENT_TOKEN->type == TOK_eof) {
+        else if (CURRENT_TOKEN->kind == TOK_eof) {
             return;
         } else {
             fprintf(stderr, "[FSM Parser] Line %d Error: Expected 'fn' or EOF but got %s\n",
-                CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+                CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
             exit(EXIT_FAILURE);
         }
     }
@@ -886,6 +886,8 @@ void output_asm(const char *asm_file_name) {
                 break;
         }
     }
+
+
 
     fclose(file);
 }
