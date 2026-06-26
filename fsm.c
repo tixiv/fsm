@@ -96,7 +96,6 @@ void read_number(SV *num, SV *input) {
     }
 }
 
-
 void read_string(SV *str, SV *input) {
     sv_pop(input); // initial '"'
     str->begin = input->begin;
@@ -115,6 +114,7 @@ void read_string(SV *str, SV *input) {
 
 #define TOKEN_LIST \
     X(TOK_keyword_fn) \
+    X(TOK_keyword_let) \
     X(TOK_keyword_return) \
     X(TOK_keyword_if) \
     X(TOK_lparen) \
@@ -125,6 +125,7 @@ void read_string(SV *str, SV *input) {
     X(TOK_minus) \
     X(TOK_asterisk) \
     X(TOK_slash) \
+    X(TOK_equal_assign) \
     X(TOK_equal) \
     X(TOK_unequal) \
     X(TOK_komma) \
@@ -170,6 +171,9 @@ void push_token(int kind, SV *value, int line_number) {
 void handle_word(SV *word, int line_number) {
     if (sv_compare_cstr(word, "fn")) {
         push_token(TOK_keyword_fn, nullptr, line_number);
+    }
+    else if (sv_compare_cstr(word, "let")) {
+        push_token(TOK_keyword_let, nullptr, line_number);
     }
     else if (sv_compare_cstr(word, "return")) {
         push_token(TOK_keyword_return, nullptr, line_number);
@@ -256,6 +260,10 @@ void tokenizer(SV *code) {
             sv_pop(code);  sv_pop(code);
             push_token(TOK_unequal, nullptr, line_number);
         }
+        else if (c == '=') {
+            sv_pop(code);
+            push_token(TOK_equal_assign, nullptr, line_number);
+        }
         else if ('"' == c) {
             SV str;
             read_string(&str, code);
@@ -294,17 +302,19 @@ void dump_tokens() {
     X(OP_call) \
     X(OP_push_result) \
     X(OP_push_arg) \
+    X(OP_push_local_var) \
+    X(OP_assign_local_var) \
     X(OP_if) \
     X(OP_end_if) \
-
-enum Op_Type {
+    
+enum Op_Kind {
 #define X(name) name,
     OPCODE_LIST
 #undef X
 };
 
-const char *opcode_type_name(enum Op_Type type) {
-    switch (type) {
+const char *opcode_name(enum Op_Kind kind) {
+    switch (kind) {
 #define X(name) case name: return #name;
         OPCODE_LIST
 #undef X
@@ -312,7 +322,7 @@ const char *opcode_type_name(enum Op_Type type) {
 }
 
 typedef struct {
-    int type;
+    int kind;
     SV string_value;
     uint64_t u64_value;
 } Opcode;
@@ -320,20 +330,22 @@ typedef struct {
 Opcode opcodes[1000];
 size_t num_opcodes;
 
-void push_opcode(int type, SV *value, uint64_t u64_value) {
-    opcodes[num_opcodes].type = type;
+Opcode *push_opcode(int kind, SV *value, uint64_t u64_value) {
+    opcodes[num_opcodes].kind = kind;
     opcodes[num_opcodes].u64_value = u64_value;
     if (value) sv_clone(&opcodes[num_opcodes].string_value, value);
     num_opcodes++;
+
+    return &opcodes[num_opcodes-1];
 }
 
 void dump_opcodes() {
     for (int i=0; i<num_opcodes; i++) {
         Opcode *t = &opcodes[i];
         if (t->string_value.begin) {
-            printf("[%s, \"" SV_FMT "\"]\n", opcode_type_name(t->type), SV_prnt(t->string_value));
+            printf("[%s, \"" SV_FMT "\"]\n", opcode_name(t->kind), SV_prnt(t->string_value));
         } else {
-            printf("[%s, %lu]\n", opcode_type_name(t->type), t->u64_value);
+            printf("[%s, %lu]\n", opcode_name(t->kind), t->u64_value);
         }
     }
 }
@@ -382,6 +394,18 @@ void debug_log_parser(const char * fmt, ...) {
     va_end(args);
 }
 
+void parser_error(int line_number, const char * fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    fprintf(stderr, "[FSM Parser] Line %d Error: ", line_number);
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
+
+    exit(EXIT_FAILURE);
+    va_end(args);
+}
+
 Token *current_token = tokens;
 
 #define CURRENT_TOKEN current_token
@@ -408,6 +432,27 @@ int get_arg_by_name(SV *name) {
     return -1;
 }
 
+
+int num_local_vars = 0;
+SV local_var_names[100];
+
+void reset_local_vars() {
+    num_local_vars = 0;
+}
+
+void push_local_var(SV *name) {
+    local_var_names[num_local_vars++] = *name;
+}
+
+int get_local_var_by_name(SV *name) {
+    for (int i=0; i<num_local_vars; i++) {
+        if (sv_equal(&local_var_names[i], name)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 void parse_expression(bool result_used);
 
 int num_ifs;
@@ -415,9 +460,8 @@ int num_ifs;
 void parse_if(bool result_used) {
     debug_log_parser("Entering %s\n", __func__);
     if (CURRENT_TOKEN->kind != TOK_lparen) {
-        fprintf(stderr, "[FSM Parser] Line %d Error: Expected '(' but got %s\n",
-            CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
-        exit(EXIT_FAILURE);
+        parser_error(CURRENT_TOKEN->line_number, "Expected '(' but got %s",
+            token_kind_name(CURRENT_TOKEN->kind));
     }
     MOVE_NEXT();
 
@@ -425,9 +469,8 @@ void parse_if(bool result_used) {
     parse_expression(true);
 
     if (CURRENT_TOKEN->kind != TOK_rparen) {
-        fprintf(stderr, "[FSM Parser] Line %d Error: Expected ')' but got %s\n",
-            CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
-        exit(EXIT_FAILURE);
+        parser_error(CURRENT_TOKEN->line_number, "Expected ')' but got %s",
+            token_kind_name(CURRENT_TOKEN->kind));
     }
     MOVE_NEXT();
 
@@ -449,9 +492,8 @@ void parse_call(bool result_used) {
     MOVE_NEXT();
 
     if (CURRENT_TOKEN->kind != TOK_lparen) {
-        fprintf(stderr, "[FSM Parser] Line %d Error: Expected '(' but got %s\n",
-            CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
-        exit(EXIT_FAILURE);
+        parser_error(CURRENT_TOKEN->line_number, "Expected '(' but got %s",
+            token_kind_name(CURRENT_TOKEN->kind));
     }
     MOVE_NEXT();
 
@@ -460,9 +502,8 @@ void parse_call(bool result_used) {
     while (1) {
         if (CURRENT_TOKEN->kind == TOK_rparen) {
             if (num_args != fun->num_arguments) {
-                fprintf(stderr, "[FSM Parser] Line %d Error: Incorrect number of function arguments to '" SV_FMT "'. Expected %d but got %d\n",
-                    CURRENT_TOKEN->line_number, SV_prnt(fun->name), fun->num_arguments, num_args);
-                exit(EXIT_FAILURE);
+                parser_error(CURRENT_TOKEN->line_number, "Incorrect number of function arguments to '" SV_FMT "'. Expected %d but got %d",
+                    SV_prnt(fun->name), fun->num_arguments, num_args);
             }
             MOVE_NEXT();
             push_opcode(OP_call, &fun->name, num_args);
@@ -496,15 +537,19 @@ void parse_primary(bool result_used)
         if (get_function_by_name(&CURRENT_TOKEN->value)) {
             parse_call(result_used);
         }
+        else if (get_local_var_by_name(&CURRENT_TOKEN->value) != -1) {
+            int offset = get_local_var_by_name(&CURRENT_TOKEN->value);
+            if (result_used) push_opcode(OP_push_local_var, &CURRENT_TOKEN->value, offset);
+            MOVE_NEXT();
+        }
         else if (get_arg_by_name(&CURRENT_TOKEN->value) != -1) {
             int offset = get_arg_by_name(&CURRENT_TOKEN->value);
             if (result_used) push_opcode(OP_push_arg, &CURRENT_TOKEN->value, num_args -1 - offset);
             MOVE_NEXT();
         }
         else {
-            fprintf(stderr, "[FSM Parser] Line %d Error: Undefined identifier '" SV_FMT "'\n",
-                CURRENT_TOKEN->line_number, SV_prnt(CURRENT_TOKEN->value));
-            exit(EXIT_FAILURE);
+            parser_error(CURRENT_TOKEN->line_number, "Undefined identifier '" SV_FMT "'",
+                SV_prnt(CURRENT_TOKEN->value));
         }
     }
     else if (CURRENT_TOKEN->kind == TOK_lparen) {
@@ -513,9 +558,8 @@ void parse_primary(bool result_used)
 
         if (CURRENT_TOKEN->kind != TOK_rparen)
         {
-            fprintf(stderr, "[FSM Parser] Line %d Error: Expected ')' but got %s\n",
-                CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
-            exit(EXIT_FAILURE);
+            parser_error(CURRENT_TOKEN->line_number, "Expected ')' but got %s",
+                token_kind_name(CURRENT_TOKEN->kind));
         }
         MOVE_NEXT();
     }
@@ -525,9 +569,8 @@ void parse_primary(bool result_used)
     }
     else {
 
-        fprintf(stderr, "[FSM Parser] Line %d Error: Expected expression but got %s\n",
-                CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
-            exit(EXIT_FAILURE);
+        parser_error(CURRENT_TOKEN->line_number, "Expected expression but got %s",
+                token_kind_name(CURRENT_TOKEN->kind));
     }
     debug_log_parser("Leaving %s\n", __func__);
 }
@@ -538,13 +581,13 @@ void parse_multiplicative(bool result_used)
     parse_primary(result_used);
 
     while (CURRENT_TOKEN->kind == TOK_asterisk || CURRENT_TOKEN->kind == TOK_slash) {
-        int type = CURRENT_TOKEN->kind;
+        int kind = CURRENT_TOKEN->kind;
 
         MOVE_NEXT();
         parse_primary(result_used);
 
         if (result_used) {
-            if (type == TOK_asterisk) {
+            if (kind == TOK_asterisk) {
                 push_opcode(OP_mul, nullptr, 0);
             } else {
                 push_opcode(OP_div, nullptr, 0);
@@ -560,13 +603,13 @@ void parse_additive(bool result_used)
     parse_multiplicative(result_used);
 
     while (CURRENT_TOKEN->kind == TOK_plus || CURRENT_TOKEN->kind == TOK_minus) {
-        int type = CURRENT_TOKEN->kind;
+        int kind = CURRENT_TOKEN->kind;
 
         MOVE_NEXT();
         parse_multiplicative(result_used);
 
         if (result_used) {
-            if (type == TOK_plus) {
+            if (kind == TOK_plus) {
                 push_opcode(OP_add, nullptr, 0);
             } else {
                 push_opcode(OP_sub, nullptr, 0);
@@ -582,13 +625,13 @@ void parse_equality(bool result_used)
     parse_additive(result_used);
 
     while (CURRENT_TOKEN->kind == TOK_equal || CURRENT_TOKEN->kind == TOK_unequal) {
-        int type = CURRENT_TOKEN->kind;
+        int kind = CURRENT_TOKEN->kind;
 
         MOVE_NEXT();
         parse_additive(result_used);
 
         if (result_used) {
-            if (type == TOK_equal) {
+            if (kind == TOK_equal) {
                 push_opcode(OP_equal, nullptr, 0);
             } else {
                 push_opcode(OP_unequal, nullptr, 0);
@@ -613,7 +656,30 @@ void parse_return_and_assignment(bool result_used)
             parse_equality(true);
             push_opcode(OP_return, nullptr, 1);
         }
-    } else {
+    }
+    else if (CURRENT_TOKEN->kind == TOK_keyword_let) {
+        MOVE_NEXT();
+        
+        if (CURRENT_TOKEN->kind != TOK_identifier) {
+            parser_error(CURRENT_TOKEN->line_number, "Expected identifier, but got %s",
+                token_kind_name(CURRENT_TOKEN->kind));
+        }
+        push_local_var(&CURRENT_TOKEN->value);
+        MOVE_NEXT();
+
+        if (CURRENT_TOKEN->kind == TOK_equal_assign) {
+            MOVE_NEXT();
+            parse_equality(true);
+            push_opcode(OP_assign_local_var, nullptr, num_local_vars-1);
+        }
+        else if (CURRENT_TOKEN->kind == TOK_semicolon) {
+            // just declaring the variable without assigning it
+        } else {
+            parser_error(CURRENT_TOKEN->line_number, "Expected '=' or ';', but got %s",
+                token_kind_name(CURRENT_TOKEN->kind));
+        }
+    }
+    else {
         parse_equality(result_used);
     }
 
@@ -629,27 +695,28 @@ void parse_expression(bool result_used)
 
 void parse_function() {
     debug_log_parser("Entering %s\n", __func__);
+    
+    reset_args();
+    reset_local_vars();
+
     assert(CURRENT_TOKEN->kind == TOK_keyword_fn);
     MOVE_NEXT();
 
     if (CURRENT_TOKEN->kind != TOK_identifier) {
-        fprintf(stderr, "[FSM Parser] Line %d Error: Expected function name but got %s\n",
-            CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
-        exit(EXIT_FAILURE);
+        parser_error(CURRENT_TOKEN->line_number, "Expected function name but got %s",
+            token_kind_name(CURRENT_TOKEN->kind));
     }
 
     SV *function_name = &CURRENT_TOKEN->value;
     MOVE_NEXT();
 
     if (CURRENT_TOKEN->kind != TOK_lparen) {
-        fprintf(stderr, "[FSM Parser] Line %d Error: Expected '(' but got %s\n",
-            CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
-        exit(EXIT_FAILURE);
+        parser_error(CURRENT_TOKEN->line_number, "Expected '(' but got %s",
+            token_kind_name(CURRENT_TOKEN->kind));
     }
     MOVE_NEXT();
 
     // Function arguments
-    reset_args();
     while (1) {
         if (CURRENT_TOKEN->kind == TOK_rparen) {
             MOVE_NEXT();
@@ -663,27 +730,24 @@ void parse_function() {
             }
         }
         else {
-            fprintf(stderr, "[FSM Parser] Line %d Error: Expected ')' or function argument but got %s\n",
-                CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
-            exit(EXIT_FAILURE);
+            parser_error(CURRENT_TOKEN->line_number, "Expected ')' or function argument but got %s",
+                token_kind_name(CURRENT_TOKEN->kind));
         }
     }
     
     if (CURRENT_TOKEN->kind != TOK_lbrace) {
-        fprintf(stderr, "[FSM Parser] Line %d Error: Expected '{' but got %s\n",
-            CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
-        exit(EXIT_FAILURE);
+        parser_error(CURRENT_TOKEN->line_number, "Expected '{' but got %s",
+            token_kind_name(CURRENT_TOKEN->kind));
     }
     MOVE_NEXT();
 
     push_function(function_name, num_args);
-    push_opcode(OP_begin_fn, function_name, num_args);
+    Opcode *begin_fn_opcode = push_opcode(OP_begin_fn, function_name, 0);
 
     // function body
     while(1) {
         if (CURRENT_TOKEN->kind == TOK_eof) {
-            fprintf(stderr, "[FSM Parser] Line %d Error: encountered EOF while parsing function body\n", CURRENT_TOKEN->line_number);
-            exit(EXIT_FAILURE);
+            parser_error(CURRENT_TOKEN->line_number, "encountered EOF while parsing function body");
         }
         else if (CURRENT_TOKEN->kind == TOK_semicolon) {
             MOVE_NEXT();
@@ -707,13 +771,14 @@ void parse_function() {
         else {
             parse_expression(false);
             if (CURRENT_TOKEN->kind != TOK_semicolon) {
-                fprintf(stderr, "[FSM Parser] Line %d Error: missing ';'\n", CURRENT_TOKEN->line_number);
-                exit(EXIT_FAILURE);
+                parser_error(CURRENT_TOKEN->line_number, "missing ';'");
             } else {
                 MOVE_NEXT();
             }
         }
     }
+
+    begin_fn_opcode->u64_value = num_local_vars;
 
     debug_log_parser("Leaving %s\n", __func__);
 }
@@ -727,9 +792,8 @@ void parse_program() {
         else if (CURRENT_TOKEN->kind == TOK_eof) {
             return;
         } else {
-            fprintf(stderr, "[FSM Parser] Line %d Error: Expected 'fn' or EOF but got %s\n",
-                CURRENT_TOKEN->line_number, token_kind_name(CURRENT_TOKEN->kind));
-            exit(EXIT_FAILURE);
+            parser_error(CURRENT_TOKEN->line_number, "Expected 'fn' or EOF but got %s",
+                token_kind_name(CURRENT_TOKEN->kind));
         }
     }
     debug_log_parser("Leaving %s\n", __func__);
@@ -794,16 +858,18 @@ void output_asm(const char *asm_file_name) {
     for (int i=0; i<num_opcodes; i++) {
         Opcode *t = &opcodes[i];
 
-        switch(t->type) {
+        switch(t->kind) {
             case OP_begin_fn:
                 fprintf(file,"; ------- begin_fn ---------\n");
                 fprintf(file,"fn_" SV_FMT ":\n", SV_prnt(t->string_value));
                 fprintf(file,"\t" "push rbp\n");
-                fprintf(file,"\t" "mov  rbp, rsp\n");
+                fprintf(file,"\t" "mov rbp, rsp\n");
+                fprintf(file,"\t" "sub rsp, %lu\n", t->u64_value * 8);
                 break;
             case OP_return:
                 fprintf(file,"; -------- return ----------\n");
                 if (t->u64_value) fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "mov rsp, rbp\n");
                 fprintf(file,"\t" "pop rbp\n");
                 fprintf(file,"\t" "ret\n");
                 break;
@@ -872,6 +938,16 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "mov rax, [rbp+%lu]\n", 16 + 8 * t->u64_value);
                 fprintf(file,"\t" "push rax\n");
                 break;
+            case OP_push_local_var:
+                fprintf(file,"; ------ push_local_var ----\n");
+                fprintf(file,"\t" "mov rax, [rbp-%lu]\n", 8 + 8 * t->u64_value);
+                fprintf(file,"\t" "push rax\n");
+                break;
+            case OP_assign_local_var:
+                fprintf(file,"; ----- assign_local_var ---\n");
+                fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "mov [rbp-%lu],rax\n", 8 + 8 * t->u64_value);
+                break;
             case OP_if:
                 fprintf(file,"; ------------ if ----------\n");
                 fprintf(file,"\t" "pop rax\n");
@@ -883,6 +959,10 @@ void output_asm(const char *asm_file_name) {
             case OP_end_if:
                 fprintf(file,"; --------- end_if ---------\n");
                 fprintf(file,"end_if_%lu:\n", t->u64_value);
+                break;
+            default:
+                fprintf(stderr, "%s:%d Generating %s opcode is not implemented yet.\n", __FILE__, __LINE__, opcode_name(t->kind));
+                exit(EXIT_FAILURE);
                 break;
         }
     }

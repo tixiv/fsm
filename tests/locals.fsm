@@ -1,0 +1,16 @@
+
+fn bar(a, b) {
+    let c = a*2;
+
+    print (c+b);
+
+    return a;
+}
+
+fn main() {
+    let a = 34;
+    let b = 35;
+
+    print(a+b);
+    print(bar(13, 2));
+}
