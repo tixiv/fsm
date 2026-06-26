@@ -115,6 +115,7 @@ void read_string(SV *str, SV *input) {
 #define TOKEN_LIST \
     X(TOK_keyword_fn) \
     X(TOK_keyword_return) \
+    X(TOK_keyword_if) \
     X(TOK_lparen) \
     X(TOK_rparen) \
     X(TOK_lbrace) \
@@ -123,6 +124,8 @@ void read_string(SV *str, SV *input) {
     X(TOK_minus) \
     X(TOK_asterisk) \
     X(TOK_slash) \
+    X(TOK_equal) \
+    X(TOK_unequal) \
     X(TOK_komma) \
     X(TOK_semicolon) \
     X(TOK_identifier) \
@@ -169,6 +172,9 @@ void handle_word(SV *word, int line_number) {
     }
     else if (sv_compare_cstr(word, "return")) {
         push_token(TOK_keyword_return, nullptr, line_number);
+    }
+    else if (sv_compare_cstr(word, "if")) {
+        push_token(TOK_keyword_if, nullptr, line_number);
     }
     else {
         push_token(TOK_identifier, word, line_number);
@@ -241,6 +247,14 @@ void tokenizer(SV *code) {
             sv_pop(code);
             push_token(TOK_slash, nullptr, line_number);
         }
+        else if (sv_starts_with(code, "==")) {
+            sv_pop(code);  sv_pop(code);
+            push_token(TOK_equal, nullptr, line_number);
+        }
+        else if (sv_starts_with(code, "!=")) {
+            sv_pop(code);  sv_pop(code);
+            push_token(TOK_unequal, nullptr, line_number);
+        }
         else if ('"' == c) {
             SV str;
             read_string(&str, code);
@@ -272,11 +286,15 @@ void dump_tokens() {
     X(OP_sub) \
     X(OP_mul) \
     X(OP_div) \
+    X(OP_equal) \
+    X(OP_unequal) \
     X(OP_number) \
     X(OP_string) \
     X(OP_call) \
     X(OP_push_result) \
     X(OP_push_arg) \
+    X(OP_if) \
+    X(OP_end_if) \
 
 enum Op_Type {
 #define X(name) name,
@@ -376,6 +394,37 @@ int get_arg_by_name(SV *name) {
 
 void parse_expression(bool result_used);
 
+int num_ifs;
+
+void parse_if(bool result_used) {
+    printf("Entering %s\n", __func__);
+    if (CURRENT_TOKEN->type != TOK_lparen) {
+        fprintf(stderr, "[FSM Parser] Line %d Error: Expected '(' but got %s\n",
+            CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+        exit(EXIT_FAILURE);
+    }
+    MOVE_NEXT();
+
+    // parse if clause
+    parse_expression(true);
+
+    if (CURRENT_TOKEN->type != TOK_rparen) {
+        fprintf(stderr, "[FSM Parser] Line %d Error: Expected ')' but got %s\n",
+            CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+        exit(EXIT_FAILURE);
+    }
+    MOVE_NEXT();
+
+    int if_num = num_ifs++;
+    push_opcode(OP_if, nullptr, if_num);
+
+    parse_expression(false);
+
+    push_opcode(OP_end_if, nullptr, if_num);
+
+    printf("Leaving %s\n", __func__);
+}
+
 void parse_call(bool result_used) {
     printf("Entering %s\n", __func__);
     Function *fun = get_function_by_name(&CURRENT_TOKEN->value);
@@ -385,7 +434,7 @@ void parse_call(bool result_used) {
 
     if (CURRENT_TOKEN->type != TOK_lparen) {
         fprintf(stderr, "[FSM Parser] Line %d Error: Expected '(' but got %s\n",
-        CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
+            CURRENT_TOKEN->line_number, token_type_name(CURRENT_TOKEN->type));
         exit(EXIT_FAILURE);
     }
     MOVE_NEXT();
@@ -402,6 +451,7 @@ void parse_call(bool result_used) {
             MOVE_NEXT();
             push_opcode(OP_call, &fun->name, num_args);
             if (result_used) push_opcode(OP_push_result, nullptr, 0);
+            printf("Leaving %s\n", __func__);
             return;
         } else {
             parse_expression(true);
@@ -452,6 +502,10 @@ void parse_primary(bool result_used)
             exit(EXIT_FAILURE);
         }
         MOVE_NEXT();
+    }
+    else if (CURRENT_TOKEN->type == TOK_keyword_if) {
+        MOVE_NEXT();
+        parse_if(result_used);
     }
     else {
 
@@ -506,10 +560,54 @@ void parse_additive(bool result_used)
     printf("Leaving %s\n", __func__);
 }
 
-void parse_expression(bool result_used)
+void parse_equality(bool result_used)
 {
     printf("Entering %s\n", __func__);
     parse_additive(result_used);
+
+    while (CURRENT_TOKEN->type == TOK_equal || CURRENT_TOKEN->type == TOK_unequal) {
+        int type = CURRENT_TOKEN->type;
+
+        MOVE_NEXT();
+        parse_additive(result_used);
+
+        if (result_used) {
+            if (type == TOK_equal) {
+                push_opcode(OP_equal, nullptr, 0);
+            } else {
+                push_opcode(OP_unequal, nullptr, 0);
+            }
+        }
+    }
+
+    printf("Leaving %s\n", __func__);
+}
+
+void parse_return_and_assignment(bool result_used)
+{
+    printf("Entering %s\n", __func__);
+    
+    if (CURRENT_TOKEN->type == TOK_keyword_return) {
+        MOVE_NEXT();
+        if (CURRENT_TOKEN->type == TOK_semicolon)
+        {
+            push_opcode(OP_return, nullptr, 0);
+        }
+        else{
+            parse_equality(true);
+            push_opcode(OP_return, nullptr, 1);
+        }
+    } else {
+        parse_equality(result_used);
+    }
+
+    printf("Leaving %s\n", __func__);
+}
+
+void parse_expression(bool result_used)
+{
+    printf("Entering %s\n", __func__);
+    parse_return_and_assignment(result_used);
     printf("Leaving %s\n", __func__);
 }
 
@@ -634,7 +732,10 @@ void output_asm() {
     "mov rdi, 0\n"
     "syscall\n";
 
-    // Print function borrowed from Porth compiler
+    // The print function and some other assembly snippets are copied
+    // from the Porth compiler https://gitlab.com/tsoding/porth which
+    // was also the main inspiration for me to start this project.
+    
     const char *print_function =
     "fn_print:\n"
     "mov rdi, [rsp+8]\n"
@@ -693,14 +794,12 @@ void output_asm() {
             case OP_add:
                 fprintf(file,"; ---------- add -----------\n");
                 fprintf(file,"\t" "pop rax\n");
-                fprintf(file,"\t" "pop rbx\n");
-                fprintf(file,"\t" "add rax, rbx\n");
-                fprintf(file,"\t" "push rax\n");
+                fprintf(file,"\t" "add [rsp], rax\n");
                 break;
             case OP_sub:
                 fprintf(file,"; ---------- sub -----------\n");
-                fprintf(stderr, "%s:%d Generating OP_sub not implemented yet.\n", __FILE__, __LINE__);
-                exit(EXIT_FAILURE);
+                fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "sub [rsp], rax\n");
                 break;
             case OP_mul:
                 fprintf(file,"; ---------- mul -----------\n");
@@ -712,6 +811,26 @@ void output_asm() {
                 fprintf(file,"; ---------- div -----------\n");
                 fprintf(stderr, "%s:%d Generating OP_div not implemented yet.\n", __FILE__, __LINE__);
                 exit(EXIT_FAILURE);
+                break;
+            case OP_equal:
+                fprintf(file,"; ---------- == ------------\n");
+                fprintf(file,"\t" "mov rcx, 0\n");
+                fprintf(file,"\t" "mov rdx, 1\n");
+                fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "pop rbx\n");
+                fprintf(file,"\t" "cmp rax, rbx\n");
+                fprintf(file,"\t" "cmove rcx, rdx\n");
+                fprintf(file,"\t" "push rcx\n");
+                break;
+            case OP_unequal:
+                fprintf(file,"; ---------- != ------------\n");
+                fprintf(file,"\t" "mov rcx, 1\n");
+                fprintf(file,"\t" "mov rdx, 0\n");
+                fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "pop rbx\n");
+                fprintf(file,"\t" "cmp rax, rbx\n");
+                fprintf(file,"\t" "cmove rcx, rdx\n");
+                fprintf(file,"\t" "push rcx\n");
                 break;
             case OP_number:
                 fprintf(file,"; --------- number ---------\n");
@@ -736,6 +855,18 @@ void output_asm() {
                 fprintf(file,"; --------- push_arg -------\n");
                 fprintf(file,"\t" "mov rax, [rbp+%lu]\n", 16 + 8 * t->u64_value);
                 fprintf(file,"\t" "push rax\n");
+                break;
+            case OP_if:
+                fprintf(file,"; ------------ if ----------\n");
+                fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "or rax, rax\n");
+                fprintf(file,"\t" "jne @f\n");
+                fprintf(file,"\t" "jmp end_if_%lu\n", t->u64_value);
+                fprintf(file,"@@:\n");
+                break;
+            case OP_end_if:
+                fprintf(file,"; --------- end_if ---------\n");
+                fprintf(file,"end_if_%lu:\n", t->u64_value);
                 break;
         }
     }
