@@ -3,3 +3,4 @@ asm/
 fsm
 out
 out.asm
+build/
