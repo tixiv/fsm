@@ -130,6 +130,10 @@ void read_string(SV *str, SV *input) {
     X(TOK_equal_assign) \
     X(TOK_equal) \
     X(TOK_unequal) \
+    X(TOK_greater) \
+    X(TOK_lower) \
+    X(TOK_greater_equal) \
+    X(TOK_lower_equal) \
     X(TOK_komma) \
     X(TOK_semicolon) \
     X(TOK_identifier) \
@@ -268,6 +272,22 @@ void tokenizer(SV *code) {
             sv_pop(code);  sv_pop(code);
             push_token(TOK_unequal, nullptr, line_number);
         }
+        else if (sv_starts_with(code, ">=")) {
+            sv_pop(code);  sv_pop(code);
+            push_token(TOK_greater_equal, nullptr, line_number);
+        }
+        else if (sv_starts_with(code, "<=")) {
+            sv_pop(code);  sv_pop(code);
+            push_token(TOK_lower_equal, nullptr, line_number);
+        }
+        else if (c == '>') {
+            sv_pop(code);
+            push_token(TOK_greater, nullptr, line_number);
+        }
+        else if (c == '<') {
+            sv_pop(code);
+            push_token(TOK_lower, nullptr, line_number);
+        }
         else if (c == '=') {
             sv_pop(code);
             push_token(TOK_equal_assign, nullptr, line_number);
@@ -320,6 +340,10 @@ void debug_log_parser(const char * fmt, ...) {
     X(OP_div) \
     X(OP_equal) \
     X(OP_unequal) \
+    X(OP_compare_GT) \
+    X(OP_compare_LT) \
+    X(OP_compare_GE) \
+    X(OP_compare_LE) \
     X(OP_number) \
     X(OP_string) \
     X(OP_call) \
@@ -696,16 +720,47 @@ void parse_additive(bool result_used)
     debug_log_parser("Leaving %s\n", __func__);
 }
 
-void parse_equality(bool result_used)
+void parse_comparison(bool result_used)
 {
     debug_log_parser("Entering %s\n", __func__);
     parse_additive(result_used);
+
+    while (CURRENT_TOKEN->kind == TOK_greater || CURRENT_TOKEN->kind == TOK_lower ||
+           CURRENT_TOKEN->kind == TOK_greater_equal || CURRENT_TOKEN->kind == TOK_lower_equal) {
+        int kind = CURRENT_TOKEN->kind;
+
+        MOVE_NEXT();
+        parse_additive(result_used);
+
+        if (result_used) {
+            if (kind == TOK_greater) {
+                push_opcode(OP_compare_GT, nullptr, 0);
+            }
+            else if (kind == TOK_lower) {
+                push_opcode(OP_compare_LT, nullptr, 0);
+            }
+            else if (kind == TOK_greater_equal) {
+                push_opcode(OP_compare_GE, nullptr, 0);
+            }
+            else {
+                push_opcode(OP_compare_LE, nullptr, 0);
+            }
+        }
+    }
+
+    debug_log_parser("Leaving %s\n", __func__);
+}
+
+void parse_equality(bool result_used)
+{
+    debug_log_parser("Entering %s\n", __func__);
+    parse_comparison(result_used);
 
     while (CURRENT_TOKEN->kind == TOK_equal || CURRENT_TOKEN->kind == TOK_unequal) {
         int kind = CURRENT_TOKEN->kind;
 
         MOVE_NEXT();
-        parse_additive(result_used);
+        parse_comparison(result_used);
 
         if (result_used) {
             if (kind == TOK_equal) {
@@ -949,44 +1004,39 @@ void output_asm(const char *asm_file_name) {
     for (int i=0; i<num_opcodes; i++) {
         Opcode *t = &opcodes[i];
 
+        fprintf(file,"; ------- %s ---------\n", opcode_name(t->kind));
+
         switch(t->kind) {
             case OP_begin_fn:
-                fprintf(file,"; ------- begin_fn ---------\n");
                 fprintf(file,"fn_" SV_FMT ":\n", SV_prnt(t->string_value));
                 fprintf(file,"\t" "push rbp\n");
                 fprintf(file,"\t" "mov rbp, rsp\n");
                 fprintf(file,"\t" "sub rsp, %lu\n", t->u64_value * 8);
                 break;
             case OP_return:
-                fprintf(file,"; -------- return ----------\n");
                 if (t->u64_value) fprintf(file,"\t" "pop rax\n");
                 fprintf(file,"\t" "mov rsp, rbp\n");
                 fprintf(file,"\t" "pop rbp\n");
                 fprintf(file,"\t" "ret\n");
                 break;
             case OP_add:
-                fprintf(file,"; ---------- add -----------\n");
                 fprintf(file,"\t" "pop rax\n");
                 fprintf(file,"\t" "add [rsp], rax\n");
                 break;
             case OP_sub:
-                fprintf(file,"; ---------- sub -----------\n");
                 fprintf(file,"\t" "pop rax\n");
                 fprintf(file,"\t" "sub [rsp], rax\n");
                 break;
             case OP_mul:
-                fprintf(file,"; ---------- mul -----------\n");
                 fprintf(file,"\t" "pop rax\n");
                 fprintf(file,"\t" "mul QWORD [rsp]\n");
                 fprintf(file,"\t" "mov [rsp], rax\n");
                 break;
             case OP_div:
-                fprintf(file,"; ---------- div -----------\n");
                 fprintf(stderr, "%s:%d Generating OP_div not implemented yet.\n", __FILE__, __LINE__);
                 exit(EXIT_FAILURE);
                 break;
             case OP_equal:
-                fprintf(file,"; ---------- == ------------\n");
                 fprintf(file,"\t" "mov rcx, 0\n");
                 fprintf(file,"\t" "mov rdx, 1\n");
                 fprintf(file,"\t" "pop rax\n");
@@ -996,7 +1046,6 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "push rcx\n");
                 break;
             case OP_unequal:
-                fprintf(file,"; ---------- != ------------\n");
                 fprintf(file,"\t" "mov rcx, 1\n");
                 fprintf(file,"\t" "mov rdx, 0\n");
                 fprintf(file,"\t" "pop rax\n");
@@ -1005,42 +1054,70 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "cmove rcx, rdx\n");
                 fprintf(file,"\t" "push rcx\n");
                 break;
+            case OP_compare_GT:
+                fprintf(file,"\t" "mov rcx, 0\n");
+                fprintf(file,"\t" "mov rdx, 1\n");
+                fprintf(file,"\t" "pop rbx\n");
+                fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "cmp rax, rbx\n");
+                fprintf(file,"\t" "cmovg rcx, rdx\n");
+                fprintf(file,"\t" "push rcx\n");
+                break;
+            case OP_compare_LT:
+                fprintf(file,"\t" "mov rcx, 0\n");
+                fprintf(file,"\t" "mov rdx, 1\n");
+                fprintf(file,"\t" "pop rbx\n");
+                fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "cmp rax, rbx\n");
+                fprintf(file,"\t" "cmovl rcx, rdx\n");
+                fprintf(file,"\t" "push rcx\n");
+                break;
+            case OP_compare_GE:
+                fprintf(file,"\t" "mov rcx, 0\n");
+                fprintf(file,"\t" "mov rdx, 1\n");
+                fprintf(file,"\t" "pop rbx\n");
+                fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "cmp rax, rbx\n");
+                fprintf(file,"\t" "cmovge rcx, rdx\n");
+                fprintf(file,"\t" "push rcx\n");
+                break;
+            case OP_compare_LE:
+                fprintf(file,"\t" "mov rcx, 0\n");
+                fprintf(file,"\t" "mov rdx, 1\n");
+                fprintf(file,"\t" "pop rbx\n");
+                fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "cmp rax, rbx\n");
+                fprintf(file,"\t" "cmovle rcx, rdx\n");
+                fprintf(file,"\t" "push rcx\n");
+                break;
             case OP_number:
-                fprintf(file,"; --------- number ---------\n");
                 fprintf(file,"\t" "mov rax,%lu\n", strtoul(t->string_value.begin, 0, 10));
                 fprintf(file,"\t" "push rax\n");
                 break;
             case OP_string:
-                fprintf(file,"; --------- string ---------\n");
                 fprintf(stderr, "%s:%d Generating OP_string not implemented yet.\n", __FILE__, __LINE__);
                 exit(EXIT_FAILURE);
                 break;
             case OP_call:
-                fprintf(file,"; ---------- call ----------\n");
                 fprintf(file,"\t" "call fn_" SV_FMT "\n", SV_prnt(t->string_value));
                 fprintf(file,"\t" "add rsp, %lu\n", t->u64_value * 8);
                 break;
             case OP_push_result:
-                fprintf(file,"; ------- push_result ------\n");
                 fprintf(file,"\t" "push rax\n");
                 break;
             case OP_push_arg:
-                fprintf(file,"; --------- push_arg -------\n");
                 fprintf(file,"\t" "mov rax, [rbp+%lu]\n", 16 + 8 * t->u64_value);
                 fprintf(file,"\t" "push rax\n");
                 break;
             case OP_push_local_var:
-                fprintf(file,"; ------ push_local_var ----\n");
                 fprintf(file,"\t" "mov rax, [rbp-%lu]\n", 8 + 8 * t->u64_value);
                 fprintf(file,"\t" "push rax\n");
                 break;
             case OP_assign_local_var:
-                fprintf(file,"; ----- assign_local_var ---\n");
                 fprintf(file,"\t" "pop rax\n");
                 fprintf(file,"\t" "mov [rbp-%lu],rax\n", 8 + 8 * t->u64_value);
                 break;
             case OP_if:
-                fprintf(file,"; ------------ if ----------\n");
                 fprintf(file,"\t" "pop rax\n");
                 fprintf(file,"\t" "or rax, rax\n");
                 fprintf(file,"\t" "jne @f\n");
@@ -1051,20 +1128,16 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"@@:\n");
                 break;
             case OP_else:
-                fprintf(file,"; ---------- else ----------\n");
                 fprintf(file,"\t" "jmp end_if_%u\n", t->u32_value[0]);
                 fprintf(file,"else_%u:\n", t->u32_value[0]);
                 break;
             case OP_end_if:
-                fprintf(file,"; --------- end_if ---------\n");
                 fprintf(file,"end_if_%u:\n", t->u32_value[0]);
                 break;
             case OP_while_loop:
-                fprintf(file,"; -------- while loop ------\n");
                 fprintf(file,"while_loop_%lu:\n", t->u64_value);
                 break;
             case OP_while_check:
-                fprintf(file,"; -------- while check -----\n");
                 fprintf(file,"\t" "pop rax\n");
                 fprintf(file,"\t" "or rax, rax\n");
                 fprintf(file,"\t" "jne @f\n");
@@ -1072,7 +1145,6 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"@@:\n");
                 break;
             case OP_while_end:
-                fprintf(file,"; --------- while_end -----\n");
                 fprintf(file,"\t" "jmp while_loop_%lu\n", t->u64_value);
                 fprintf(file,"end_while_%lu:\n", t->u64_value);
                 break;
@@ -1083,13 +1155,11 @@ void output_asm(const char *asm_file_name) {
         }
     }
 
-
-
     fclose(file);
 }
 
 bool debug_tokens = false;
-bool debug_opcodes = false;
+bool debug_opcodes = true;
 
 int main (int argc, const char *argv[]) {
     
