@@ -292,6 +292,21 @@ void dump_tokens() {
     }
 }
 
+const bool enable_debug_parser = false;
+
+void debug_log_parser(const char * fmt, ...) {
+    if (!enable_debug_parser)
+        return;
+
+    va_list args;
+    va_start(args, fmt);
+
+    printf("[FSM debug parser] ");
+    vprintf(fmt, args);
+
+    va_end(args);
+}
+
 #define OPCODE_LIST \
     X(OP_begin_fn) \
     X(OP_return) \
@@ -338,6 +353,10 @@ Opcode opcodes[1000];
 size_t num_opcodes;
 
 Opcode *push_opcode(int kind, SV *value, uint64_t u64_value) {
+    if (value)
+        debug_log_parser("Push opcode %s, " SV_FMT ", %lu\n", opcode_name(kind), SV_prnt(*value), u64_value);
+    else
+        debug_log_parser("Push opcode %s, null, %lu\n", opcode_name(kind), u64_value);
     opcodes[num_opcodes].kind = kind;
     opcodes[num_opcodes].u64_value = u64_value;
     if (value) sv_clone(&opcodes[num_opcodes].string_value, value);
@@ -384,21 +403,6 @@ Function *get_function_by_name(const SV *name)
     }
     
     return nullptr;
-}
-
-const bool enable_debug_parser = false;
-
-void debug_log_parser(const char * fmt, ...) {
-    if (!enable_debug_parser)
-        return;
-
-    va_list args;
-    va_start(args, fmt);
-
-    printf("[FSM debug parser] ");
-    vprintf(fmt, args);
-
-    va_end(args);
 }
 
 void parser_error(int line_number, const char * fmt, ...) {
@@ -465,6 +469,9 @@ void parse_expression(bool result_used);
 int num_while_loops;
 void parse_while(bool result_used) {
     debug_log_parser("Entering %s\n", __func__);
+
+    if (result_used) parser_error(CURRENT_TOKEN->line_number, "'void' result of 'while' used");
+
     if (CURRENT_TOKEN->kind != TOK_lparen) {
         parser_error(CURRENT_TOKEN->line_number, "Expected '(' but got %s",
             token_kind_name(CURRENT_TOKEN->kind));
@@ -515,7 +522,7 @@ void parse_if(bool result_used) {
     int if_num = num_ifs++;
     push_opcode(OP_if, nullptr, if_num);
 
-    parse_expression(false);
+    parse_expression(result_used);
 
     push_opcode(OP_end_if, nullptr, if_num);
 
@@ -577,8 +584,14 @@ void parse_primary(bool result_used)
         }
         else if (get_local_var_by_name(&CURRENT_TOKEN->value) != -1) {
             int offset = get_local_var_by_name(&CURRENT_TOKEN->value);
-            if (result_used) push_opcode(OP_push_local_var, &CURRENT_TOKEN->value, offset);
             MOVE_NEXT();
+            if (CURRENT_TOKEN->kind == TOK_equal_assign) {
+                MOVE_NEXT();
+                parse_expression(true);
+                push_opcode(OP_assign_local_var, nullptr, offset);
+            }
+
+            if (result_used) push_opcode(OP_push_local_var, nullptr, offset);
         }
         else if (get_arg_by_name(&CURRENT_TOKEN->value) != -1) {
             int offset = get_arg_by_name(&CURRENT_TOKEN->value);
