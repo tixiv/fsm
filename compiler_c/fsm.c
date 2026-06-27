@@ -38,7 +38,7 @@ void read_file(SV *contents, const char *path)
 
 
 bool debug_tokens = false;
-bool debug_opcodes = true;
+bool debug_opcodes = false;
 
 int main (int argc, const char *argv[]) {
     
@@ -63,6 +63,6 @@ int main (int argc, const char *argv[]) {
     const char *asm_file_name = "out.asm";
     output_asm(asm_file_name);
 
-    printf ("Compilation of '%s' to '%s' was succesfull. You can now run 'fasm %s' to generate the executable.\n",
-        argv[1], asm_file_name, asm_file_name);
+    // printf ("Compilation of '%s' to '%s' was succesfull. You can now run 'fasm %s' to generate the executable.\n",
+    //    argv[1], asm_file_name, asm_file_name);
 }

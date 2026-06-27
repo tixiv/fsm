@@ -4,3 +4,4 @@ fsm
 out
 out.asm
 build/
+tests/*.out
