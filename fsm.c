@@ -117,6 +117,7 @@ void read_string(SV *str, SV *input) {
     X(TOK_keyword_let) \
     X(TOK_keyword_return) \
     X(TOK_keyword_if) \
+    X(TOK_keyword_else) \
     X(TOK_keyword_while) \
     X(TOK_lparen) \
     X(TOK_rparen) \
@@ -181,6 +182,9 @@ void handle_word(SV *word, int line_number) {
     }
     else if (sv_compare_cstr(word, "if")) {
         push_token(TOK_keyword_if, nullptr, line_number);
+    }
+    else if (sv_compare_cstr(word, "else")) {
+        push_token(TOK_keyword_else, nullptr, line_number);
     }
     else if (sv_compare_cstr(word, "while")) {
         push_token(TOK_keyword_while, nullptr, line_number);
@@ -324,6 +328,7 @@ void debug_log_parser(const char * fmt, ...) {
     X(OP_push_local_var) \
     X(OP_assign_local_var) \
     X(OP_if) \
+    X(OP_else) \
     X(OP_end_if) \
     X(OP_while_loop) \
     X(OP_while_check) \
@@ -346,7 +351,10 @@ const char *opcode_name(enum Op_Kind kind) {
 typedef struct {
     int kind;
     SV string_value;
-    uint64_t u64_value;
+    union {
+        uint64_t u64_value;
+        uint32_t u32_value[2];
+    };
 } Opcode;
 
 Opcode opcodes[1000];
@@ -510,7 +518,7 @@ void parse_if(bool result_used) {
     }
     MOVE_NEXT();
 
-    // parse if clause
+    // parse condition
     parse_expression(true);
 
     if (CURRENT_TOKEN->kind != TOK_rparen) {
@@ -520,9 +528,23 @@ void parse_if(bool result_used) {
     MOVE_NEXT();
 
     int if_num = num_ifs++;
-    push_opcode(OP_if, nullptr, if_num);
+    Opcode *if_opcode = push_opcode(OP_if, nullptr, if_num);
 
+    // parse if block
     parse_expression(result_used);
+
+    if (CURRENT_TOKEN->kind == TOK_keyword_else) {
+        MOVE_NEXT();
+        push_opcode(OP_else, nullptr, if_num);
+        if_opcode->u32_value[1] = true; // Mark has 'else'
+
+        // parse else block
+        parse_expression(result_used);
+    }
+    else if (result_used) {
+        parser_error(CURRENT_TOKEN->line_number,
+            "When using the result of an 'if' then an 'else' clause is mandatory");
+    }
 
     push_opcode(OP_end_if, nullptr, if_num);
 
@@ -725,7 +747,7 @@ void parse_scope_body(bool result_used)
             }
         }
         else {
-            bool require_semicolon = CURRENT_TOKEN->kind != TOK_lbrace;
+            bool require_semicolon = false;
             parse_expression(false);
             if (CURRENT_TOKEN->kind != TOK_semicolon) {
                 if (require_semicolon) parser_error(CURRENT_TOKEN->line_number, "missing ';'");
@@ -1022,8 +1044,20 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "pop rax\n");
                 fprintf(file,"\t" "or rax, rax\n");
                 fprintf(file,"\t" "jne @f\n");
-                fprintf(file,"\t" "jmp end_if_%lu\n", t->u64_value);
+                if (t->u32_value[1])
+                    fprintf(file,"\t" "jmp else_%u\n", t->u32_value[0]);
+                else
+                    fprintf(file,"\t" "jmp end_if_%u\n", t->u32_value[0]);
                 fprintf(file,"@@:\n");
+                break;
+            case OP_else:
+                fprintf(file,"; ---------- else ----------\n");
+                fprintf(file,"\t" "jmp end_if_%u\n", t->u32_value[0]);
+                fprintf(file,"else_%u:\n", t->u32_value[0]);
+                break;
+            case OP_end_if:
+                fprintf(file,"; --------- end_if ---------\n");
+                fprintf(file,"end_if_%u:\n", t->u32_value[0]);
                 break;
             case OP_while_loop:
                 fprintf(file,"; -------- while loop ------\n");
@@ -1041,10 +1075,6 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"; --------- while_end -----\n");
                 fprintf(file,"\t" "jmp while_loop_%lu\n", t->u64_value);
                 fprintf(file,"end_while_%lu:\n", t->u64_value);
-                break;
-            case OP_end_if:
-                fprintf(file,"; --------- end_if ---------\n");
-                fprintf(file,"end_if_%lu:\n", t->u64_value);
                 break;
             default:
                 fprintf(stderr, "%s:%d Generating %s opcode is not implemented yet.\n", __FILE__, __LINE__, opcode_name(t->kind));
