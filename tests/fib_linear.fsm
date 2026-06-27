@@ -1,0 +1,16 @@
+
+fn main() {
+    let a = 1;
+    let b = 1;
+    let count = 50;
+
+    while (count) {
+        count = count - 1;
+
+        print(a);
+
+        let c = a + b;
+        a = b;
+        b = c;
+    };
+}
