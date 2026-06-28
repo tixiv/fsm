@@ -1,6 +1,7 @@
 
 #include "tokenizer.h"
 #include "common.h"
+#include "dyn_array.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -61,16 +62,16 @@ const char *token_kind_name(enum TokenKind kind) {
     return "Undefined Token kind";
 }
 
-Token tokens[1000];
-int num_tokens;
+Dyn_array tokens_dyn;
 
 void push_token(int kind, SV *value, int line_number) {
-    tokens[num_tokens].kind = kind;
+    Token *token = (Token*) dyn_array_push(&tokens_dyn);
+
+    token->kind = kind;
     if (value)
-        sv_clone(&tokens[num_tokens].value, value);
+        token->value = *value;
     
-    tokens[num_tokens].line_number = line_number;
-    num_tokens++;
+    token->line_number = line_number;
 }
 
 void handle_word(SV *word, int line_number) {
@@ -98,7 +99,9 @@ void handle_word(SV *word, int line_number) {
 }
 
 void tokenizer(SV *code) {
+    dyn_array_init(&tokens_dyn, sizeof(Token), 16);
     int line_number = 1;
+    
     while (code->len) {
         char c = *code->begin;
         

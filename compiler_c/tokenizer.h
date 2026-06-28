@@ -1,14 +1,12 @@
 
 #include "sv.h"
+#include "dyn_array.h"
 
 typedef struct {
     int kind;
     SV value;
     int line_number;
 } Token;
-
-extern Token tokens[];
-extern int num_tokens;
 
 #define TOKEN_LIST \
     X(TOK_keyword_fn) \
@@ -48,3 +46,8 @@ enum TokenKind {
 const char *token_kind_name(enum TokenKind kind);
 void dump_tokens();
 void tokenizer(SV *code);
+
+extern Dyn_array tokens_dyn;
+
+#define num_tokens (tokens_dyn.count)
+#define tokens ((Token*)tokens_dyn.data)

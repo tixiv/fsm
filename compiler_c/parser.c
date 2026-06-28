@@ -1,5 +1,6 @@
 
 #include "parser.h"
+#include "dyn_array.h"
 #include "tokenizer.h"
 #include "opcodes.h"
 #include "common.h"
@@ -9,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
 
 const bool enable_debug_parser = false;
 
@@ -43,17 +45,25 @@ typedef struct {
     int num_arguments;
 } Function;
 
+Dyn_array functions_dyn;
 
-Function functions[1000] = {
-    {{"print", 5}, 1},
-};
-
-size_t num_functions = 1;
+#define num_functions (functions_dyn.count)
+#define functions ((Function *)functions_dyn.data)
 
 void push_function(const SV *name, int num_arguments) {
-    sv_clone(&functions[num_functions].name, name);
-    functions[num_functions].num_arguments = num_arguments;
-    num_functions++;
+    Function *f = (Function *) dyn_array_push(&functions_dyn);
+
+    f->name = *name;
+    f->num_arguments = num_arguments;
+}
+
+// The names passed to this function must be allocated in static memory
+// because the string view inside 'Function' will reference the data.
+void push_builtin_function(const char *name, int num_arguments) {
+    Function *f = (Function *) dyn_array_push(&functions_dyn);
+    f->name.begin = name;
+    f->name.len = strlen(name);
+    f->num_arguments = num_arguments;
 }
 
 Function *get_function_by_name(const SV *name)
@@ -79,7 +89,7 @@ void parser_error(int line_number, const char * fmt, ...) {
     va_end(args);
 }
 
-Token *current_token = tokens;
+Token *current_token;
 
 #define CURRENT_TOKEN current_token
 #define MOVE_NEXT() (current_token++)
@@ -560,6 +570,10 @@ void parse_function() {
 }
 
 void parse_program() {
+    dyn_array_init(&functions_dyn, sizeof(Function), 16);
+    push_builtin_function("print", 1);
+
+    current_token = tokens;
     debug_log_parser("Entering %s\n", __func__);
     while (1) {
         if (CURRENT_TOKEN->kind == TOK_keyword_fn) {
