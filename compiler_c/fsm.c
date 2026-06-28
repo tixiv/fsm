@@ -1,7 +1,9 @@
 
+#include "ast.h"
 #include "sv.h"
 #include "tokenizer.h"
 #include "parser.h"
+#include "parser_ast.h"
 #include "opcodes.h"
 #include "generator.h"
 #include <stdio.h>
@@ -54,7 +56,7 @@ int main (int argc, const char *argv[]) {
 
     if(debug_tokens)
         dump_tokens();
-
+#if 0
     parse_program();
     
     if (debug_opcodes)
@@ -62,7 +64,14 @@ int main (int argc, const char *argv[]) {
 
     const char *asm_file_name = "out.asm";
     output_asm(asm_file_name);
+#else
 
+    AST_node *ast = parse_program_ast();
+
+    ast_dump_tree(ast);
+
+
+#endif
     // printf ("Compilation of '%s' to '%s' was succesfull. You can now run 'fasm %s' to generate the executable.\n",
     //    argv[1], asm_file_name, asm_file_name);
 }

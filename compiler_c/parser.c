@@ -12,9 +12,9 @@
 #include <assert.h>
 #include <string.h>
 
-const bool enable_debug_parser = false;
+static const bool enable_debug_parser = false;
 
-void debug_log_parser(const char * fmt, ...) {
+static void debug_log_parser(const char * fmt, ...) {
     if (!enable_debug_parser)
         return;
 
@@ -45,12 +45,12 @@ typedef struct {
     int num_arguments;
 } Function;
 
-Dyn_array functions_dyn;
+static Dyn_array functions_dyn;
 
 #define num_functions (functions_dyn.count)
 #define functions ((Function *)functions_dyn.data)
 
-void push_function(const SV *name, int num_arguments) {
+static void push_function(const SV *name, int num_arguments) {
     Function *f = (Function *) dyn_array_push(&functions_dyn);
 
     f->name = *name;
@@ -59,14 +59,14 @@ void push_function(const SV *name, int num_arguments) {
 
 // The names passed to this function must be allocated in static memory
 // because the string view inside 'Function' will reference the data.
-void push_builtin_function(const char *name, int num_arguments) {
+static void push_builtin_function(const char *name, int num_arguments) {
     Function *f = (Function *) dyn_array_push(&functions_dyn);
     f->name.begin = name;
     f->name.len = strlen(name);
     f->num_arguments = num_arguments;
 }
 
-Function *get_function_by_name(const SV *name)
+static Function *get_function_by_name(const SV *name)
 {
     for (int i=0; i<num_functions; i++) {
         if(sv_equal(name, &functions[i].name)) {
@@ -77,7 +77,7 @@ Function *get_function_by_name(const SV *name)
     return nullptr;
 }
 
-void parser_error(int line_number, const char * fmt, ...) {
+static void parser_error(int line_number, const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
@@ -89,7 +89,7 @@ void parser_error(int line_number, const char * fmt, ...) {
     va_end(args);
 }
 
-Token *current_token;
+static Token *current_token;
 
 #define CURRENT_TOKEN current_token
 #define MOVE_NEXT() (current_token++)
@@ -253,7 +253,7 @@ void parse_call(bool result_used) {
     }
 }
 
-void parse_primary(bool result_used)
+static void parse_primary(bool result_used)
 {
     debug_log_parser("Entering %s\n", __func__);
     if (CURRENT_TOKEN->kind == TOK_number) {
@@ -416,7 +416,7 @@ void parse_equality(bool result_used)
 
 SV current_function_name;
 
-void parse_scope_body(bool result_used)
+static void parse_scope_body(bool result_used)
 {
     // function body
     while(1) {
@@ -508,7 +508,7 @@ void parse_expression(bool result_used)
     debug_log_parser("Leaving %s\n", __func__);
 }
 
-void parse_function() {
+static void parse_function() {
     debug_log_parser("Entering %s\n", __func__);
     
     reset_args();
