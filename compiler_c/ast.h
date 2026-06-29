@@ -14,6 +14,8 @@
     X(AST_binary) \
     X(AST_call) \
     X(AST_return) \
+    X(AST_if) \
+    X(AST_while) \
 
 typedef enum {
 #define X(name) name,
@@ -27,6 +29,7 @@ typedef struct AST_node_s {
         struct {
             struct AST_node_s *left;
             struct AST_node_s *right;
+            int token_kind;
         } binary;
 
         struct {
@@ -49,6 +52,7 @@ typedef struct AST_node_s {
         } ret;
 
         struct {
+            struct AST_node_s *initializer;
             SV name;
         } var;
 
@@ -59,6 +63,17 @@ typedef struct AST_node_s {
         struct {
             SV value;
         } str;
+
+        struct {
+            struct AST_node_s *condition;
+            struct AST_node_s *if_clause;
+            struct AST_node_s *else_clause;
+        } _if;
+
+        struct {
+            struct AST_node_s *condition;
+            struct AST_node_s *body;
+        } _while;
     };
     AST_kind kind;
     int line_number;

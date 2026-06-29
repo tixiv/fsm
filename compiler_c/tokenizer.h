@@ -9,6 +9,7 @@ typedef struct {
 } Token;
 
 #define TOKEN_LIST \
+    X(TOK_null) \
     X(TOK_keyword_fn) \
     X(TOK_keyword_let) \
     X(TOK_keyword_return) \

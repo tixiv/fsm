@@ -44,14 +44,66 @@ static Token *current_token;
 #define CT current_token
 #define MOVE_NEXT() (current_token++)
 
+static AST_node *parse_statement();
 static AST_node *parse_expression();
+static AST_node *parse_scope_body();
 
 static AST_node *parse_if() {
-    return nullptr;    
+    debug_log_parser("Entering %s\n", __func__);
+
+    AST_node *n = ast_alloc(AST_if, CT->line_number);
+    MOVE_NEXT();
+
+    if (CT->kind != TOK_lparen) {
+        parser_error(CT->line_number, "Expected '(' but got %s",
+            token_kind_name(CT->kind));
+    }
+    MOVE_NEXT();
+
+    n->_if.condition = parse_expression();
+
+    if (CT->kind != TOK_rparen) {
+        parser_error(CT->line_number, "Expected ')' but got %s",
+            token_kind_name(CT->kind));
+    }
+    MOVE_NEXT();
+
+    n->_if.if_clause = parse_statement();
+
+    if (CT->kind == TOK_keyword_else) {
+        MOVE_NEXT();
+
+        n->_if.else_clause = parse_statement();
+    }
+
+    debug_log_parser("Leaving %s\n", __func__);
+    return n;
 }
 
 static AST_node *parse_while() {
-    return nullptr;    
+    debug_log_parser("Entering %s\n", __func__);
+    AST_node *n = ast_alloc(AST_while, CT->line_number);
+    MOVE_NEXT();
+
+    if (CT->kind != TOK_lparen) {
+        parser_error(CT->line_number, "Expected '(' but got %s",
+            token_kind_name(CT->kind));
+    }
+    MOVE_NEXT();
+
+    n->_while.condition = parse_expression();
+
+    if (CT->kind != TOK_rparen) {
+        parser_error(CT->line_number, "Expected ')' but got %s",
+            token_kind_name(CT->kind));
+    }
+    MOVE_NEXT();
+
+    n->_while.body = parse_statement();
+
+    debug_log_parser("Leaving %s\n", __func__);
+
+    return n;
 }
 
 static AST_node *parse_call_arguments() {
@@ -124,11 +176,9 @@ static AST_node *parse_primary()
         MOVE_NEXT();
     }
     else if (CT->kind == TOK_keyword_if) {
-        MOVE_NEXT();
         n = parse_if();
     }
     else if (CT->kind == TOK_keyword_while) {
-        MOVE_NEXT();
         n = parse_while();
     }
     else {
@@ -141,8 +191,99 @@ static AST_node *parse_primary()
     return n;
 }
 
+#define NUM_PRIOS 5
+#define NUM_MAX_OPERATORS_IN_PRIO 4
+
+const int operator_table[NUM_PRIOS][NUM_MAX_OPERATORS_IN_PRIO] =  {
+    { TOK_equal_assign, 0, 0, 0},
+    { TOK_greater, TOK_lower, TOK_greater_equal, TOK_lower_equal},
+    { TOK_equal, TOK_unequal, 0, 0},
+    { TOK_plus, TOK_minus, 0, 0},
+    { TOK_asterisk, TOK_slash, 0, 0},
+};
+
+static bool is_in_prio(int op, int prio) {
+    for (int i = 0; i < NUM_MAX_OPERATORS_IN_PRIO; i++) {
+        if (operator_table[prio][i] == op) return true;
+    }
+    return false;
+}
+
+static AST_node *parse_binary_operators(int prio) {
+    if (prio == NUM_PRIOS) return parse_primary();
+    
+    AST_node *left = parse_binary_operators(prio + 1);
+
+    while (is_in_prio(CT->kind, prio)) {
+        AST_node *n = ast_alloc(AST_binary, CT->line_number);
+        n->binary.left = left;
+        n->binary.token_kind = CT->kind;
+        
+        MOVE_NEXT();
+
+        n->binary.right = parse_binary_operators(prio + 1);
+
+        left = n;
+    }
+
+    return left;
+}
+
+static AST_node *parse_operators() {
+    return parse_binary_operators(0);
+}
+
 static AST_node *parse_expression() {
-    return parse_primary();
+    return parse_operators();
+}
+
+static AST_node *parse_statement()
+{
+    debug_log_parser("Entering %s\n", __func__);
+    
+    AST_node *n = nullptr;
+
+    if (CT->kind == TOK_keyword_return) {
+        n = ast_alloc(AST_return, CT->line_number);
+        MOVE_NEXT();
+
+        if (CT->kind != TOK_semicolon)
+        {
+            n->ret.return_val = parse_expression();
+        }
+    }
+    else if (CT->kind == TOK_keyword_let) {
+        n = ast_alloc(AST_var_decl, CT->line_number);
+        MOVE_NEXT();
+        
+        if (CT->kind != TOK_identifier) {
+            parser_error(CT->line_number, "Expected identifier, but got %s",
+                token_kind_name(CT->kind));
+        }
+        n->var.name = CT->value;
+        MOVE_NEXT();
+
+        if (CT->kind == TOK_equal_assign) {
+            MOVE_NEXT();
+            n->var.initializer = parse_expression();
+        }
+        else if (CT->kind == TOK_semicolon) {
+            // just declaring the variable without assigning it
+        } else {
+            parser_error(CT->line_number, "Expected '=' or ';', but got %s",
+                token_kind_name(CT->kind));
+        }
+    }
+    else if (CT->kind == TOK_lbrace) {
+        MOVE_NEXT();
+        n = parse_scope_body();
+    }
+    else {
+        return parse_expression();
+    }
+
+    debug_log_parser("Leaving %s\n", __func__);
+    return n;
 }
 
 static AST_node *parse_scope_body()
@@ -161,33 +302,16 @@ static AST_node *parse_scope_body()
             MOVE_NEXT();
             break;
         }
-        else if (CT->kind == TOK_keyword_return) {
-            AST_node *ast_return = ast_alloc(AST_return, CT->line_number);
-            MOVE_NEXT();
-
-            if (CT->kind != TOK_semicolon)
-            {
-                ast_return->ret.return_val = parse_expression();
-            }
-
-             if (!ast_last) {
-                ast_begin = ast_return;
-                ast_last = ast_return;
-            } else {
-                ast_last->next = ast_return;
-                ast_last = ast_return;
-            }
-        }
         else {
-            AST_node * ast_expr = parse_expression(false);
-            assert(ast_expr);
+            AST_node * n = parse_statement();
+            assert(n);
 
             if (!ast_last) {
-                ast_begin = ast_expr;
-                ast_last = ast_expr;
+                ast_begin = n;
+                ast_last = n;
             } else {
-                ast_last->next = ast_expr;
-                ast_last = ast_expr;
+                ast_last->next = n;
+                ast_last = n;
             }
 
             if (CT->kind != TOK_semicolon) {

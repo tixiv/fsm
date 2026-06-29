@@ -1,6 +1,7 @@
 
 #include "ast.h"
 #include "sv.h"
+#include "tokenizer.h"
 #include <malloc.h>
 #include <stdio.h>
 #include <string.h>
@@ -58,6 +59,53 @@ static void ast_dump_tree_node (AST_node *n, int spaces) {
                 break;
             case AST_number:
                 printf("%.*s%s '%.*s'\n", spaces, spc, kind_name, SV_prnt(n->number.value));
+                break;
+            case AST_if:
+                printf("%.*s%s\n", spaces, spc, kind_name);
+                if (n->_if.condition) {
+                    printf("%.*s  Condition:\n", spaces, spc);
+                    ast_dump_tree_node(n->_if.condition, spaces + 4);
+                }
+                if (n->_if.if_clause) {
+                    printf("%.*s  If clause:\n", spaces, spc);
+                    ast_dump_tree_node(n->_if.if_clause, spaces + 4);
+                }
+                if (n->_if.else_clause) {
+                    printf("%.*s  Else clause:\n", spaces, spc);
+                    ast_dump_tree_node(n->_if.else_clause, spaces + 4);
+                }
+                break;
+            case AST_while:
+                printf("%.*s%s\n", spaces, spc, kind_name);
+                if (n->_while.condition) {
+                    printf("%.*s  Condition:\n", spaces, spc);
+                    ast_dump_tree_node(n->_if.condition, spaces + 4);
+                }
+                if (n->_while.body) {
+                    printf("%.*s  Body:\n", spaces, spc);
+                    ast_dump_tree_node(n->_if.if_clause, spaces + 4);
+                }
+                break;
+            case AST_binary:
+                printf("%.*s%s %s\n", spaces, spc, kind_name, token_kind_name(n->binary.token_kind));
+                if (n->binary.left) {
+                    printf("%.*s  left:\n", spaces, spc);
+                    ast_dump_tree_node(n->binary.left, spaces + 4);
+                }
+                if (n->binary.right) {
+                    printf("%.*s  right:\n", spaces, spc);
+                    ast_dump_tree_node(n->binary.right, spaces + 4);
+                }
+                break;
+            case AST_var:
+                printf("%.*s%s '%.*s'\n", spaces, spc, kind_name, SV_prnt(n->var.name));
+                break;
+            case AST_call:
+                printf("%.*s%s '%.*s'\n", spaces, spc, kind_name, SV_prnt(n->call.name));
+                if (n->call.args) {
+                    printf("%.*s  Args:\n", spaces, spc);
+                    ast_dump_tree_node(n->call.args, spaces + 4);
+                }
                 break;
             default:
                 fprintf(stderr, "Dumping %s is not implemented yet.\n", kind_name);

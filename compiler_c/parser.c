@@ -215,7 +215,7 @@ void parse_if(bool result_used) {
     debug_log_parser("Leaving %s\n", __func__);
 }
 
-void parse_call(bool result_used) {
+static void parse_call(bool result_used) {
     debug_log_parser("Entering %s\n", __func__);
     Function *fun = get_function_by_name(&CURRENT_TOKEN->value);
     assert(fun && "Error: parse_call called without current token pointing to fn");
@@ -453,7 +453,7 @@ static void parse_scope_body(bool result_used)
     }
 }
 
-void parse_return_and_assignment(bool result_used)
+static void parse_return_and_assignment(bool result_used)
 {
     debug_log_parser("Entering %s\n", __func__);
     
