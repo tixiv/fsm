@@ -6,6 +6,7 @@
 #include "parser_ast.h"
 #include "opcodes.h"
 #include "generator.h"
+#include "ast_to_il.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -40,7 +41,7 @@ void read_file(SV *contents, const char *path)
 
 
 bool debug_tokens = false;
-bool debug_opcodes = false;
+bool debug_opcodes = true;
 
 int main (int argc, const char *argv[]) {
     
@@ -58,20 +59,22 @@ int main (int argc, const char *argv[]) {
         dump_tokens();
 #if 0
     parse_program();
-    
-    if (debug_opcodes)
-        dump_opcodes();
 
-    const char *asm_file_name = "out.asm";
-    output_asm(asm_file_name);
 #else
 
     AST_node *ast = parse_program_ast();
 
     ast_dump_tree(ast);
-
+    ast_to_il(ast);
 
 #endif
+
+    if (debug_opcodes)
+        dump_opcodes();
+
+    const char *asm_file_name = "out.asm";
+    output_asm(asm_file_name);
+
     // printf ("Compilation of '%s' to '%s' was succesfull. You can now run 'fasm %s' to generate the executable.\n",
     //    argv[1], asm_file_name, asm_file_name);
 }

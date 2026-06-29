@@ -83,21 +83,10 @@ AST_node *ast_alloc(AST_kind kind, int line_number);
 
 void ast_dump_tree (AST_node *root);
 
-/*
 
-fn main()
-{
-    let x = 42;
-    print(x + 1);
-}
+const char *ast_kind_name(AST_kind kind);
 
-Function "main"
-└── Block
-    ├── VariableDecl "x"
-    │   └── IntegerLiteral 42
-    └── Call
-        ├── Identifier "print"
-        └── Binary(+)
-            ├── Identifier "x"
-            └── IntegerLiteral 1
-            */
+typedef void (*AstVisitor)(AST_node *, void *);
+
+void ast_visit_chain(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg);
+void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg);

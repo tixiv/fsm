@@ -1,6 +1,7 @@
 #include "dyn_array.h"
 #include <malloc.h>
 #include <string.h>
+#include <assert.h>
 
 
 void dyn_array_init(Dyn_array *a, size_t element_size, size_t initial_capacity) {
@@ -11,6 +12,7 @@ void dyn_array_init(Dyn_array *a, size_t element_size, size_t initial_capacity) 
 }
 
 void *dyn_array_push(Dyn_array *a) {
+    assert(a->data);
     if (a->count >= a->capacity) {
         a->capacity *= 2;
         a->data = realloc(a->data, a->capacity * a->element_size);

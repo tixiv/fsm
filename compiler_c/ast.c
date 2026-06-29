@@ -2,6 +2,7 @@
 #include "ast.h"
 #include "sv.h"
 #include "tokenizer.h"
+#include "common.h"
 #include <malloc.h>
 #include <stdio.h>
 #include <string.h>
@@ -25,6 +26,53 @@ const char *ast_kind_name(AST_kind kind) {
 
     return "Undefined AST kind";
 }
+
+void ast_visit_chain(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg) {
+    while (n) {
+        visit(n, arg);
+        n = n->next;
+    }
+}
+
+void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg)
+{
+    switch (n->kind) {
+        case AST_function:
+            ast_visit_chain(n->fun.args, visit, arg);
+            ast_visit_chain(n->fun.body, visit, arg);            
+            break;
+        case AST_return:
+            if (n->ret.return_val) visit(n->ret.return_val, arg);
+            break;
+        case AST_var_decl:
+        case AST_number:
+        case AST_var:
+            break;
+
+        case AST_if:
+            if (n->_if.condition) visit(n->_if.condition, arg);
+            ast_visit_chain(n->_if.if_clause, visit, arg);
+            ast_visit_chain(n->_if.else_clause, visit, arg);
+            break;
+        case AST_while:
+            if (n->_while.condition) visit(n->_while.condition, arg);
+            ast_visit_chain(n->_while.body, visit, arg);
+            break;
+        case AST_binary:
+            if (n->binary.left) visit(n->binary.left, arg);
+            if (n->binary.left) visit(n->binary.right, arg);
+            break;
+        case AST_call:
+            ast_visit_chain(n->call.args, visit, arg);
+            break;
+        default:
+            NOT_IMPLEMENTED("Visiting %s is not implemented yet.\n", ast_kind_name(n->kind));
+            break;
+    }
+}
+
+
+
 
 static void ast_dump_tree_node (AST_node *n, int spaces) {
     assert(n);
@@ -83,7 +131,7 @@ static void ast_dump_tree_node (AST_node *n, int spaces) {
                 }
                 if (n->_while.body) {
                     printf("%.*s  Body:\n", spaces, spc);
-                    ast_dump_tree_node(n->_if.if_clause, spaces + 4);
+                    ast_dump_tree_node(n->_while.body, spaces + 4);
                 }
                 break;
             case AST_binary:
@@ -108,7 +156,7 @@ static void ast_dump_tree_node (AST_node *n, int spaces) {
                 }
                 break;
             default:
-                fprintf(stderr, "Dumping %s is not implemented yet.\n", kind_name);
+                NOT_IMPLEMENTED("Dumping %s is not implemented yet.\n", ast_kind_name(n->kind));
                 break;
         }
     }

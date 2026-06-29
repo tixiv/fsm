@@ -1,5 +1,6 @@
 
 #include "sv.h"
+#include "dyn_array.h"
 #include <stdint.h>
 
 #define OPCODE_LIST \
@@ -46,7 +47,11 @@ typedef struct {
     };
 } Opcode;
 
-extern Opcode opcodes[1000];
-extern size_t num_opcodes;
+extern Dyn_array opcodes_dyn;
+
+#define num_opcodes (opcodes_dyn.count)
+#define opcodes ((Opcode *)opcodes_dyn.data)
 
 void dump_opcodes();
+
+size_t push_opcode(int kind, SV *value, uint64_t u64_value);

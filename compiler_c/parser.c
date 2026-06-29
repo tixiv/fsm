@@ -27,17 +27,13 @@ static void debug_log_parser(const char * fmt, ...) {
     va_end(args);
 }
 
-Opcode *push_opcode(int kind, SV *value, uint64_t u64_value) {
+static size_t parser_push_opcode(int kind, SV *value, uint64_t u64_value) {
     if (value)
         debug_log_parser("Push opcode %s, " SV_FMT ", %lu\n", opcode_name(kind), SV_prnt(*value), u64_value);
     else
         debug_log_parser("Push opcode %s, null, %lu\n", opcode_name(kind), u64_value);
-    opcodes[num_opcodes].kind = kind;
-    opcodes[num_opcodes].u64_value = u64_value;
-    if (value) sv_clone(&opcodes[num_opcodes].string_value, value);
-    num_opcodes++;
 
-    return &opcodes[num_opcodes-1];
+    return push_opcode(kind, value, u64_value);
 }
 
 typedef struct {
@@ -151,12 +147,12 @@ void parse_while(bool result_used) {
     MOVE_NEXT();
 
     int while_num = num_while_loops++;
-    push_opcode(OP_while_loop, nullptr, while_num);
+    parser_push_opcode(OP_while_loop, nullptr, while_num);
 
     // parse conditional
     parse_expression(true);
 
-    push_opcode(OP_while_check, nullptr, while_num);
+    parser_push_opcode(OP_while_check, nullptr, while_num);
 
     if (CURRENT_TOKEN->kind != TOK_rparen) {
         parser_error(CURRENT_TOKEN->line_number, "Expected ')' but got %s",
@@ -167,7 +163,7 @@ void parse_while(bool result_used) {
     // parse body
     parse_expression(false);
 
-    push_opcode(OP_while_end, nullptr, while_num);
+    parser_push_opcode(OP_while_end, nullptr, while_num);
     
     debug_log_parser("Leaving %s\n", __func__);
 }
@@ -192,15 +188,15 @@ void parse_if(bool result_used) {
     MOVE_NEXT();
 
     int if_num = num_ifs++;
-    Opcode *if_opcode = push_opcode(OP_if, nullptr, if_num);
+    size_t if_opcode = parser_push_opcode(OP_if, nullptr, if_num);
 
     // parse if block
     parse_expression(result_used);
 
     if (CURRENT_TOKEN->kind == TOK_keyword_else) {
         MOVE_NEXT();
-        push_opcode(OP_else, nullptr, if_num);
-        if_opcode->u32_value[1] = true; // Mark has 'else'
+        parser_push_opcode(OP_else, nullptr, if_num);
+        opcodes[if_opcode].u32_value[1] = true; // Mark has 'else'
 
         // parse else block
         parse_expression(result_used);
@@ -210,7 +206,7 @@ void parse_if(bool result_used) {
             "When using the result of an 'if' then an 'else' clause is mandatory");
     }
 
-    push_opcode(OP_end_if, nullptr, if_num);
+    parser_push_opcode(OP_end_if, nullptr, if_num);
 
     debug_log_parser("Leaving %s\n", __func__);
 }
@@ -237,8 +233,8 @@ static void parse_call(bool result_used) {
                     SV_prnt(fun->name), fun->num_arguments, num_args);
             }
             MOVE_NEXT();
-            push_opcode(OP_call, &fun->name, num_args);
-            if (result_used) push_opcode(OP_push_result, nullptr, 0);
+            parser_push_opcode(OP_call, &fun->name, num_args);
+            if (result_used) parser_push_opcode(OP_push_result, nullptr, 0);
             debug_log_parser("Leaving %s\n", __func__);
             return;
         } else {
@@ -257,11 +253,11 @@ static void parse_primary(bool result_used)
 {
     debug_log_parser("Entering %s\n", __func__);
     if (CURRENT_TOKEN->kind == TOK_number) {
-        if (result_used) push_opcode(OP_number, &CURRENT_TOKEN->value, 0);
+        if (result_used) parser_push_opcode(OP_number, &CURRENT_TOKEN->value, 0);
         MOVE_NEXT();
     }
     else if (CURRENT_TOKEN->kind == TOK_string) {
-        if (result_used) push_opcode(OP_string, &CURRENT_TOKEN->value, 0);
+        if (result_used) parser_push_opcode(OP_string, &CURRENT_TOKEN->value, 0);
         MOVE_NEXT();
     }
     else if (CURRENT_TOKEN->kind == TOK_identifier) {
@@ -274,14 +270,14 @@ static void parse_primary(bool result_used)
             if (CURRENT_TOKEN->kind == TOK_equal_assign) {
                 MOVE_NEXT();
                 parse_expression(true);
-                push_opcode(OP_assign_local_var, nullptr, offset);
+                parser_push_opcode(OP_assign_local_var, nullptr, offset);
             }
 
-            if (result_used) push_opcode(OP_push_local_var, nullptr, offset);
+            if (result_used) parser_push_opcode(OP_push_local_var, nullptr, offset);
         }
         else if (get_arg_by_name(&CURRENT_TOKEN->value) != -1) {
             int offset = get_arg_by_name(&CURRENT_TOKEN->value);
-            if (result_used) push_opcode(OP_push_arg, &CURRENT_TOKEN->value, num_args -1 - offset);
+            if (result_used) parser_push_opcode(OP_push_arg, &CURRENT_TOKEN->value, num_args -1 - offset);
             MOVE_NEXT();
         }
         else {
@@ -329,9 +325,9 @@ void parse_multiplicative(bool result_used)
 
         if (result_used) {
             if (kind == TOK_asterisk) {
-                push_opcode(OP_mul, nullptr, 0);
+                parser_push_opcode(OP_mul, nullptr, 0);
             } else {
-                push_opcode(OP_div, nullptr, 0);
+                parser_push_opcode(OP_div, nullptr, 0);
             }
         }
     }
@@ -351,9 +347,9 @@ void parse_additive(bool result_used)
 
         if (result_used) {
             if (kind == TOK_plus) {
-                push_opcode(OP_add, nullptr, 0);
+                parser_push_opcode(OP_add, nullptr, 0);
             } else {
-                push_opcode(OP_sub, nullptr, 0);
+                parser_push_opcode(OP_sub, nullptr, 0);
             }
         }
     }
@@ -374,16 +370,16 @@ void parse_comparison(bool result_used)
 
         if (result_used) {
             if (kind == TOK_greater) {
-                push_opcode(OP_compare_GT, nullptr, 0);
+                parser_push_opcode(OP_compare_GT, nullptr, 0);
             }
             else if (kind == TOK_lower) {
-                push_opcode(OP_compare_LT, nullptr, 0);
+                parser_push_opcode(OP_compare_LT, nullptr, 0);
             }
             else if (kind == TOK_greater_equal) {
-                push_opcode(OP_compare_GE, nullptr, 0);
+                parser_push_opcode(OP_compare_GE, nullptr, 0);
             }
             else {
-                push_opcode(OP_compare_LE, nullptr, 0);
+                parser_push_opcode(OP_compare_LE, nullptr, 0);
             }
         }
     }
@@ -404,9 +400,9 @@ void parse_equality(bool result_used)
 
         if (result_used) {
             if (kind == TOK_equal) {
-                push_opcode(OP_equal, nullptr, 0);
+                parser_push_opcode(OP_equal, nullptr, 0);
             } else {
-                push_opcode(OP_unequal, nullptr, 0);
+                parser_push_opcode(OP_unequal, nullptr, 0);
             }
         }
     }
@@ -434,11 +430,11 @@ static void parse_scope_body(bool result_used)
             MOVE_NEXT();
             if (CURRENT_TOKEN->kind == TOK_semicolon)
             {
-                push_opcode(OP_return, &current_function_name, 0);
+                parser_push_opcode(OP_return, &current_function_name, 0);
             }
             else{
                 parse_expression(true);
-                push_opcode(OP_return, &current_function_name, 1);
+                parser_push_opcode(OP_return, &current_function_name, 1);
             }
         }
         else {
@@ -461,11 +457,11 @@ static void parse_return_and_assignment(bool result_used)
         MOVE_NEXT();
         if (CURRENT_TOKEN->kind == TOK_semicolon)
         {
-            push_opcode(OP_return, nullptr, 0);
+            parser_push_opcode(OP_return, nullptr, 0);
         }
         else{
             parse_equality(true);
-            push_opcode(OP_return, nullptr, 1);
+            parser_push_opcode(OP_return, nullptr, 1);
         }
     }
     else if (CURRENT_TOKEN->kind == TOK_keyword_let) {
@@ -481,7 +477,7 @@ static void parse_return_and_assignment(bool result_used)
         if (CURRENT_TOKEN->kind == TOK_equal_assign) {
             MOVE_NEXT();
             parse_equality(true);
-            push_opcode(OP_assign_local_var, nullptr, num_local_vars-1);
+            parser_push_opcode(OP_assign_local_var, nullptr, num_local_vars-1);
         }
         else if (CURRENT_TOKEN->kind == TOK_semicolon) {
             // just declaring the variable without assigning it
@@ -551,7 +547,7 @@ static void parse_function() {
     }
     
     push_function(function_name, num_args);
-    Opcode *begin_fn_opcode = push_opcode(OP_begin_fn, function_name, 0);
+    size_t begin_fn_opcode = parser_push_opcode(OP_begin_fn, function_name, 0);
 
     if (CURRENT_TOKEN->kind != TOK_lbrace) {
         parser_error(CURRENT_TOKEN->line_number, "Expected '{' but got %s",
@@ -562,9 +558,9 @@ static void parse_function() {
     current_function_name = *function_name;
 
     parse_scope_body(0);
-    push_opcode(OP_return, function_name, 0);
+    parser_push_opcode(OP_return, function_name, 0);
 
-    begin_fn_opcode->u64_value = num_local_vars;
+    opcodes[begin_fn_opcode].u64_value = num_local_vars;
 
     debug_log_parser("Leaving %s\n", __func__);
 }

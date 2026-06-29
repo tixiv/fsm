@@ -1,2 +1,6 @@
+
+#include <stdlib.h>
+#include <stdio.h>
+
 #define nullptr ((void *)0)
-#define NOT_IMPLEMENTED(s) fprintf(stderr,  "%s:%d: Error: %s is not implemented yet.\n", __FILE__, __LINE__, s); exit(EXIT_FAILURE)
+#define NOT_IMPLEMENTED(...) fprintf(stderr,  "%s:%d: Error: ", __FILE__, __LINE__); fprintf(stderr, __VA_ARGS__); exit(EXIT_FAILURE)

@@ -13,7 +13,7 @@
 
 static const bool enable_debug_parser = false;
 
-static void debug_log_parser(const char * fmt, ...) {
+void debug_log_parser(const char * fmt, ...) {
     if (!enable_debug_parser)
         return;
 

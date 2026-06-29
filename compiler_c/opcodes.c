@@ -12,8 +12,7 @@ const char *opcode_name(enum Op_Kind kind) {
     return "Undefined Opcode";
 }
 
-Opcode opcodes[1000];
-size_t num_opcodes;
+Dyn_array opcodes_dyn;
 
 void dump_opcodes() {
     for (int i=0; i<num_opcodes; i++) {
@@ -24,4 +23,14 @@ void dump_opcodes() {
             printf("[%s, %lu]\n", opcode_name(t->kind), t->u64_value);
         }
     }
+}
+
+size_t push_opcode(int kind, SV *value, uint64_t u64_value) {
+    Opcode * op = dyn_array_push(&opcodes_dyn);
+
+    op->kind = kind;
+    op->u64_value = u64_value;
+    if (value) op->string_value = *value;
+
+    return num_opcodes - 1;
 }
