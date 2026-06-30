@@ -7,6 +7,7 @@
 #include "opcodes.h"
 #include "generator.h"
 #include "ast_to_il.h"
+#include "resolver.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -63,6 +64,8 @@ int main (int argc, const char *argv[]) {
 #else
 
     AST_node *ast = parse_program_ast();
+
+    resolver(ast);
 
     ast_dump_tree(ast);
     ast_to_il(ast);

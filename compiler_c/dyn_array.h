@@ -13,3 +13,4 @@ typedef struct {
 void dyn_array_init(Dyn_array *a, size_t element_size, size_t initial_capacity);
 
 void *dyn_array_push(Dyn_array *a);
+void dyn_array_push_p(Dyn_array *a, void *element);

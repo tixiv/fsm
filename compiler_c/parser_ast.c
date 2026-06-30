@@ -38,7 +38,6 @@ static void parser_error(int line_number, const char * fmt, ...) {
     va_end(args);
 }
 
-
 static Token *current_token;
 
 #define CT current_token
@@ -160,8 +159,8 @@ static AST_node *parse_primary()
             n->call.name = *name;
             n->call.args = parse_call_arguments(name);
         } else {
-            n = ast_alloc(AST_var, CT->line_number);
-            n->var.name = *name;
+            n = ast_alloc(AST_symbol, CT->line_number);
+            n->symbol.name = *name;
         }
     }
     else if (CT->kind == TOK_lparen) {
@@ -260,12 +259,12 @@ static AST_node *parse_statement()
             parser_error(CT->line_number, "Expected identifier, but got %s",
                 token_kind_name(CT->kind));
         }
-        n->var.name = CT->value;
+        n->var_decl.name = CT->value;
         MOVE_NEXT();
 
         if (CT->kind == TOK_equal_assign) {
             MOVE_NEXT();
-            n->var.initializer = parse_expression();
+            n->var_decl.initializer = parse_expression();
         }
         else if (CT->kind == TOK_semicolon) {
             // just declaring the variable without assigning it
@@ -355,8 +354,8 @@ static AST_node *parse_function() {
                 break;
             }
             else if(CT->kind == TOK_identifier) {
-                AST_node *ast_arg = ast_alloc(AST_var_decl, CT->line_number);
-                ast_arg->var.name = CT->value;
+                AST_node *ast_arg = ast_alloc(AST_arg_decl, CT->line_number);
+                ast_arg->var_decl.name = CT->value;
                 
                 if (latest_arg) {
                     latest_arg->next = ast_arg;
@@ -393,19 +392,18 @@ static AST_node *parse_function() {
 AST_node *parse_program_ast() {
     debug_log_parser("Entering %s\n", __func__);
 
-    AST_node *root = nullptr;
+    AST_node *root = ast_alloc(AST_program, 0);
     AST_node *last = nullptr;
 
     current_token = tokens;
     while (1) {
         if (CT->kind == TOK_keyword_fn) {
             AST_node *fun = parse_function();
-            if (last) {
+            if (last) 
                 last->next = fun;
-            } else {
-                root = fun;
-                last = fun;
-            }
+            else
+                root->program.body = fun;
+            last = fun;
         }
         else if (CT->kind == TOK_eof) {
             break;

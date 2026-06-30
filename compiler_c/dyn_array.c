@@ -22,3 +22,7 @@ void *dyn_array_push(Dyn_array *a) {
     a->count++;
     return e;
 }
+
+void dyn_array_push_p(Dyn_array *a, void *element) {
+    *((void **)dyn_array_push(a)) = element;
+}

@@ -23,8 +23,16 @@ const char *ast_kind_name(AST_kind kind) {
         AST_LIST
 #undef X
     }
-
     return "Undefined AST kind";
+}
+
+const char *symbol_kind_name(SymbolKind kind) {
+    switch (kind) {
+#define X(name) case name: return #name;
+        SYM_LIST
+#undef X
+    }
+    return "Undefined Symbol kind";
 }
 
 void ast_visit_chain(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg) {
@@ -37,6 +45,9 @@ void ast_visit_chain(AST_node *n, void (*visit)(AST_node *, void *arg), void *ar
 void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg)
 {
     switch (n->kind) {
+        case AST_program:
+            ast_visit_chain(n->program.body, visit, arg);
+            break;
         case AST_function:
             ast_visit_chain(n->fun.args, visit, arg);
             ast_visit_chain(n->fun.body, visit, arg);            
@@ -45,8 +56,10 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             if (n->ret.return_val) visit(n->ret.return_val, arg);
             break;
         case AST_var_decl:
+            if (n->var_decl.initializer) visit(n->var_decl.initializer, arg);
+            break;
+        case AST_arg_decl:
         case AST_number:
-        case AST_var:
             break;
 
         case AST_if:
@@ -72,7 +85,12 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
 }
 
 
-
+static void print_symbol(Symbol *s) {
+    if(!s)
+        printf("(null symbol)");
+    else
+        printf("(%s '%.*s')", symbol_kind_name(s->kind), SV_prnt(s->name));
+}
 
 static void ast_dump_tree_node (AST_node *n, int spaces) {
     assert(n);
@@ -84,6 +102,10 @@ static void ast_dump_tree_node (AST_node *n, int spaces) {
         const char *kind_name = ast_kind_name(n->kind);
 
         switch (n->kind) {
+            case AST_program:
+                printf("%.*s%s\n", spaces, spc, kind_name);
+                ast_dump_tree_node(n->program.body, spaces + 2);
+                break;
             case AST_function:
                 printf("%.*s%s '%.*s'\n", spaces, spc, kind_name, SV_prnt(n->fun.name));
                 if (n->fun.args) {
@@ -103,7 +125,12 @@ static void ast_dump_tree_node (AST_node *n, int spaces) {
                 }
                 break;
             case AST_var_decl:
-                printf("%.*s%s '%.*s'\n", spaces, spc, kind_name, SV_prnt(n->var.name));
+            case AST_arg_decl:
+                printf("%.*s%s '%.*s' ", spaces, spc, kind_name, SV_prnt(n->var_decl.name));
+                print_symbol(n->var_decl.symbol);
+                printf("\n");
+                if (n->var_decl.initializer)
+                    ast_dump_tree_node(n->var_decl.initializer, spaces + 2);
                 break;
             case AST_number:
                 printf("%.*s%s '%.*s'\n", spaces, spc, kind_name, SV_prnt(n->number.value));
@@ -145,11 +172,16 @@ static void ast_dump_tree_node (AST_node *n, int spaces) {
                     ast_dump_tree_node(n->binary.right, spaces + 4);
                 }
                 break;
-            case AST_var:
-                printf("%.*s%s '%.*s'\n", spaces, spc, kind_name, SV_prnt(n->var.name));
+            case AST_symbol:
+                printf("%.*s%s '%.*s' ", spaces, spc, kind_name, SV_prnt(n->symbol.name));
+                print_symbol(n->symbol.symbol);
+                printf("\n");
                 break;
             case AST_call:
-                printf("%.*s%s '%.*s'\n", spaces, spc, kind_name, SV_prnt(n->call.name));
+                printf("%.*s%s '%.*s' ", spaces, spc, kind_name, SV_prnt(n->call.name));
+                print_symbol(n->call.symbol);
+                printf("\n");
+                
                 if (n->call.args) {
                     printf("%.*s  Args:\n", spaces, spc);
                     ast_dump_tree_node(n->call.args, spaces + 4);
