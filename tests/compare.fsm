@@ -1,0 +1,14 @@
+
+fn main() {
+    let counter = 1;
+
+    while (counter < 4) {
+        print(9999); // seperator, ain't got strings yet
+        print(counter);
+        print(counter > 2);
+        print(counter < 2);
+        print(counter >= 2);
+        print(counter <= 2);
+        counter = counter + 1;
+    }
+}

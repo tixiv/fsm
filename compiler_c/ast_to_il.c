@@ -54,6 +54,10 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen) {
             case TOK_asterisk: push_opcode(OP_mul, nullptr, 0); break;
             case TOK_equal: push_opcode(OP_equal, nullptr, 0); break;
             case TOK_unequal: push_opcode(OP_unequal, nullptr, 0); break;
+            case TOK_greater: push_opcode(OP_compare_GT, nullptr, 0); break;
+            case TOK_lower: push_opcode(OP_compare_LT, nullptr, 0); break;
+            case TOK_greater_equal: push_opcode(OP_compare_GE, nullptr, 0); break;
+            case TOK_lower_equal: push_opcode(OP_compare_LE, nullptr, 0); break;
 
             default:
                 NOT_IMPLEMENTED("Generating IL for binary operator %s is not implemented yet.\n", token_kind_name(n->binary.token_kind));
