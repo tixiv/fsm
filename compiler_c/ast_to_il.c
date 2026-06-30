@@ -65,10 +65,6 @@ static int num_whiles;
 
 static void il_gen_visitor(AST_node *n, IL_gen *gen) {
     switch (n->kind) {
-        case AST_program:
-            ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
-            break;
-
         case AST_function: {
             Symbol *s_fun = n->fun.symbol;
             ASSERT(s_fun, "IL gen tried to generate function '%.*s' with null symbol\n", SV_prnt(n->fun.name));
@@ -142,6 +138,11 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
                 il_gen_visitor(n->var_decl.initializer, gen);
                 il_gen_assign_var(n->var_decl.symbol);
             }
+            break;
+
+        case AST_program:
+        case AST_scope:
+            ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             break;
 
         case AST_arg_decl:

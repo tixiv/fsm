@@ -48,6 +48,9 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_program:
             ast_visit_chain(n->program.body, visit, arg);
             break;
+        case AST_scope:
+            ast_visit_chain(n->scope.body, visit, arg);
+            break;
         case AST_function:
             ast_visit_chain(n->fun.args, visit, arg);
             ast_visit_chain(n->fun.body, visit, arg);            
@@ -105,6 +108,10 @@ static void ast_dump_tree_node (AST_node *n, int spaces) {
             case AST_program:
                 printf("%.*s%s\n", spaces, spc, kind_name);
                 ast_dump_tree_node(n->program.body, spaces + 2);
+                break;
+            case AST_scope:
+                printf("%.*s%s\n", spaces, spc, kind_name);
+                ast_dump_tree_node(n->scope.body, spaces + 2);
                 break;
             case AST_function:
                 printf("%.*s%s '%.*s'\n", spaces, spc, kind_name, SV_prnt(n->fun.name));

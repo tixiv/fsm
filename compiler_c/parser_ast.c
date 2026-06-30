@@ -274,7 +274,6 @@ static AST_node *parse_statement()
         }
     }
     else if (CT->kind == TOK_lbrace) {
-        MOVE_NEXT();
         n = parse_scope_body();
     }
     else {
@@ -287,9 +286,11 @@ static AST_node *parse_statement()
 
 static AST_node *parse_scope_body()
 {
-    AST_node *ast_begin = nullptr;
+    AST_node *ast_scope = ast_alloc(AST_scope, CT->line_number);
     AST_node *ast_last = nullptr;
-    
+
+    MOVE_NEXT();
+
     while(1) {
         if (CT->kind == TOK_eof) {
             parser_error(CT->line_number, "encountered EOF while parsing block");
@@ -306,7 +307,7 @@ static AST_node *parse_scope_body()
             assert(n);
 
             if (!ast_last) {
-                ast_begin = n;
+                ast_scope->scope.body = n;
                 ast_last = n;
             } else {
                 ast_last->next = n;
@@ -319,7 +320,7 @@ static AST_node *parse_scope_body()
         }
     }
 
-    return ast_begin;
+    return ast_scope;
 }
 
 static AST_node *parse_function() {
@@ -381,7 +382,6 @@ static AST_node *parse_function() {
         parser_error(CT->line_number, "Expected '{' but got %s",
             token_kind_name(CT->kind));
     }
-    MOVE_NEXT();
 
     ast_fn->fun.body = parse_scope_body();
 

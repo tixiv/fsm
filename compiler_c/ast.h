@@ -31,11 +31,11 @@ typedef struct {
 #define AST_LIST \
     X(AST_program) \
     X(AST_function) \
+    X(AST_scope) \
     X(AST_var_decl) \
     X(AST_arg_decl) \
     X(AST_number) \
     X(AST_string) \
-    X(AST_block) \
     X(AST_symbol) \
     X(AST_binary) \
     X(AST_call) \

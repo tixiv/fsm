@@ -164,6 +164,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
                 res->current_function->num_fn_returns = 1;
             break;
 
+        case AST_scope:
         case AST_program:
         case AST_while:
         case AST_number:
