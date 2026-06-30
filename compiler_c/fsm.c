@@ -42,7 +42,8 @@ void read_file(SV *contents, const char *path)
 
 
 bool debug_tokens = false;
-bool debug_opcodes = true;
+bool debug_opcodes = false;
+bool debug_ast = false;
 
 int main (int argc, const char *argv[]) {
     
@@ -53,24 +54,18 @@ int main (int argc, const char *argv[]) {
     
     SV input;
     read_file(&input, argv[1]);
-
     tokenizer(&input);
 
     if(debug_tokens)
         dump_tokens();
-#if 0
-    parse_program();
-
-#else
 
     AST_node *ast = parse_program_ast();
-
     resolver(ast);
 
-    ast_dump_tree(ast);
+    if (debug_ast)
+        ast_dump_tree(ast);
+    
     ast_to_il(ast);
-
-#endif
 
     if (debug_opcodes)
         dump_opcodes();
