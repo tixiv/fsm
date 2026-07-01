@@ -62,6 +62,43 @@ const char *token_kind_name(TokenKind kind) {
     return "Undefined Token kind";
 }
 
+const char *token_kind_printable(TokenKind kind) {
+    switch (kind) {
+        case TOK_null: return("(null token)");
+        case TOK_keyword_fn: return("'fn'");
+        case TOK_keyword_let: return("'let'");
+        case TOK_keyword_return: return("'return'");
+        case TOK_keyword_if: return("'if'");
+        case TOK_keyword_else: return("'else'");
+        case TOK_keyword_while: return("'while'");
+        case TOK_keyword_for: return("'for'");
+        case TOK_lparen: return("'('");
+        case TOK_rparen: return("')'");
+        case TOK_lbrace: return("'{'");
+        case TOK_rbrace: return("'}'");
+        case TOK_plus: return("'+'");
+        case TOK_minus: return("'-'");
+        case TOK_asterisk: return("'*'");
+        case TOK_slash: return("'/'");
+        case TOK_equal_assign: return("'='");
+        case TOK_equal: return("'=='");
+        case TOK_unequal: return("'!='");
+        case TOK_greater: return("'>'");
+        case TOK_lower: return("'<'");
+        case TOK_greater_equal: return("'>='");
+        case TOK_lower_equal: return("'<='");
+        case TOK_boolean_and: return("'&&'");
+        case TOK_boolean_or: return("'||'");
+        case TOK_komma: return("','");
+        case TOK_semicolon: return("';'");
+        case TOK_identifier: return("identifier");
+        case TOK_string: return("string constant");
+        case TOK_number: return("number");
+        case TOK_eof: return("EOF");
+    }
+    return token_kind_name(kind);
+}
+
 Dyn_array tokens_dyn;
 
 void push_token(int kind, SV *value, int line_number) {
@@ -92,6 +129,9 @@ void handle_word(SV *word, int line_number) {
     }
     else if (sv_compare_cstr(word, "while")) {
         push_token(TOK_keyword_while, nullptr, line_number);
+    }
+    else if (sv_compare_cstr(word, "for")) {
+        push_token(TOK_keyword_for, nullptr, line_number);
     }
     else {
         push_token(TOK_identifier, word, line_number);

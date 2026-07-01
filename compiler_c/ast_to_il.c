@@ -170,6 +170,18 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             break;
         }
 
+        case AST_for: {
+            int while_num = num_whiles++;
+            il_gen_visitor(n->_for.initializer, gen);
+            push_opcode(OP_while_loop, 0, while_num);
+            il_gen_visitor(n->_for.condition, gen);
+            push_opcode(OP_while_check, 0, while_num);
+            il_gen_visitor(n->_for.body, gen);
+            il_gen_visitor(n->_for.post_action, gen);
+            push_opcode(OP_while_end, 0, while_num);
+            break;
+        }
+
         case AST_var_decl:
             if (n->var_decl.initializer) {
                 il_gen_visitor(n->var_decl.initializer, gen);

@@ -69,12 +69,18 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
 
         case AST_if:
             if (n->_if.condition) visit(n->_if.condition, arg);
-            ast_visit_chain(n->_if.if_clause, visit, arg);
-            ast_visit_chain(n->_if.else_clause, visit, arg);
+            if (n->_if.if_clause) visit (n->_if.if_clause, arg);
+            if (n->_if.if_clause) visit (n->_if.if_clause, arg);
             break;
         case AST_while:
             if (n->_while.condition) visit(n->_while.condition, arg);
-            ast_visit_chain(n->_while.body, visit, arg);
+            if (n->_while.body) visit(n->_while.body, arg);
+            break;
+        case AST_for:
+            if (n->_for.initializer) visit(n->_for.initializer, arg);
+            if (n->_for.condition) visit(n->_for.condition, arg);
+            if (n->_for.post_action) visit(n->_for.post_action, arg);
+            if (n->_for.body) visit(n->_for.body, arg);
             break;
         case AST_binary:
             if (n->binary.left) visit(n->binary.left, arg);

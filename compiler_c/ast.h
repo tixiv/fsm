@@ -43,6 +43,7 @@ typedef struct {
     X(AST_return) \
     X(AST_if) \
     X(AST_while) \
+    X(AST_for) \
 
 typedef enum {
 #define X(name) name,
@@ -115,6 +116,13 @@ typedef struct AST_node_s {
             struct AST_node_s *condition;
             struct AST_node_s *body;
         } _while;
+
+        struct {
+            struct AST_node_s *initializer;
+            struct AST_node_s *condition;
+            struct AST_node_s *post_action;
+            struct AST_node_s *body;
+        } _for;
     };
     AST_kind kind;
     int line_number;

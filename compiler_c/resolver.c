@@ -166,10 +166,11 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
 
         case AST_scope:
         case AST_program:
+        case AST_if:
         case AST_while:
+        case AST_for:
         case AST_number:
         case AST_binary:
-        case AST_if:
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             break;
 

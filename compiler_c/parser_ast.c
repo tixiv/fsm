@@ -106,6 +106,33 @@ static AST_node *parse_while() {
     return n;
 }
 
+static void take_expected(TokenKind tok) {
+    if (CT->kind != tok) {
+        parser_error(CT->line_number, "Expected %s but got %s",
+            token_kind_printable(tok), token_kind_printable(CT->kind));
+    }
+    MOVE_NEXT();
+}
+
+static AST_node *parse_for() {
+    debug_log_parser("Entering %s\n", __func__);
+    AST_node *n = ast_alloc(AST_for, CT->line_number);
+    MOVE_NEXT();
+
+    take_expected(TOK_lparen);
+    n->_for.initializer = parse_statement();
+    take_expected(TOK_semicolon);
+    n->_for.condition = parse_expression();
+    take_expected(TOK_semicolon);
+    n->_for.post_action = parse_statement();
+    take_expected(TOK_rparen);
+    n->_for.body = parse_statement();
+
+    debug_log_parser("Leaving %s\n", __func__);
+
+    return n;
+}
+
 static AST_node *parse_call_arguments() {
     debug_log_parser("Entering %s\n", __func__);
 
@@ -180,6 +207,9 @@ static AST_node *parse_primary()
     }
     else if (CT->kind == TOK_keyword_while) {
         n = parse_while();
+    }
+    else if (CT->kind == TOK_keyword_for) {
+        n = parse_for();
     }
     else {
 

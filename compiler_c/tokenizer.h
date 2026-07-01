@@ -18,6 +18,7 @@ typedef struct {
     X(TOK_keyword_if) \
     X(TOK_keyword_else) \
     X(TOK_keyword_while) \
+    X(TOK_keyword_for) \
     X(TOK_lparen) \
     X(TOK_rparen) \
     X(TOK_lbrace) \
@@ -49,6 +50,7 @@ typedef enum {
 } TokenKind;
 
 const char *token_kind_name(TokenKind kind);
+const char *token_kind_printable(TokenKind kind);
 void dump_tokens();
 void tokenizer(SV *code);
 
