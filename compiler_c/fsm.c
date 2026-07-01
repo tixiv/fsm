@@ -2,7 +2,6 @@
 #include "ast.h"
 #include "sv.h"
 #include "tokenizer.h"
-#include "parser.h"
 #include "parser_ast.h"
 #include "opcodes.h"
 #include "generator.h"
