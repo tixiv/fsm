@@ -1,7 +1,9 @@
 .vscode/
+.cache/
 asm/
 fsm
 out
 out.asm
 build/
 tests/*.out
+compile_commands.json
