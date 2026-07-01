@@ -253,7 +253,7 @@ static void parse_primary(bool result_used)
 {
     debug_log_parser("Entering %s\n", __func__);
     if (CURRENT_TOKEN->kind == TOK_number) {
-        if (result_used) parser_push_opcode(OP_number, &CURRENT_TOKEN->value, 0);
+        if (result_used) parser_push_opcode(OP_push_literal, &CURRENT_TOKEN->value, 0);
         MOVE_NEXT();
     }
     else if (CURRENT_TOKEN->kind == TOK_string) {

@@ -1,0 +1,33 @@
+
+fn foo (i) {
+    print(42);
+    return i > 0;
+}
+
+fn bar (i) {
+    print(23);
+    return i > 1;
+}
+
+fn baz (i) {
+    print(420);
+    return i > 2;
+}
+
+fn main() {
+    let i = 0;
+
+    while (i < 4) {
+        print(9999);
+        if (foo(i) && bar(i) && baz(i)) print(2342);
+        i = i + 1;
+    }
+    
+    i = 3;
+
+    while (i >= 0) {
+        print(99999);
+        if (baz(i) || bar(i) || foo(i)) print(2342);
+        i = i - 1;
+    }
+}

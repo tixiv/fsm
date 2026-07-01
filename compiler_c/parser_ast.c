@@ -5,6 +5,7 @@
 #include "tokenizer.h"
 #include "dyn_array.h"
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -190,11 +191,13 @@ static AST_node *parse_primary()
     return n;
 }
 
-#define NUM_PRIOS 5
+#define NUM_PRIOS 7
 #define NUM_MAX_OPERATORS_IN_PRIO 4
 
-const int operator_table[NUM_PRIOS][NUM_MAX_OPERATORS_IN_PRIO] =  {
+const uint8_t operator_table[NUM_PRIOS][NUM_MAX_OPERATORS_IN_PRIO] =  {
     { TOK_equal_assign, 0, 0, 0},
+    { TOK_boolean_or, 0, 0, 0},
+    { TOK_boolean_and, 0, 0, 0},
     { TOK_greater, TOK_lower, TOK_greater_equal, TOK_lower_equal},
     { TOK_equal, TOK_unequal, 0, 0},
     { TOK_plus, TOK_minus, 0, 0},

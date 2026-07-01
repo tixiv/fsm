@@ -149,7 +149,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "cmovle rcx, rdx\n");
                 fprintf(file,"\t" "push rcx\n");
                 break;
-            case OP_number:
+            case OP_push_literal:
                 fprintf(file,"\t" "mov rax,%lu\n", strtoul(t->string_value.begin, 0, 10));
                 fprintf(file,"\t" "push rax\n");
                 break;

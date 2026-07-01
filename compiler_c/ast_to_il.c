@@ -19,6 +19,9 @@ static void il_gen_error(int line_number, const char * fmt, ...) {
     va_end(args);
 }
 
+static int num_ifs;
+static int num_whiles;
+
 typedef struct {
 } IL_gen;
 
@@ -33,8 +36,40 @@ void il_gen_assign_var(Symbol *s) {
 
 static void il_gen_visitor(AST_node *n, IL_gen *gen);
 
+
 static void gen_binary_operators(AST_node *n, IL_gen *gen) {
-    if (TOK_equal_assign == n->binary.token_kind) {
+    if (TOK_boolean_and == n->binary.token_kind) {
+        // short circuit logic:
+        // bar = a && b; -> bar = if(a) (bool)b else 0
+        int if_num = num_ifs++;
+        il_gen_visitor(n->binary.left, gen);
+
+        push_opcode(OP_if, nullptr, 0x100000000 | if_num);
+        
+        il_gen_visitor(n->binary.right, gen);
+        //push_opcode(OP_to_bool, nullptr, 0);
+
+        push_opcode(OP_else, nullptr, if_num);
+        push_opcode(OP_push_literal, &mkSV("0"), 0);
+
+        push_opcode(OP_end_if, nullptr, if_num);
+    }
+    else if (TOK_boolean_or == n->binary.token_kind) {
+        // short circuit logic:
+        // bar = a || b; -> bar = if(a) 1 else (bool)b
+        int if_num = num_ifs++;
+        il_gen_visitor(n->binary.left, gen);
+
+        push_opcode(OP_if, nullptr, 0x100000000 | if_num);
+        push_opcode(OP_push_literal, &mkSV("1"), 0);
+        push_opcode(OP_else, nullptr, if_num);
+
+        il_gen_visitor(n->binary.right, gen);
+        //push_opcode(OP_to_bool, nullptr, 0);
+
+        push_opcode(OP_end_if, nullptr, if_num);
+    }
+    else if (TOK_equal_assign == n->binary.token_kind) {
         if(n->binary.left->kind == AST_symbol) {
             Symbol *s = n->binary.left->symbol.symbol;
             ASSERT(s, "Symbol for variable assignment to '%.*s' is not resolved\n", SV_prnt(n->binary.left->symbol.name))
@@ -58,16 +93,12 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen) {
             case TOK_lower: push_opcode(OP_compare_LT, nullptr, 0); break;
             case TOK_greater_equal: push_opcode(OP_compare_GE, nullptr, 0); break;
             case TOK_lower_equal: push_opcode(OP_compare_LE, nullptr, 0); break;
-            case TOK_boolean_and: push_opcode(OP_mul, nullptr, 0); break;
 
             default:
                 NOT_IMPLEMENTED("Generating IL for binary operator %s is not implemented yet.\n", token_kind_name(n->binary.token_kind));
         }
     }
 }
-
-static int num_ifs;
-static int num_whiles;
 
 static void il_gen_visitor(AST_node *n, IL_gen *gen) {
     switch (n->kind) {
@@ -96,7 +127,7 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         }
 
         case AST_number:
-            push_opcode(OP_number, &n->number.value, 0);
+            push_opcode(OP_push_literal, &n->number.value, 0);
             break;
         
         case AST_symbol: {

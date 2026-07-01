@@ -182,6 +182,14 @@ void tokenizer(SV *code) {
             sv_pop(code);  sv_pop(code);
             push_token(TOK_lower_equal, nullptr, line_number);
         }
+        else if (sv_starts_with(code, "&&")) {
+            sv_pop(code);  sv_pop(code);
+            push_token(TOK_boolean_and, nullptr, line_number);
+        }
+        else if (sv_starts_with(code, "||")) {
+            sv_pop(code);  sv_pop(code);
+            push_token(TOK_boolean_or, nullptr, line_number);
+        }
         else if (c == '>') {
             sv_pop(code);
             push_token(TOK_greater, nullptr, line_number);

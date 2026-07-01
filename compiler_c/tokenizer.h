@@ -34,6 +34,7 @@ typedef struct {
     X(TOK_greater_equal) \
     X(TOK_lower_equal) \
     X(TOK_boolean_and) \
+    X(TOK_boolean_or) \
     X(TOK_komma) \
     X(TOK_semicolon) \
     X(TOK_identifier) \
