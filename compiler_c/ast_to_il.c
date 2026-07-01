@@ -47,10 +47,12 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen) {
         push_opcode(OP_if, nullptr, 0x100000000 | if_num);
         
         il_gen_visitor(n->binary.right, gen);
-        //push_opcode(OP_to_bool, nullptr, 0);
+        //if (n->result_used)
+        //    push_opcode(OP_to_bool, nullptr, 0);
 
         push_opcode(OP_else, nullptr, if_num);
-        push_opcode(OP_push_literal, &mkSV("0"), 0);
+        if (n->result_used)
+            push_opcode(OP_push_literal, &mkSV("0"), 0);
 
         push_opcode(OP_end_if, nullptr, if_num);
     }
@@ -61,11 +63,13 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen) {
         il_gen_visitor(n->binary.left, gen);
 
         push_opcode(OP_if, nullptr, 0x100000000 | if_num);
-        push_opcode(OP_push_literal, &mkSV("1"), 0);
+        if (n->result_used)
+            push_opcode(OP_push_literal, &mkSV("1"), 0);
         push_opcode(OP_else, nullptr, if_num);
 
         il_gen_visitor(n->binary.right, gen);
-        //push_opcode(OP_to_bool, nullptr, 0);
+        //if (n->result_used)
+        //    push_opcode(OP_to_bool, nullptr, 0);
 
         push_opcode(OP_end_if, nullptr, if_num);
     }
@@ -83,31 +87,34 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen) {
     } else {
         ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
 
-        switch (n->binary.token_kind) {
-            case TOK_plus: push_opcode(OP_add, nullptr, 0); break;
-            case TOK_minus: push_opcode(OP_sub, nullptr, 0); break;
-            case TOK_asterisk: push_opcode(OP_mul, nullptr, 0); break;
-            case TOK_equal: push_opcode(OP_equal, nullptr, 0); break;
-            case TOK_unequal: push_opcode(OP_unequal, nullptr, 0); break;
-            case TOK_greater: push_opcode(OP_compare_GT, nullptr, 0); break;
-            case TOK_lower: push_opcode(OP_compare_LT, nullptr, 0); break;
-            case TOK_greater_equal: push_opcode(OP_compare_GE, nullptr, 0); break;
-            case TOK_lower_equal: push_opcode(OP_compare_LE, nullptr, 0); break;
+        if (n->result_used) {
+            switch (n->binary.token_kind) {
+                case TOK_plus: push_opcode(OP_add, nullptr, 0); break;
+                case TOK_minus: push_opcode(OP_sub, nullptr, 0); break;
+                case TOK_asterisk: push_opcode(OP_mul, nullptr, 0); break;
+                case TOK_equal: push_opcode(OP_equal, nullptr, 0); break;
+                case TOK_unequal: push_opcode(OP_unequal, nullptr, 0); break;
+                case TOK_greater: push_opcode(OP_compare_GT, nullptr, 0); break;
+                case TOK_lower: push_opcode(OP_compare_LT, nullptr, 0); break;
+                case TOK_greater_equal: push_opcode(OP_compare_GE, nullptr, 0); break;
+                case TOK_lower_equal: push_opcode(OP_compare_LE, nullptr, 0); break;
 
-            default:
-                NOT_IMPLEMENTED("Generating IL for binary operator %s is not implemented yet.\n", token_kind_name(n->binary.token_kind));
+                default:
+                    NOT_IMPLEMENTED("Generating IL for binary operator %s is not implemented yet.\n", token_kind_name(n->binary.token_kind));
+            }
         }
     }
 }
 
 static void il_gen_visitor(AST_node *n, IL_gen *gen) {
+    if (!n) return;
     switch (n->kind) {
         case AST_function: {
             Symbol *s_fun = n->fun.symbol;
             ASSERT(s_fun, "IL gen tried to generate function '%.*s' with null symbol\n", SV_prnt(n->fun.name));
             push_opcode(OP_begin_fn, &n->fun.name, s_fun->size);
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
-            push_opcode(OP_return, nullptr, 1);
+            push_opcode(OP_return, nullptr, s_fun->num_fn_returns);
             break;
         }
 
@@ -121,22 +128,25 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             ASSERT(s_call, "Symbol for called function '%.*s' is not resolved\n", SV_prnt(n->call.name))
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             push_opcode(OP_call, &n->call.name, s_call->num_fn_args);
-            if (s_call->num_fn_returns)
+            if (s_call->num_fn_returns && n->result_used)
                 push_opcode(OP_push_result, nullptr, 0);
             break;
         }
 
         case AST_number:
-            push_opcode(OP_push_literal, &n->number.value, 0);
+            if (n->result_used)
+                push_opcode(OP_push_literal, &n->number.value, 0);
             break;
         
         case AST_symbol: {
             Symbol *s = n->symbol.symbol;
             ASSERT(s, "symbol '%.*s' was not resolved\n", SV_prnt(n->symbol.name));
             if (s->kind == SYM_arg) {
-                push_opcode(OP_push_arg, nullptr, s->offset);
+                if (n->result_used)
+                    push_opcode(OP_push_arg, nullptr, s->offset);
             } else if (s->kind == SYM_local) {
-                push_opcode(OP_push_local_var, nullptr, s->offset);
+                if (n->result_used)
+                    push_opcode(OP_push_local_var, nullptr, s->offset);
             } else {
                 NOT_IMPLEMENTED("Generating IL for AST_symbol with %s is not implemented yet.\n", symbol_kind_name(s->kind));
             }
@@ -174,8 +184,10 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             int while_num = num_whiles++;
             il_gen_visitor(n->_for.initializer, gen);
             push_opcode(OP_while_loop, 0, while_num);
-            il_gen_visitor(n->_for.condition, gen);
-            push_opcode(OP_while_check, 0, while_num);
+            if (n->_for.condition) {
+                il_gen_visitor(n->_for.condition, gen);
+                push_opcode(OP_while_check, 0, while_num);
+            }
             il_gen_visitor(n->_for.body, gen);
             il_gen_visitor(n->_for.post_action, gen);
             push_opcode(OP_while_end, 0, while_num);

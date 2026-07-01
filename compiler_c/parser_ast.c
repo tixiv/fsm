@@ -120,11 +120,11 @@ static AST_node *parse_for() {
     MOVE_NEXT();
 
     take_expected(TOK_lparen);
-    n->_for.initializer = parse_statement();
+    if (CT->kind != TOK_semicolon) n->_for.initializer = parse_statement();
     take_expected(TOK_semicolon);
-    n->_for.condition = parse_expression();
+    if (CT->kind != TOK_semicolon) n->_for.condition = parse_expression();
     take_expected(TOK_semicolon);
-    n->_for.post_action = parse_statement();
+    if (CT->kind != TOK_rparen) n->_for.post_action = parse_statement();
     take_expected(TOK_rparen);
     n->_for.body = parse_statement();
 

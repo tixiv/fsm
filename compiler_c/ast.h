@@ -55,6 +55,7 @@ const char *ast_kind_name(AST_kind kind);
 
 typedef struct AST_node_s {
     struct AST_node_s *next;
+    bool result_used;
     union {
         struct {
             struct AST_node_s *left;

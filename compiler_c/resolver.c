@@ -174,7 +174,6 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             break;
 
-
         default:
             NOT_IMPLEMENTED("Resolver for %s is not implemented yet.\n", ast_kind_name(n->kind));
             break;

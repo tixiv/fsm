@@ -8,16 +8,18 @@
 #include "ast_to_il.h"
 #include "operator_chaining.h"
 #include "resolver.h"
+#include "type_checker.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 
 void read_file(SV *contents, const char *path)
 {
     FILE *f = fopen(path, "rb");
     if (!f) {
-        fprintf(stderr, "[FSM Compiler] Error opening file '%s':", path);
-        perror("\n");
+        fprintf(stderr, "[FSM Compiler] Error opening file '%s': %s\n", path, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
@@ -28,8 +30,7 @@ void read_file(SV *contents, const char *path)
     char *buffer = malloc(size + 1);
 
     if (fread(buffer, 1, size, f) != size) {
-        fprintf(stderr, "[FSM Compiler] Error opening file '%s':", path);
-        perror("\n");
+        fprintf(stderr, "[FSM Compiler] Error reading from file '%s': %s\n", path, strerror(errno));
         exit(EXIT_FAILURE);
     }
     buffer[size] = '\0';
@@ -62,6 +63,7 @@ int main (int argc, const char *argv[]) {
     AST_node *ast = parse_program_ast();
     chain_operators(ast);
     resolver(ast);
+    run_typechecking(ast);
 
     if (debug_ast)
         ast_dump_tree(ast);

@@ -1,0 +1,31 @@
+
+fn bar() {
+    print (42)
+}
+
+fn baz() {
+    print (23)
+}
+
+fn blub() {
+    print (69)
+}
+
+fn foo() {
+    return 5;
+}
+
+fn main() {
+    2 * bar();
+    55 && baz();
+    0 && blub();
+
+    let count = 0;
+    
+    for (let i = 0; i < 100000000; i = i + 1) {
+        42 * 23 + 17 * foo();
+        count = count + 1;
+    }
+
+    print (count);
+}
