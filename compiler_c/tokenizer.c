@@ -52,7 +52,7 @@ void read_string(SV *str, SV *input) {
     }
 }
 
-const char *token_kind_name(enum TokenKind kind) {
+const char *token_kind_name(TokenKind kind) {
     switch (kind) {
 #define X(name) case name: return #name;
         TOKEN_LIST

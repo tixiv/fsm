@@ -2,6 +2,7 @@
 #pragma once
 
 #include "sv.h"
+#include "tokenizer.h"
 
 #define SYM_LIST \
     X(SYM_global) \
@@ -57,7 +58,7 @@ typedef struct AST_node_s {
         struct {
             struct AST_node_s *left;
             struct AST_node_s *right;
-            int token_kind;
+            TokenKind token_kind;
         } binary;
 
         struct {

@@ -62,6 +62,7 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_var_decl:
             if (n->var_decl.initializer) visit(n->var_decl.initializer, arg);
             break;
+        case AST_symbol:
         case AST_arg_decl:
         case AST_number:
             break;

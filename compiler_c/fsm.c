@@ -7,6 +7,7 @@
 #include "opcodes.h"
 #include "generator.h"
 #include "ast_to_il.h"
+#include "operator_chaining.h"
 #include "resolver.h"
 #include <stdio.h>
 #include <stdbool.h>
@@ -60,6 +61,7 @@ int main (int argc, const char *argv[]) {
         dump_tokens();
 
     AST_node *ast = parse_program_ast();
+    chain_operators(ast);
     resolver(ast);
 
     if (debug_ast)

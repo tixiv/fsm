@@ -1,4 +1,6 @@
 
+#pragma once
+
 #include "sv.h"
 #include "dyn_array.h"
 
@@ -31,6 +33,7 @@ typedef struct {
     X(TOK_lower) \
     X(TOK_greater_equal) \
     X(TOK_lower_equal) \
+    X(TOK_boolean_and) \
     X(TOK_komma) \
     X(TOK_semicolon) \
     X(TOK_identifier) \
@@ -38,13 +41,13 @@ typedef struct {
     X(TOK_number) \
     X(TOK_eof) \
 
-enum TokenKind {
+typedef enum {
 #define X(name) name,
     TOKEN_LIST
 #undef X
-};
+} TokenKind;
 
-const char *token_kind_name(enum TokenKind kind);
+const char *token_kind_name(TokenKind kind);
 void dump_tokens();
 void tokenizer(SV *code);
 
