@@ -44,7 +44,7 @@ void read_file(SV *contents, const char *path)
 
 bool debug_tokens = false;
 bool debug_opcodes = false;
-bool debug_ast = false;
+bool debug_ast = true;
 
 int main (int argc, const char *argv[]) {
     
@@ -63,10 +63,12 @@ int main (int argc, const char *argv[]) {
     AST_node *ast = parse_program_ast();
     chain_operators(ast);
     resolver(ast);
-    run_typechecking(ast);
 
     if (debug_ast)
         ast_dump_tree(ast);
+
+    run_typechecking(ast);
+
     
     ast_to_il(ast);
 

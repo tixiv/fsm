@@ -114,6 +114,7 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
         case AST_scope:
         case AST_return:
         case AST_while:
+        case AST_for:
             printf("%.*s%s\n", (int)spaces, spc, kind_name);
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;

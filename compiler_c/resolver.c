@@ -3,6 +3,7 @@
 #include "common.h"
 #include "dyn_array.h"
 #include "sv.h"
+#include "type.h"
 #include <string.h>
 #include <stdarg.h>
 
@@ -67,6 +68,13 @@ static void calculate_function_stack(Resolver *res, Symbol *s_fun) {
             }
         }
         s_fun->num_fn_args = arg_count;
+
+        Type **arg_types = malloc(sizeof(Type*) * arg_count);
+        for (int i = 0; i < arg_count; i++) {
+            arg_types[i] = get_symbol(&res->local_symbols, i)->type;
+        }
+        s_fun->type = type_alloc(T_function);
+        s_fun->type->fun.argument_types = arg_types;
     }
     {
         int var_count = 0;
@@ -125,7 +133,6 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
             Symbol *s_fun = alloc_symbol(SYM_global, &n->fun.name);
             push_symbol(&global_symbols, s_fun, n->line_number);
             n->fun.symbol = s_fun;
-            
             resolver_enter_function(res, s_fun);
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             resolver_leave_function(res);
@@ -135,6 +142,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_arg_decl: {
             ASSERT(res->current_function, "Found function argument declaration for '%.*s' outside of function\n", SV_prnt(n->var_decl.name));
             Symbol *s_arg = alloc_symbol(SYM_arg, &n->var_decl.name);
+            s_arg->type = &builtin_i64;
             dyn_array_push_p(&res->local_symbols, s_arg);
             n->var_decl.symbol = s_arg;
             break;

@@ -5,7 +5,7 @@ SRC_DIR = compiler_c
 BUILD_DIR = build
 TEST_DIR = tests
 
-CFLAGS += -Wall -O2
+CFLAGS += -Wall -O0 -g
 
 C_SRCS = $(wildcard $(SRC_DIR)/*.c)
 

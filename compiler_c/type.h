@@ -2,16 +2,19 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdbool.h>
 
 typedef enum {
     T_unsigned_integer,
     T_signed_integer,
     T_pointer,
+    T_function,
 } TypeKind;
 
 typedef struct Type_s {
     TypeKind kind;
     size_t storage_size;
+    bool is_literal;
     union {
         struct {
             size_t num_bits;
@@ -20,10 +23,32 @@ typedef struct Type_s {
         struct {
             struct Type_s *target_type;
         } pointer;
+
+        struct {
+            struct Type_s **argument_types;
+            struct Type_s *return_type;
+        } fun;
     };
 } Type;
 
-typedef struct {
-    const char *name;
-    Type type;
-} BuiltinTypes_t;
+extern Type builtin_u64;
+extern Type builtin_i64;
+extern Type builtin_u32;
+extern Type builtin_i32;
+extern Type builtin_u16;
+extern Type builtin_i16;
+extern Type builtin_u8;
+extern Type builtin_i8;
+
+extern Type builtin_u64_literal;
+extern Type builtin_i64_literal;
+extern Type builtin_u32_literal;
+extern Type builtin_i32_literal;
+extern Type builtin_u16_literal;
+extern Type builtin_i16_literal;
+extern Type builtin_u8_literal;
+extern Type builtin_i8_literal;
+
+Type *type_alloc(TypeKind kind);
+
+void append_fn_arg_type(Type *fn_type, Type *arg_type);

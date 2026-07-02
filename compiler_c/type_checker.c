@@ -78,6 +78,65 @@ void annotate_used_visitor(AST_node *n, uint64_t used) {
     }
 }
 
+void type_propagate_binary_operator(AST_node *n) {
+    NOT_IMPLEMENTED("Type binary operators is not implemented yet.\n");
+}
+
+void type_propagation_visitor(AST_node *n, void *prop) {
+    ast_visit_children(n, (AstVisitor)type_propagation_visitor, prop);
+    switch (n->kind) {
+        case AST_number:
+            n->type = &builtin_i64_literal;
+            break;
+        case AST_var_decl:
+        case AST_arg_decl:
+            n->var_decl.symbol->type = &builtin_i64;
+            break;
+        case AST_symbol:
+            n->type = n->symbol.symbol->type;
+            break;
+        case AST_binary:
+            type_propagate_binary_operator(n);
+            break;
+
+        case AST_call:
+            NOT_IMPLEMENTED("Type checking calls is not implemented yet.\n");
+            break;
+
+        case AST_return:
+            NOT_IMPLEMENTED("Type checking return is not implemented yet.\n");
+            break;
+        
+        case AST_if:
+            NOT_IMPLEMENTED("Type checking if is not implemented yet.\n");
+            break;
+        
+        case AST_while:
+            NOT_IMPLEMENTED("Type checking while is not implemented yet.\n");
+            break;
+
+        case AST_for:
+            NOT_IMPLEMENTED("Type checking for is not implemented yet.\n");
+            break;
+
+        case AST_string:
+            NOT_IMPLEMENTED("Type checking string literals is not implemented yet.\n");
+            break;
+
+        case AST_function:
+            NOT_IMPLEMENTED("Type checking functions is not implemented yet.\n");
+            break;
+
+        // these have void type
+        case AST_program:
+        case AST_scope:
+            break;
+        
+    }
+
+}
+
 void run_typechecking(AST_node *root) {
     annotate_used_visitor(root, 0);
+    // type_propagation_visitor(root, nullptr);
 }

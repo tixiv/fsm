@@ -3,6 +3,7 @@
 
 #include "sv.h"
 #include "tokenizer.h"
+#include "type.h"
 
 #define SYM_LIST \
     X(SYM_global) \
@@ -21,11 +22,13 @@ const char *symbol_kind_name(SymbolKind kind);
 typedef struct {
     SV name;
     SymbolKind kind;
+    Type *type;
 
+    // TODO: move all of these or most to the type
     size_t size; // stack frame size for functions
-    size_t offset;
+    size_t offset; // stack offset for args and local vars
     int num_fn_args; // argument count for functions
-    int num_fn_returns;
+    int num_fn_returns; // 1 or 0 for now
 } Symbol;
 
 
@@ -55,6 +58,7 @@ const char *ast_kind_name(AST_kind kind);
 
 typedef struct AST_node_s {
     struct AST_node_s *next;
+    Type *type;
     bool result_used;
     union {
         struct {
