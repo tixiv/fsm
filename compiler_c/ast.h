@@ -90,6 +90,7 @@ typedef struct AST_node_s {
 
         struct {
             struct AST_node_s *return_val;
+            bool implicit;
         } ret;
 
         struct {
@@ -135,11 +136,11 @@ typedef struct AST_node_s {
 
 AST_node *ast_alloc(AST_kind kind, int line_number);
 
-void ast_dump_tree (AST_node *root);
-
-
+AST_node *get_last_in_chain(AST_node *n);
 
 typedef void (*AstVisitor)(AST_node *, void *);
 
 void ast_visit_chain(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg);
 void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg);
+
+void ast_dump_tree (AST_node *root);

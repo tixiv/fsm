@@ -82,8 +82,25 @@ void type_propagate_binary_operator(AST_node *n) {
     NOT_IMPLEMENTED("Type binary operators is not implemented yet.\n");
 }
 
-void type_propagation_visitor(AST_node *n, void *prop) {
-    ast_visit_children(n, (AstVisitor)type_propagation_visitor, prop);
+typedef struct {
+    Symbol *current_function_symbol;
+} PropagationVisitorData;
+
+void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
+    // actions while traversing the tree down
+    switch (n->kind) {
+        case AST_function:
+            prop->current_function_symbol = n->fun.symbol;
+            ast_visit_children(n, (AstVisitor)type_propagation_visitor, prop);
+            prop->current_function_symbol = nullptr;
+            break;
+
+        default:
+            ast_visit_children(n, (AstVisitor)type_propagation_visitor, prop);
+            break;
+    }
+
+    // actions while traversing the tree up
     switch (n->kind) {
         case AST_number:
             n->type = &builtin_i64_literal;
@@ -98,34 +115,54 @@ void type_propagation_visitor(AST_node *n, void *prop) {
         case AST_binary:
             type_propagate_binary_operator(n);
             break;
-
         case AST_call:
-            NOT_IMPLEMENTED("Type checking calls is not implemented yet.\n");
+            n->type = n->call.symbol->type->fun.return_type;
             break;
 
         case AST_return:
-            NOT_IMPLEMENTED("Type checking return is not implemented yet.\n");
-            break;
-        
-        case AST_if:
-            NOT_IMPLEMENTED("Type checking if is not implemented yet.\n");
-            break;
-        
-        case AST_while:
-            NOT_IMPLEMENTED("Type checking while is not implemented yet.\n");
-            break;
+            ASSERT(prop->current_function_symbol, "Encountered 'return' without active function symbol\n")
+            AST_node *ret_expression = n->ret.return_val;
+            Type *ret_type;
+            if (ret_expression) 
+                ret_type = ret_expression->type;
+            else
+                ret_type = &builtin_void;
 
-        case AST_for:
-            NOT_IMPLEMENTED("Type checking for is not implemented yet.\n");
-            break;
+            Type **fun_ret_type = &prop->current_function_symbol->type->fun.return_type;
 
-        case AST_string:
-            NOT_IMPLEMENTED("Type checking string literals is not implemented yet.\n");
+            if (*fun_ret_type == nullptr) {
+                *fun_ret_type = ret_type;
+            } else {
+                if (*fun_ret_type != ret_type) {
+                    char buf_1[1024];
+                    char buf_2[1024];
+                    type_checker_error(n->line_number, "Returning different types from the same function. Have '%s' and '%s'.",
+                        get_type_name_r(buf_1, *fun_ret_type), get_type_name_r(buf_2, ret_type));
+                }
+            }
             break;
 
         case AST_function:
-            NOT_IMPLEMENTED("Type checking functions is not implemented yet.\n");
+            // function return type handled in case for AST_return
             break;
+
+        
+        case AST_if:
+            NOT_IMPLEMENTED("Type propagating if is not implemented yet.\n");
+            break;
+        
+        case AST_while:
+            NOT_IMPLEMENTED("Type propagating while is not implemented yet.\n");
+            break;
+
+        case AST_for:
+            NOT_IMPLEMENTED("Type propagating for is not implemented yet.\n");
+            break;
+
+        case AST_string:
+            NOT_IMPLEMENTED("Type propagating string literals is not implemented yet.\n");
+            break;
+
 
         // these have void type
         case AST_program:
@@ -138,5 +175,7 @@ void type_propagation_visitor(AST_node *n, void *prop) {
 
 void run_typechecking(AST_node *root) {
     annotate_used_visitor(root, 0);
-    // type_propagation_visitor(root, nullptr);
+
+    PropagationVisitorData pvd = {0};
+    type_propagation_visitor(root, &pvd);
 }

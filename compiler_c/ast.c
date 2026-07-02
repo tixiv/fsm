@@ -36,6 +36,11 @@ const char *symbol_kind_name(SymbolKind kind) {
     return "Undefined Symbol kind";
 }
 
+AST_node *get_last_in_chain(AST_node *n) {
+    while (n->next) n = n->next;
+    return n;
+}
+
 void ast_visit_chain(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg) {
     while (n) {
         visit(n, arg);

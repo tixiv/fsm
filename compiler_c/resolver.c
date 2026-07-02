@@ -100,12 +100,16 @@ static void resolver_leave_function(Resolver *res) {
     res->current_function = nullptr;
     res->local_symbols.count = 0;
 }
+Type *builtin_print_argument_types[] = { &builtin_i64 };
+
+Type builtin_print_type = (Type){T_function, 8, true, .fun.num_arguments = 1, .fun.argument_types = builtin_print_argument_types, .fun.return_type = &builtin_void};
 
 Symbol builtin_print = {
     .kind = SYM_global,
     .name.begin = "print",
     .name.len = 5,
     .num_fn_args = 1,
+    .type = &builtin_print_type,
 };
 
 static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number) {

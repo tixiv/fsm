@@ -106,11 +106,15 @@ static AST_node *parse_while() {
     return n;
 }
 
-static void take_expected(TokenKind tok) {
+static void expect_token(TokenKind tok) {
     if (CT->kind != tok) {
         parser_error(CT->line_number, "Expected %s but got %s",
             token_kind_printable(tok), token_kind_printable(CT->kind));
     }
+}
+
+static void take_expected(TokenKind tok) {
+    expect_token(tok);
     MOVE_NEXT();
 }
 
@@ -322,7 +326,7 @@ static AST_node *parse_scope_body()
     AST_node *ast_scope = ast_alloc(AST_scope, CT->line_number);
     AST_node *ast_last = nullptr;
 
-    MOVE_NEXT();
+    take_expected(TOK_lbrace);
 
     while(1) {
         if (CT->kind == TOK_eof) {
@@ -354,6 +358,16 @@ static AST_node *parse_scope_body()
     }
 
     return ast_scope;
+}
+
+static void insert_implicit_return(AST_node *scope) {
+    ASSERT(scope->kind == AST_scope, "Tried to insert return in something that is not a scope\n");
+    AST_node *last = get_last_in_chain(scope->scope.body);
+    if (last->kind != AST_return) {
+        AST_node *ast_return = ast_alloc(AST_return, last->line_number);
+        ast_return->ret.implicit = true;
+        last->next = ast_return;
+    }
 }
 
 static AST_node *parse_function() {
@@ -411,12 +425,11 @@ static AST_node *parse_function() {
         }
     }
 
-    if (CT->kind != TOK_lbrace) {
-        parser_error(CT->line_number, "Expected '{' but got %s",
-            token_kind_name(CT->kind));
-    }
+    expect_token(TOK_lbrace);
 
     ast_fn->fun.body = parse_scope_body();
+
+    insert_implicit_return(ast_fn->fun.body);
 
     debug_log_parser("Leaving %s\n", __func__);
     return ast_fn;

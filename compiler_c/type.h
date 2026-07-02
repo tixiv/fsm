@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 typedef enum {
+    T_void,
     T_unsigned_integer,
     T_signed_integer,
     T_pointer,
@@ -25,11 +26,14 @@ typedef struct Type_s {
         } pointer;
 
         struct {
+            int num_arguments;
             struct Type_s **argument_types;
             struct Type_s *return_type;
         } fun;
     };
 } Type;
+
+extern Type builtin_void;
 
 extern Type builtin_u64;
 extern Type builtin_i64;
@@ -52,3 +56,5 @@ extern Type builtin_i8_literal;
 Type *type_alloc(TypeKind kind);
 
 void append_fn_arg_type(Type *fn_type, Type *arg_type);
+
+const char *get_type_name_r(char print_buf[1024], Type *type);
