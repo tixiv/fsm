@@ -1,5 +1,6 @@
 
 #include "type.h"
+#include "ast.h"
 #include "common.h"
 #include "string_builder.h"
 #include <malloc.h>
@@ -7,6 +8,7 @@
 #include <string.h>
 
 Type builtin_void = (Type){T_void};
+Type builtin_bool = (Type){T_boolean, 8};
 
 Type builtin_u64 = (Type){T_unsigned_integer, 8, .integer.num_bits = 64};
 Type builtin_i64 = (Type){T_signed_integer,   8, .integer.num_bits = 64};
@@ -36,6 +38,7 @@ Type *type_alloc(TypeKind kind) {
 const char *get_type_name_r(char print_buf[1024], Type *type) {
     if (type == nullptr)       return "(null type)";
     if (type == &builtin_void) return "void";
+    if (type == &builtin_bool) return "bool";
     if (type == &builtin_u64)  return "u64";
     if (type == &builtin_i64)  return "i64";
     if (type == &builtin_u32)  return "u32";
@@ -75,4 +78,60 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
     }
 
     return sb.buffer;
+}
+
+bool is_boolean_kind(Type *t) {
+    return t && t->kind == T_boolean;
+}
+
+bool is_integer_kind(Type *t) {
+    return t && (t->kind == T_unsigned_integer || t->kind == T_signed_integer);
+}
+
+bool types_are_equivalent(Type *t1, Type *t2) {
+    if (t1 == t2) return true;
+    if (is_integer_kind(t1) && t1->kind == t2->kind && t1->integer.num_bits == t2->integer.num_bits) return true;
+    
+    return false;
+}
+
+
+bool is_castable_to_integer(Type *t, const char **out_warn) {
+    if (out_warn) *out_warn = nullptr;
+
+    if (t->kind == T_unsigned_integer || t->kind == T_signed_integer || t->kind == T_boolean)
+    {
+        return true;
+    }
+
+    if (t->kind == T_pointer)
+    {
+        if (out_warn) *out_warn = "Implicitly casting pointer to integer";
+        return true;
+    }
+    return false;
+}
+
+bool is_castable_to(Type *to, Type *from, const char **out_warn) {
+    if (out_warn) *out_warn = nullptr;
+    if (is_integer_kind(to)) return is_castable_to_integer(from, out_warn);
+    if (is_boolean_kind(to)) {
+        if (from->kind == T_unsigned_integer || from->kind == T_signed_integer || from->kind == T_boolean || from->kind == T_pointer)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+AST_node *make_cast(Type *to, Type *from) {
+    ASSERT(is_castable_to(to, from, nullptr), "make_cast() should only be called if the cast is possible.\n");
+    
+    AST_node *n = ast_alloc(AST_cast, 0); // 'line_number' will be filled in when the cast is inserted.
+    n->type = to;
+    n->_cast.right_type = from;
+
+    return n;
 }

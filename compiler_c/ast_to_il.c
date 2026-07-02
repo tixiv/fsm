@@ -5,6 +5,7 @@
 #include "opcodes.h"
 #include "sv.h"
 #include "tokenizer.h"
+#include "type.h"
 #include <stdarg.h>
 
 static void il_gen_error(int line_number, const char * fmt, ...) {
@@ -106,6 +107,23 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen) {
     }
 }
 
+static void gen_cast(AST_node *n) {
+    ASSERT(n->kind == AST_cast, "gen_cast() called on wrong kind of AST node\n");
+
+    Type *to = n->type;
+    Type *from = n->_cast.right_type;
+    
+    if (is_boolean_kind(to) && is_integer_kind(from)) {
+        if (n->result_used)
+            push_opcode(OP_to_bool, nullptr, 0);
+    }
+    else {
+        char buf_1[1024], buf_2[1024];
+        NOT_IMPLEMENTED("Generating IL for cast to '%s' from '%s' is not implemented yet.\n",
+            get_type_name_r(buf_1, to), get_type_name_r(buf_2, from));
+    }
+}
+
 static void il_gen_visitor(AST_node *n, IL_gen *gen) {
     if (!n) return;
     switch (n->kind) {
@@ -114,13 +132,12 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             ASSERT(s_fun, "IL gen tried to generate function '%.*s' with null symbol\n", SV_prnt(n->fun.name));
             push_opcode(OP_begin_fn, &n->fun.name, s_fun->size);
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
-            push_opcode(OP_return, nullptr, s_fun->num_fn_returns);
             break;
         }
 
         case AST_return:
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
-            push_opcode(OP_return, nullptr, 1);
+            push_opcode(OP_return, nullptr, n->ret.return_val ? 1:0);
             break;
 
         case AST_call: {
@@ -128,6 +145,9 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             ASSERT(s_call, "Symbol for called function '%.*s' is not resolved\n", SV_prnt(n->call.name))
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             push_opcode(OP_call, &n->call.name, s_call->num_fn_args);
+
+            // printf("IL Gen AST_call: num_fn_returns = %d, result_used = %d, name = '%.*s'\n", s_call->num_fn_returns, n->result_used, SV_prnt(n->call.name));
+
             if (s_call->num_fn_returns && n->result_used)
                 push_opcode(OP_push_result, nullptr, 0);
             break;
@@ -207,6 +227,12 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             break;
 
         case AST_arg_decl:
+            // Nothing to do here for an arg decl, as it can't have an initializer
+            break;
+        
+        case AST_cast:
+            ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
+            gen_cast(n);
             break;
 
         default:

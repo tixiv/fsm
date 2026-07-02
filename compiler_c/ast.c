@@ -3,6 +3,7 @@
 #include "sv.h"
 #include "tokenizer.h"
 #include "common.h"
+#include "type.h"
 #include <malloc.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -39,6 +40,24 @@ const char *symbol_kind_name(SymbolKind kind) {
 AST_node *get_last_in_chain(AST_node *n) {
     while (n->next) n = n->next;
     return n;
+}
+
+void ast_insert_node(AST_node **at, AST_node *new_node) {
+    AST_node *child = *at;
+    switch (new_node->kind) {
+        case AST_cast:
+            new_node->_cast.body = child;
+            break;
+        
+        default:
+            NOT_IMPLEMENTED("Inserting AST node of kind %s is not implemented yet.\n", ast_kind_name(new_node->kind));
+
+    }
+
+    new_node->line_number = child->line_number;
+    new_node->next = child->next;
+    child->next = 0;
+    *at = new_node;
 }
 
 void ast_visit_chain(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg) {
@@ -93,6 +112,9 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             break;
         case AST_call:
             ast_visit_chain(n->call.args, visit, arg);
+            break;
+        case AST_cast:
+            if (n->_cast.body) visit(n->_cast.body, arg);
             break;
         default:
             NOT_IMPLEMENTED("Visiting %s is not implemented yet.\n", ast_kind_name(n->kind));
@@ -167,6 +189,14 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             printf("\n");
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
+        case AST_cast: {
+                char buf_1[1024], buf_2[1024];
+                printf("%.*s%s '%s' <- '%s'\n", (int)spaces, spc, kind_name,
+                    get_type_name_r(buf_1, n->type),
+                    get_type_name_r(buf_2, n->_cast.right_type));
+                ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+                break;
+            }
         default:
             NOT_IMPLEMENTED("Dumping %s is not implemented yet.\n", ast_kind_name(n->kind));
             break;

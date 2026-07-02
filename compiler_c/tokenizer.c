@@ -11,6 +11,8 @@
 bool is_whitespace(char c) { return c == ' ' ||  c == '\t' || c == '\r'; }
 bool is_numeric(char c) { return c >= '0' && c <= '9'; }
 bool is_alpha(char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
+bool is_allowed_at_start_of_identifier(char c) { return is_alpha(c) || c == '_'; }
+bool is_allowed_in_identifier(char c) { return is_alpha(c) || is_numeric(c) || c == '_'; }
 
 void skip_whitespace(SV *sv) {
     while (sv->len && is_whitespace(*sv->begin)) {
@@ -21,7 +23,7 @@ void skip_whitespace(SV *sv) {
 void read_word(SV *word, SV *input) {
     word->begin = input->begin;
     word->len = 0;
-    while(input->len && is_alpha(*input->begin)) {
+    while(input->len && is_allowed_in_identifier(*input->begin) ) {
         sv_pop(input);
         word->len++;
     }
@@ -145,12 +147,7 @@ void tokenizer(SV *code) {
     while (code->len) {
         char c = *code->begin;
         
-        if (is_alpha(c)) {
-            SV word;
-            read_word(&word, code);
-            handle_word(&word, line_number);
-        }
-        else if (is_numeric(c)) {
+        if (is_numeric(c)) {
             SV num;
             read_number(&num, code);
             push_token(TOK_number, &num, line_number);
@@ -246,6 +243,11 @@ void tokenizer(SV *code) {
             SV str;
             read_string(&str, code);
             push_token(TOK_string, &str, line_number);
+        }
+        else if (is_allowed_at_start_of_identifier(c)) {
+            SV word;
+            read_word(&word, code);
+            handle_word(&word, line_number);
         }
         else {
             fprintf(stderr, FSM_TOKENIZER "encountered unhandled character '%c' = 0x%02X. Quitting.\n", c, c);

@@ -1,14 +1,17 @@
 
 fn bar() {
-    print (42)
+    print (42);
+    return 42;
 }
 
 fn baz() {
     print (23)
+    return 23;
 }
 
 fn blub() {
     print (69)
+    return 69;
 }
 
 fn foo() {

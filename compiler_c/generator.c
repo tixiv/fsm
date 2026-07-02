@@ -95,6 +95,14 @@ void output_asm(const char *asm_file_name) {
                 fprintf(stderr, "%s:%d Generating OP_div not implemented yet.\n", __FILE__, __LINE__);
                 exit(EXIT_FAILURE);
                 break;
+            case OP_to_bool:
+                fprintf(file,"\t" "mov rcx, 0\n");
+                fprintf(file,"\t" "mov rdx, 1\n");
+                fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "or rax, rax\n");
+                fprintf(file,"\t" "cmovnz rcx, rdx\n");
+                fprintf(file,"\t" "push rcx\n");
+                break;
             case OP_equal:
                 fprintf(file,"\t" "mov rcx, 0\n");
                 fprintf(file,"\t" "mov rdx, 1\n");

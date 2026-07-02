@@ -47,6 +47,7 @@ typedef struct {
     X(AST_if) \
     X(AST_while) \
     X(AST_for) \
+    X(AST_cast) \
 
 typedef enum {
 #define X(name) name,
@@ -129,6 +130,11 @@ typedef struct AST_node_s {
             struct AST_node_s *post_action;
             struct AST_node_s *body;
         } _for;
+
+        struct {
+            struct AST_node_s *body;
+            Type *right_type; // the left type is the type of the AST node
+        } _cast;
     };
     AST_kind kind;
     int line_number;
@@ -137,6 +143,7 @@ typedef struct AST_node_s {
 AST_node *ast_alloc(AST_kind kind, int line_number);
 
 AST_node *get_last_in_chain(AST_node *n);
+void ast_insert_node(AST_node **at, AST_node *new_node);
 
 typedef void (*AstVisitor)(AST_node *, void *);
 

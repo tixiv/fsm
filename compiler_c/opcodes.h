@@ -29,6 +29,7 @@
     X(OP_while_loop) \
     X(OP_while_check) \
     X(OP_while_end) \
+    X(OP_to_bool) \
 
 enum Op_Kind {
 #define X(name) name,
