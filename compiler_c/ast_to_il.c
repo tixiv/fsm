@@ -118,6 +118,9 @@ static void gen_cast(AST_node *n) {
         if (n->result_used)
             push_opcode(OP_to_bool, nullptr, 0);
     }
+    else if (is_integer_kind(to) && is_boolean_kind(from)) {
+        // No cast needed. our 64 bit bools can be used as integer directly.
+    }
     else {
         char buf_1[1024], buf_2[1024];
         NOT_IMPLEMENTED("Generating IL for cast to '%s' from '%s' is not implemented yet.\n",
@@ -145,11 +148,11 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             Symbol *s_call = n->call.symbol;
             ASSERT(s_call, "Symbol for called function '%.*s' is not resolved\n", SV_prnt(n->call.name))
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
-            push_opcode(OP_call, &n->call.name, s_call->num_fn_args);
+            push_opcode(OP_call, &n->call.name, s_call->type->fun.num_arguments);
 
             // printf("IL Gen AST_call: num_fn_returns = %d, result_used = %d, name = '%.*s'\n", s_call->num_fn_returns, n->result_used, SV_prnt(n->call.name));
 
-            if (s_call->num_fn_returns && n->result_used)
+            if (s_call->type->fun.return_type != &builtin_void && n->result_used)
                 push_opcode(OP_push_result, nullptr, 0);
             break;
         }
@@ -222,6 +225,7 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             }
             break;
 
+        case AST_arg_list:
         case AST_program:
         case AST_scope:
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);

@@ -8,28 +8,19 @@
 #include <string.h>
 
 Type builtin_void = (Type){T_void};
-Type builtin_bool = (Type){T_boolean, 8};
+Type builtin_bool = (Type){T_boolean};
 
-Type builtin_u64 = (Type){T_unsigned_integer, 8, .integer.num_bits = 64};
-Type builtin_i64 = (Type){T_signed_integer,   8, .integer.num_bits = 64};
-Type builtin_u32 = (Type){T_unsigned_integer, 4, .integer.num_bits = 32};
-Type builtin_i32 = (Type){T_signed_integer,   4, .integer.num_bits = 32};
-Type builtin_u16 = (Type){T_unsigned_integer, 2, .integer.num_bits = 16};
-Type builtin_i16 = (Type){T_signed_integer,   2, .integer.num_bits = 16};
-Type builtin_u8 =  (Type){T_unsigned_integer, 1, .integer.num_bits =  8};
-Type builtin_i8 =  (Type){T_signed_integer,   1, .integer.num_bits =  8};
+Type builtin_u64 = (Type){T_unsigned_integer, .integer.storage_size = 8, .integer.num_bits = 64};
+Type builtin_i64 = (Type){T_signed_integer,   .integer.storage_size = 8, .integer.num_bits = 64};
+Type builtin_u32 = (Type){T_unsigned_integer, .integer.storage_size = 4, .integer.num_bits = 32};
+Type builtin_i32 = (Type){T_signed_integer,   .integer.storage_size = 4, .integer.num_bits = 32};
+Type builtin_u16 = (Type){T_unsigned_integer, .integer.storage_size = 2, .integer.num_bits = 16};
+Type builtin_i16 = (Type){T_signed_integer,   .integer.storage_size = 2, .integer.num_bits = 16};
+Type builtin_u8 =  (Type){T_unsigned_integer, .integer.storage_size = 1, .integer.num_bits =  8};
+Type builtin_i8 =  (Type){T_signed_integer,   .integer.storage_size = 1, .integer.num_bits =  8};
 
-Type builtin_u64_literal = (Type){T_unsigned_integer, 8, true, .integer.num_bits = 64};
-Type builtin_i64_literal = (Type){T_signed_integer,   8, true, .integer.num_bits = 64};
-Type builtin_u32_literal = (Type){T_unsigned_integer, 4, true, .integer.num_bits = 32};
-Type builtin_i32_literal = (Type){T_signed_integer,   4, true, .integer.num_bits = 32};
-Type builtin_u16_literal = (Type){T_unsigned_integer, 2, true, .integer.num_bits = 16};
-Type builtin_i16_literal = (Type){T_signed_integer,   2, true, .integer.num_bits = 16};
-Type builtin_u8_literal =  (Type){T_unsigned_integer, 1, true, .integer.num_bits =  8};
-Type builtin_i8_literal =  (Type){T_signed_integer,   1, true, .integer.num_bits =  8};
-
-Type builtin_u8_pointer = (Type){T_pointer, 8, true, .pointer.target_type = &builtin_u8};
-
+Type builtin_u8_reference = (Type){T_reference, .reference.target_type = &builtin_u8};
+Type builtin_u8_array = (Type){T_array, .array.element_type = &builtin_u8};
 
 Type *type_alloc(TypeKind kind) {
     Type *t = malloc(sizeof(Type));
@@ -51,15 +42,6 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
     if (type == &builtin_u8)   return "u8";
     if (type == &builtin_i8)   return "i8";
 
-    if (type == &builtin_u64_literal)  return "u64 literal";
-    if (type == &builtin_i64_literal)  return "i64 literal";
-    if (type == &builtin_u32_literal)  return "u32 literal";
-    if (type == &builtin_i32_literal)  return "i32 literal";
-    if (type == &builtin_u16_literal)  return "u16 literal";
-    if (type == &builtin_i16_literal)  return "i16 literal";
-    if (type == &builtin_u8_literal)   return "u8 literal";
-    if (type == &builtin_i8_literal)   return "i8 literal";
-
     SB sb;
     sb_init(&sb, print_buf, 1024);
 
@@ -74,6 +56,12 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
                 if (i < type->fun.num_arguments-1) sb_printf(&sb, ", ");
             }
             sb_printf(&sb, ") :%s", get_type_name_r(child_print_buf, type->fun.return_type));
+            break;
+        case T_reference:
+            sb_printf(&sb, "%s &", get_type_name_r(child_print_buf, type->reference.target_type));
+            break;
+        case T_array:
+            sb_printf(&sb, "%s[]", get_type_name_r(child_print_buf, type->reference.target_type));
             break;
         default:
             NOT_IMPLEMENTED("Dumping type kind %d is not implemented yet.\n", type->kind);
@@ -107,7 +95,7 @@ bool is_castable_to_integer(Type *t, const char **out_warn) {
         return true;
     }
 
-    if (t->kind == T_pointer)
+    if (t->kind == T_reference)
     {
         if (out_warn) *out_warn = "Implicitly casting pointer to integer";
         return true;
@@ -119,7 +107,7 @@ bool is_castable_to(Type *to, Type *from, const char **out_warn) {
     if (out_warn) *out_warn = nullptr;
     if (is_integer_kind(to)) return is_castable_to_integer(from, out_warn);
     if (is_boolean_kind(to)) {
-        if (from->kind == T_unsigned_integer || from->kind == T_signed_integer || from->kind == T_boolean || from->kind == T_pointer)
+        if (from->kind == T_unsigned_integer || from->kind == T_signed_integer || from->kind == T_boolean || from->kind == T_reference)
         {
             return true;
         }

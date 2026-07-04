@@ -11,7 +11,7 @@ static void type_checker_error(int line_number, const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "[FSM Type Checker] Line %d Error: ", line_number);
+    fprintf(stderr, "[FSM Type Checker] %s:%d Error: ", current_filename, line_number);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
 
@@ -23,7 +23,7 @@ static void type_checker_warning(int line_number, const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "[FSM Type Checker] Line %d Warning: ", line_number);
+    fprintf(stderr, "[FSM Type Checker] %s:%d Warning: ", current_filename, line_number);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
 
@@ -164,6 +164,22 @@ void type_propagate_binary_operator(AST_node *n) {
 
 }
 
+void type_check_call_args(AST_node *n_call) {
+    Type *symbol_type = n_call->call.symbol->type;
+    int num_args = symbol_type->fun.num_arguments;
+
+    AST_node **arg = &n_call->call.args;
+    for (int i = 0; i < num_args; i++) {
+        Type *expected_type = symbol_type->fun.argument_types[i];
+        if (*arg == nullptr) type_checker_error(n_call->line_number, "Not enough arguments to function call.\n");
+        try_convert_to_type_if_necessary(arg, expected_type, "Function argument");
+
+        arg = &(*arg)->next;
+    }
+
+    if (*arg) type_checker_error(n_call->line_number, "Too many arguments to function call.\n");
+}
+
 typedef struct {
     Symbol *current_function_symbol;
 } PropagationVisitorData;
@@ -175,6 +191,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
     switch (n->kind) {
         case AST_function:
             prop->current_function_symbol = n->fun.symbol;
+            n->type = n->fun.symbol->type;
             ast_visit_children(n, (AstVisitor)type_propagation_visitor, prop);
             prop->current_function_symbol = nullptr;
             break;
@@ -187,9 +204,15 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
     // actions while traversing the tree up
     switch (n->kind) {
         case AST_number:
-            n->type = &builtin_i64_literal;
+            n->type = &builtin_i64;
             break;
         case AST_var_decl:
+            if (n->var_decl.initializer)
+                n->var_decl.symbol->type = n->var_decl.initializer->type;
+            else
+                n->var_decl.symbol->type = &builtin_i64;
+            n->type = &builtin_void; // the declaration itself has no value.
+            break;
         case AST_arg_decl:
             n->var_decl.symbol->type = &builtin_i64;
             n->type = &builtin_void; // the declaration itself has no value.
@@ -201,6 +224,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             type_propagate_binary_operator(n);
             break;
         case AST_call:
+            type_check_call_args(n);
             n->type = n->call.symbol->type->fun.return_type;
             break;
         
@@ -232,7 +256,6 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
         case AST_function:
             // function return type is handled in the 'case' for 'AST_return'.
-            n->type = n->fun.symbol->type;
             break;
 
         case AST_while:
@@ -258,10 +281,11 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_string:
-            n->type = &builtin_u8_pointer;
+            n->type = &builtin_u8_array;
             break;
 
         // these have void type
+        case AST_arg_list:
         case AST_program:
         case AST_scope:
             n->type = &builtin_void;

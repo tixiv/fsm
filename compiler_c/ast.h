@@ -24,17 +24,15 @@ typedef struct {
     SymbolKind kind;
     Type *type;
 
-    // TODO: move all of these or most to the type
     size_t size; // stack frame size for functions
     size_t offset; // stack offset for args and local vars
-    int num_fn_args; // argument count for functions
-    int num_fn_returns; // 1 or 0 for now
 } Symbol;
 
 
 #define AST_LIST \
     X(AST_program) \
     X(AST_function) \
+    X(AST_arg_list) \
     X(AST_scope) \
     X(AST_var_decl) \
     X(AST_arg_decl) \
@@ -74,6 +72,10 @@ typedef struct AST_node_s {
             Symbol *symbol;
             SV name;
         } fun;
+
+        struct {
+            struct AST_node_s *body;
+        } arg_list;
 
         struct {
             struct AST_node_s *body;

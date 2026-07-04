@@ -1,6 +1,7 @@
 
 #include "ast.h"
 #include "sv.h"
+#include "common.h"
 #include "tokenizer.h"
 #include "parser_ast.h"
 #include "opcodes.h"
@@ -15,8 +16,11 @@
 #include <string.h>
 #include <errno.h>
 
+const char *current_filename;
+
 void read_file(SV *contents, const char *path)
 {
+    current_filename = path;
     FILE *f = fopen(path, "rb");
     if (!f) {
         fprintf(stderr, "[FSM Compiler] Error opening file '%s': %s\n", path, strerror(errno));
@@ -61,18 +65,15 @@ int main (int argc, const char *argv[]) {
         dump_tokens();
 
     AST_node *ast = parse_program_ast();
-    chain_operators(ast);
-    resolver(ast);
 
-    if (debug_ast)
-        ast_dump_tree(ast);
+    chain_operators(ast);
+
+    resolver(ast);
 
     run_typechecking(ast);
 
     if (debug_ast)
         ast_dump_tree(ast);
-
-
     
     ast_to_il(ast);
 

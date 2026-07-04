@@ -76,8 +76,11 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_scope:
             ast_visit_chain(n->scope.body, visit, arg);
             break;
+        case AST_arg_list:
+            ast_visit_chain(n->arg_list.body, visit, arg);
+            break;
         case AST_function:
-            ast_visit_chain(n->fun.args, visit, arg);
+            if (n->fun.args) visit(n->fun.args, arg);
             ast_visit_chain(n->fun.body, visit, arg);            
             break;
         case AST_return:
@@ -138,9 +141,12 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
 
     const char *kind_name = ast_kind_name(n->kind);
 
+    char buf[1024];
+
     switch (n->kind) {
         case AST_program:
         case AST_scope:
+        case AST_arg_list:
         case AST_return:
         case AST_while:
         case AST_for:
@@ -148,7 +154,7 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_function:
-            printf("%.*s%s '%.*s'\n", (int)spaces, spc, kind_name, SV_prnt(n->fun.name));
+            printf("%.*s%s '%.*s', (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->fun.name), get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_var_decl:
@@ -159,10 +165,13 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_number:
-            printf("%.*s%s '%.*s'\n", (int)spaces, spc, kind_name, SV_prnt(n->number.value));
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->number.value), get_type_name_r(buf, n->type));
+            break;
+        case AST_string:
+            printf("%.*s%s \"%.*s\" (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->str.value), get_type_name_r(buf, n->type));
             break;
         case AST_if:
-            printf("%.*s%s\n", (int)spaces, spc, kind_name);
+            printf("%.*s%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf, n->type));
             if (n->_if.condition) {
                 printf("%.*s  Condition:\n", (int)spaces, spc);
                 ast_dump_visitor(n->_if.condition, spaces + 4);
@@ -177,18 +186,18 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             }
             break;
         case AST_binary:
-            printf("%.*s%s %s\n", (int)spaces, spc, kind_name, token_kind_name(n->binary.token_kind));
+            printf("%.*s%s %s (%s)\n", (int)spaces, spc, kind_name, token_kind_name(n->binary.token_kind), get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_symbol:
             printf("%.*s%s '%.*s' ", (int)spaces, spc, kind_name, SV_prnt(n->symbol.name));
             print_symbol(n->symbol.symbol);
-            printf("\n");
+            printf(" (%s)\n", get_type_name_r(buf, n->type));
             break;
         case AST_call:
             printf("%.*s%s '%.*s' ", (int)spaces, spc, kind_name, SV_prnt(n->call.name));
             print_symbol(n->call.symbol);
-            printf("\n");
+            printf(" (%s)\n", get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_cast: {

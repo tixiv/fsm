@@ -394,6 +394,9 @@ static AST_node *parse_function() {
 
     // Function arguments
     {
+        AST_node *ast_arglist = ast_alloc(AST_arg_list, CT->line_number);
+        ast_fn->fun.args = ast_arglist;
+
         AST_node *latest_arg = nullptr;
 
         while (1) {
@@ -408,7 +411,7 @@ static AST_node *parse_function() {
                 if (latest_arg) {
                     latest_arg->next = ast_arg;
                 } else {
-                    ast_fn->fun.args = ast_arg;
+                    ast_arglist->arg_list.body = ast_arg;
                 }
                 latest_arg = ast_arg;
 

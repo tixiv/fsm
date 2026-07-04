@@ -8,23 +8,27 @@ typedef enum {
     T_void,
     T_unsigned_integer,
     T_signed_integer,
-    T_pointer,
+    T_boolean,
     T_function,
-    T_boolean
+    T_reference,
+    T_array,
 } TypeKind;
 
 typedef struct Type_s {
     TypeKind kind;
-    size_t storage_size;
-    bool is_literal;
     union {
         struct {
             size_t num_bits;
+            size_t storage_size;
         } integer;
         
         struct {
             struct Type_s *target_type;
-        } pointer;
+        } reference;
+
+        struct {
+            struct Type_s *element_type;
+        } array;
 
         struct {
             int num_arguments;
@@ -55,7 +59,8 @@ extern Type builtin_i16_literal;
 extern Type builtin_u8_literal;
 extern Type builtin_i8_literal;
 
-extern Type builtin_u8_pointer;
+extern Type builtin_u8_reference;
+extern Type builtin_u8_array;
 
 Type *type_alloc(TypeKind kind);
 

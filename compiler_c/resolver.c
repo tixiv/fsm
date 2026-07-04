@@ -11,7 +11,7 @@ static void resolver_error(int line_number, const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "[FSM Resolver] Line %d Error: ", line_number);
+    fprintf(stderr, "[FSM Resolver] %s:%d Error: ", current_filename, line_number);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
 
@@ -67,13 +67,13 @@ static void calculate_function_stack(Resolver *res, Symbol *s_fun) {
                 arg_count ++;
             }
         }
-        s_fun->num_fn_args = arg_count;
 
         Type **arg_types = malloc(sizeof(Type*) * arg_count);
         for (int i = 0; i < arg_count; i++) {
             arg_types[i] = get_symbol(&res->local_symbols, i)->type;
         }
         s_fun->type = type_alloc(T_function);
+        s_fun->type->fun.num_arguments = arg_count;
         s_fun->type->fun.argument_types = arg_types;
     }
     {
@@ -103,25 +103,23 @@ static void resolver_leave_function(Resolver *res) {
 
 Type *builtin_print_argument_types[] = { &builtin_i64 };
 
-Type builtin_print_type = (Type){T_function, 8, true, .fun.num_arguments = 1, .fun.argument_types = builtin_print_argument_types, .fun.return_type = &builtin_void};
+Type builtin_print_type = (Type){T_function, .fun.num_arguments = 1, .fun.argument_types = builtin_print_argument_types, .fun.return_type = &builtin_void};
 
 Symbol builtin_print = {
     .kind = SYM_global,
     .name.begin = "print",
     .name.len = 5,
-    .num_fn_args = 1,
     .type = &builtin_print_type,
 };
 
-Type *builtin_puts_argument_types[] = { &builtin_u8_pointer };
+Type *builtin_puts_argument_types[] = { &builtin_u8_array };
 
-Type builtin_puts_type = (Type){T_function, 8, true, .fun.num_arguments = 1, .fun.argument_types = builtin_puts_argument_types, .fun.return_type = &builtin_void};
+Type builtin_puts_type = (Type){T_function, .fun.num_arguments = 1, .fun.argument_types = builtin_puts_argument_types, .fun.return_type = &builtin_void};
 
 Symbol builtin_puts = {
     .kind = SYM_global,
     .name.begin = "puts",
     .name.len = 4,
-    .num_fn_args = 1,
     .type = &builtin_puts_type,
 };
 
@@ -163,7 +161,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
             ASSERT(res->current_function, "Found function argument declaration for '%.*s' outside of function\n", SV_prnt(n->var_decl.name));
             Symbol *s_arg = alloc_symbol(SYM_arg, &n->var_decl.name);
             s_arg->type = &builtin_i64;
-            dyn_array_push_p(&res->local_symbols, s_arg);
+            push_symbol(&res->local_symbols, s_arg, n->line_number);
             n->var_decl.symbol = s_arg;
             break;
         }
@@ -188,11 +186,10 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
 
         case AST_return:
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
-            if (n->ret.return_val)
-                res->current_function->num_fn_returns = 1;
             break;
 
         case AST_scope:
+        case AST_arg_list:
         case AST_program:
         case AST_if:
         case AST_while:
