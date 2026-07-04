@@ -98,7 +98,7 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_if:
             if (n->_if.condition) visit(n->_if.condition, arg);
             if (n->_if.if_clause) visit (n->_if.if_clause, arg);
-            if (n->_if.if_clause) visit (n->_if.if_clause, arg);
+            if (n->_if.else_clause) visit (n->_if.else_clause, arg);
             break;
         case AST_while:
             if (n->_while.condition) visit(n->_while.condition, arg);

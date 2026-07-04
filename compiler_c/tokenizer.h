@@ -27,6 +27,7 @@ typedef struct {
     X(TOK_minus) \
     X(TOK_asterisk) \
     X(TOK_slash) \
+    X(TOK_percent) \
     X(TOK_equal_assign) \
     X(TOK_equal) \
     X(TOK_unequal) \

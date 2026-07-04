@@ -31,7 +31,7 @@ static void parser_error(int line_number, const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "[FSM Parser] Line %d Error: ", line_number);
+    fprintf(stderr, "[FSM Parser] %s:%d Error: ", current_filename, line_number);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
 
@@ -235,7 +235,7 @@ const uint8_t operator_table[NUM_PRIOS][NUM_MAX_OPERATORS_IN_PRIO] =  {
     { TOK_greater, TOK_lower, TOK_greater_equal, TOK_lower_equal},
     { TOK_equal, TOK_unequal, 0, 0},
     { TOK_plus, TOK_minus, 0, 0},
-    { TOK_asterisk, TOK_slash, 0, 0},
+    { TOK_asterisk, TOK_slash, TOK_percent, 0},
 };
 
 static bool is_in_prio(int op, int prio) {

@@ -118,6 +118,7 @@ void type_propagate_binary_operator(AST_node *n) {
         case TOK_minus:
         case TOK_asterisk:
         case TOK_slash:
+        case TOK_percent:
         case TOK_greater:
         case TOK_lower:
         case TOK_greater_equal:

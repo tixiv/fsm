@@ -113,8 +113,18 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "mov [rsp], rax\n");
                 break;
             case OP_div:
-                fprintf(stderr, "%s:%d Generating OP_div not implemented yet.\n", __FILE__, __LINE__);
-                exit(EXIT_FAILURE);
+                fprintf(file, "pop rbx\n");
+                fprintf(file, "pop rax\n");
+                fprintf(file, "cqo\n");
+                fprintf(file, "idiv rbx\n");
+                fprintf(file, "push rax\n");
+                break;
+            case OP_mod:
+                fprintf(file, "pop rbx\n");
+                fprintf(file, "pop rax\n");
+                fprintf(file, "cqo\n");
+                fprintf(file, "idiv rbx\n");
+                fprintf(file, "push rdx\n");
                 break;
             case OP_to_bool:
                 fprintf(file,"\t" "mov rcx, 0\n");

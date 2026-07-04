@@ -1,0 +1,4 @@
+
+fn fizz(n) { if (n % 3 == 0) { puts("Fizz"); return 1 }; return 0 }
+fn buzz(n) { if (n % 5 == 0) { puts("Buzz"); return 1 }; return 0 }
+fn main () { for (let n = 0; n <= 100; n = n + 1) if (fizz(n) + buzz(n)) puts("\n") else print(n) }

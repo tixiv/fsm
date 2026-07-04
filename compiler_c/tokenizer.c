@@ -82,6 +82,7 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_minus: return("'-'");
         case TOK_asterisk: return("'*'");
         case TOK_slash: return("'/'");
+        case TOK_percent: return("'%'");
         case TOK_equal_assign: return("'='");
         case TOK_equal: return("'=='");
         case TOK_unequal: return("'!='");
@@ -202,6 +203,10 @@ void tokenizer(SV *code) {
         else if ('/' == c) {
             sv_pop(code);
             push_token(TOK_slash, nullptr, line_number);
+        }
+        else if ('%' == c) {
+            sv_pop(code);
+            push_token(TOK_percent, nullptr, line_number);
         }
         else if (sv_starts_with(code, "==")) {
             sv_pop(code);  sv_pop(code);

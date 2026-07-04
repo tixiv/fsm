@@ -94,6 +94,8 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen) {
                 case TOK_plus: push_opcode(OP_add, nullptr, 0); break;
                 case TOK_minus: push_opcode(OP_sub, nullptr, 0); break;
                 case TOK_asterisk: push_opcode(OP_mul, nullptr, 0); break;
+                case TOK_slash: push_opcode(OP_div, nullptr, 0); break;
+                case TOK_percent: push_opcode(OP_mod, nullptr, 0); break;
                 case TOK_equal: push_opcode(OP_equal, nullptr, 0); break;
                 case TOK_unequal: push_opcode(OP_unequal, nullptr, 0); break;
                 case TOK_greater: push_opcode(OP_compare_GT, nullptr, 0); break;

@@ -10,6 +10,7 @@
     X(OP_sub) \
     X(OP_mul) \
     X(OP_div) \
+    X(OP_mod) \
     X(OP_equal) \
     X(OP_unequal) \
     X(OP_compare_GT) \
