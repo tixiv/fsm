@@ -89,6 +89,7 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_symbol:
         case AST_arg_decl:
         case AST_number:
+        case AST_string:
             break;
 
         case AST_if:
@@ -116,6 +117,7 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_cast:
             if (n->_cast.body) visit(n->_cast.body, arg);
             break;
+            
         default:
             NOT_IMPLEMENTED("Visiting %s is not implemented yet.\n", ast_kind_name(n->kind));
             break;

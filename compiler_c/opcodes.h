@@ -16,11 +16,11 @@
     X(OP_compare_LT) \
     X(OP_compare_GE) \
     X(OP_compare_LE) \
-    X(OP_string) \
     X(OP_call) \
     X(OP_push_result) \
     X(OP_push_arg) \
     X(OP_push_literal) \
+    X(OP_push_string_literal) \
     X(OP_push_local_var) \
     X(OP_assign_local_var) \
     X(OP_if) \

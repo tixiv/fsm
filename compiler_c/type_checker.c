@@ -258,7 +258,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_string:
-            NOT_IMPLEMENTED("Type propagating string literals is not implemented yet.\n");
+            n->type = &builtin_u8_pointer;
             break;
 
         // these have void type

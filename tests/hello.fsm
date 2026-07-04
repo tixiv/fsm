@@ -1,0 +1,4 @@
+
+fn main() {
+    puts("Hello, World!\n")
+}

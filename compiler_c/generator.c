@@ -1,6 +1,8 @@
 
 #include "generator.h"
 #include "opcodes.h"
+#include "sv.h"
+#include "common.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -57,8 +59,27 @@ void output_asm(const char *asm_file_name) {
     "add     rsp, 40\n"                 
     "ret\n";
 
+    const char *puts_function =
+    "fn_puts:\n"
+    "mov rdi, [rsp+8]\n"
+    "push rdi\n"
+    "xor rcx, rcx\n"
+    ".loop:\n"
+    "cmp byte [rdi + rcx], 0\n"
+    "je .found\n"
+    "inc rcx\n"
+    "jmp .loop\n"
+    ".found:\n"
+    "mov rax, 1          ; SYS_write\n"
+    "mov rdi, 1          ; stdout\n"
+    "pop rsi             ; original pointer\n"
+    "mov rdx, rcx        ; length\n"
+    "syscall\n"
+    "ret\n";
+
     fprintf(file, "%s", header);
     fprintf(file, "%s", print_function);
+    fprintf(file, "%s", puts_function);
 
     for (int i=0; i<num_opcodes; i++) {
         Opcode *t = &opcodes[i];
@@ -70,7 +91,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"fn_" SV_FMT ":\n", SV_prnt(t->string_value));
                 fprintf(file,"\t" "push rbp\n");
                 fprintf(file,"\t" "mov rbp, rsp\n");
-                fprintf(file,"\t" "sub rsp, %lu\n", t->u64_value * 8);
+                if (t->u64_value) fprintf(file,"\t" "sub rsp, %lu\n", t->u64_value * 8);
                 break;
             case OP_return:
                 if (t->u64_value) fprintf(file,"\t" "pop rax\n");
@@ -161,13 +182,13 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "mov rax,%lu\n", strtoul(t->string_value.begin, 0, 10));
                 fprintf(file,"\t" "push rax\n");
                 break;
-            case OP_string:
-                fprintf(stderr, "%s:%d Generating OP_string not implemented yet.\n", __FILE__, __LINE__);
-                exit(EXIT_FAILURE);
+            case OP_push_string_literal:
+                fprintf(file,"\t" "mov rax, string_literal_%lu\n", t->u64_value);
+                fprintf(file,"\t" "push rax\n");
                 break;
             case OP_call:
                 fprintf(file,"\t" "call fn_" SV_FMT "\n", SV_prnt(t->string_value));
-                fprintf(file,"\t" "add rsp, %lu\n", t->u64_value * 8);
+                if (t->u64_value) fprintf(file,"\t" "add rsp, %lu\n", t->u64_value * 8);
                 break;
             case OP_push_result:
                 fprintf(file,"\t" "push rax\n");
@@ -219,6 +240,50 @@ void output_asm(const char *asm_file_name) {
                 fprintf(stderr, "%s:%d Generating %s opcode is not implemented yet.\n", __FILE__, __LINE__, opcode_name(t->kind));
                 exit(EXIT_FAILURE);
                 break;
+        }
+    }
+
+    for (int i=0; i<num_opcodes; i++) {
+        Opcode *t = &opcodes[i];
+
+        if (t->kind == OP_push_string_literal) {
+
+            SV str = t->string_value;
+
+            fprintf(file, "string_literal_%lu: db ", t->u64_value);
+
+            while(str.len) {
+                if (*str.begin == '\\') {
+                    sv_pop(&str);
+                    uint8_t c = ' ';
+                    switch (*str.begin) {
+                        case '\\': c = '\\'; break;
+                        case 'a': c = '\a'; break;
+                        case 'b': c = '\b'; break;
+                        case 'e': c = '\e'; break;
+                        case 'n': c = '\n'; break;
+                        case 'r': c = '\r'; break;
+                        case 't': c = '\t'; break;
+                        case '"': c = '\"'; break;
+                        default:
+                            NOT_IMPLEMENTED("Genearating assembly for the escape sequence '\\%c' is not implemented yet.", *str.begin);
+                            break;
+                    }
+
+                    fprintf(file, "%d", c);
+                    sv_pop(&str);
+                } else {
+                    fprintf(file, "%d", *str.begin);
+                    sv_pop(&str);
+                }
+
+                if (str.len) fprintf(file, ", ");
+            }
+
+            // terminating null byte for C compatability
+            fprintf(file, ", 0");
+
+            fprintf(file, "\n");
         }
     }
 

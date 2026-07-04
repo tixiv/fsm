@@ -22,6 +22,7 @@ static void il_gen_error(int line_number, const char * fmt, ...) {
 
 static int num_ifs;
 static int num_whiles;
+static int num_strings;
 
 typedef struct {
 } IL_gen;
@@ -233,6 +234,10 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         case AST_cast:
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             gen_cast(n);
+            break;
+        
+        case AST_string:
+            push_opcode(OP_push_string_literal, &n->str.value, num_strings++);
             break;
 
         default:

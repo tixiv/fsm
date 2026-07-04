@@ -28,6 +28,9 @@ Type builtin_i16_literal = (Type){T_signed_integer,   2, true, .integer.num_bits
 Type builtin_u8_literal =  (Type){T_unsigned_integer, 1, true, .integer.num_bits =  8};
 Type builtin_i8_literal =  (Type){T_signed_integer,   1, true, .integer.num_bits =  8};
 
+Type builtin_u8_pointer = (Type){T_pointer, 8, true, .pointer.target_type = &builtin_u8};
+
+
 Type *type_alloc(TypeKind kind) {
     Type *t = malloc(sizeof(Type));
     memset(t, 0, sizeof(Type));

@@ -100,6 +100,7 @@ static void resolver_leave_function(Resolver *res) {
     res->current_function = nullptr;
     res->local_symbols.count = 0;
 }
+
 Type *builtin_print_argument_types[] = { &builtin_i64 };
 
 Type builtin_print_type = (Type){T_function, 8, true, .fun.num_arguments = 1, .fun.argument_types = builtin_print_argument_types, .fun.return_type = &builtin_void};
@@ -110,6 +111,18 @@ Symbol builtin_print = {
     .name.len = 5,
     .num_fn_args = 1,
     .type = &builtin_print_type,
+};
+
+Type *builtin_puts_argument_types[] = { &builtin_u8_pointer };
+
+Type builtin_puts_type = (Type){T_function, 8, true, .fun.num_arguments = 1, .fun.argument_types = builtin_puts_argument_types, .fun.return_type = &builtin_void};
+
+Symbol builtin_puts = {
+    .kind = SYM_global,
+    .name.begin = "puts",
+    .name.len = 4,
+    .num_fn_args = 1,
+    .type = &builtin_puts_type,
 };
 
 static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number) {
@@ -124,6 +137,9 @@ static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number) 
     // builtin
     if (sv_equal(name, &builtin_print.name)) {
         return &builtin_print;
+    }
+    if (sv_equal(name, &builtin_puts.name)) {
+        return &builtin_puts;
     }
 
     resolver_error(line_number, "Undefined symbol %.*s", SV_prnt(*name));
@@ -183,6 +199,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_for:
         case AST_number:
         case AST_binary:
+        case AST_string:
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             break;
 

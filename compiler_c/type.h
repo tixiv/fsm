@@ -55,6 +55,8 @@ extern Type builtin_i16_literal;
 extern Type builtin_u8_literal;
 extern Type builtin_i8_literal;
 
+extern Type builtin_u8_pointer;
+
 Type *type_alloc(TypeKind kind);
 
 void append_fn_arg_type(Type *fn_type, Type *arg_type);
