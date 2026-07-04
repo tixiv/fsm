@@ -123,6 +123,11 @@ static void gen_cast(AST_node *n) {
     else if (is_integer_kind(to) && is_boolean_kind(from)) {
         // No cast needed. our 64 bit bools can be used as integer directly.
     }
+    else if (is_integer_kind(to) && from->kind == T_unsigned_integer &&
+             to->integer.num_bits >= from->integer.num_bits)
+    {
+        // No cast needed.
+    }
     else {
         char buf_1[1024], buf_2[1024];
         NOT_IMPLEMENTED("Generating IL for cast to '%s' from '%s' is not implemented yet.\n",
@@ -244,6 +249,16 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         
         case AST_string:
             push_opcode(OP_push_string_literal, &n->str.value, num_strings++);
+            break;
+        
+        case AST_load:
+            ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
+            push_opcode(OP_load, nullptr, get_storage_size(n->type));
+            break;
+        
+        case AST_array_access:
+            ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
+            push_opcode(OP_array_access, nullptr, get_storage_size(n->_array.array->type->array.element_type));
             break;
 
         default:

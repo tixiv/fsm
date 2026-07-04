@@ -23,6 +23,8 @@ typedef struct {
     X(TOK_rparen) \
     X(TOK_lbrace) \
     X(TOK_rbrace) \
+    X(TOK_lbracket) \
+    X(TOK_rbracket) \
     X(TOK_plus) \
     X(TOK_minus) \
     X(TOK_asterisk) \

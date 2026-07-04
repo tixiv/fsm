@@ -79,6 +79,38 @@ bool is_integer_kind(Type *t) {
     return t && (t->kind == T_unsigned_integer || t->kind == T_signed_integer);
 }
 
+bool is_array_kind(Type *t) {
+    return t->kind == T_array;
+}
+
+bool is_reference_kind(Type *t) {
+    return t->kind == T_reference;
+}
+
+size_t get_storage_size(Type *t) {
+    char buf[1024];
+    switch (t->kind) {
+        case T_signed_integer:
+        case T_unsigned_integer:
+            return t->integer.storage_size;
+        case T_boolean: return 8;
+        case T_reference: return 8;
+        default:
+            NOT_IMPLEMENTED("get_storage_size() is not implemented yet for %s\n", get_type_name_r(buf, t));
+            return 0;
+    }
+}
+
+Type *dereferenced_type(Type *t) {
+    char buf[1024];
+    ASSERT(is_reference_kind(t), "Tried to dereference '%s' which is not a reference.\n",
+        get_type_name_r(buf, t));
+
+    if (t == &builtin_u8_reference) return &builtin_u8;
+
+    NOT_IMPLEMENTED("dereferenced_type() is not implemented yet for %s\n", get_type_name_r(buf, t));
+}
+
 bool types_are_equivalent(Type *t1, Type *t2) {
     if (t1 == t2) return true;
     if (is_integer_kind(t1) && t1->kind == t2->kind && t1->integer.num_bits == t2->integer.num_bits) return true;
@@ -86,18 +118,21 @@ bool types_are_equivalent(Type *t1, Type *t2) {
     return false;
 }
 
+Type *get_ref_type_for_array_type(Type *t) {
+    char buf[1024];
+    ASSERT(is_array_kind(t), "Called get_ref_type_for_array_type on something that is not an array type '%s'.\n",
+        get_type_name_r(buf, t));
+
+    if (t == &builtin_u8_array) return &builtin_u8_reference;
+
+    NOT_IMPLEMENTED("get_ref_type_for_array_type() is not implemented yet for %s\n", get_type_name_r(buf, t));
+}
 
 bool is_castable_to_integer(Type *t, const char **out_warn) {
     if (out_warn) *out_warn = nullptr;
 
     if (t->kind == T_unsigned_integer || t->kind == T_signed_integer || t->kind == T_boolean)
     {
-        return true;
-    }
-
-    if (t->kind == T_reference)
-    {
-        if (out_warn) *out_warn = "Implicitly casting pointer to integer";
         return true;
     }
     return false;
@@ -115,7 +150,6 @@ bool is_castable_to(Type *to, Type *from, const char **out_warn) {
 
     return false;
 }
-
 
 AST_node *make_cast(Type *to, Type *from) {
     ASSERT(is_castable_to(to, from, nullptr), "make_cast() should only be called if the cast is possible.\n");

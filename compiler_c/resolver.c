@@ -197,6 +197,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_number:
         case AST_binary:
         case AST_string:
+        case AST_array_access:
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             break;
 

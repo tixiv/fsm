@@ -246,6 +246,23 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "jmp while_loop_%lu\n", t->u64_value);
                 fprintf(file,"end_while_%lu:\n", t->u64_value);
                 break;
+            case OP_array_access:
+                fprintf(file,"\t" "pop rax\n"); // index
+                fprintf(file,"\t" "mov rbx, %lu\n", t->u64_value); // storage size
+                fprintf(file,"\t" "mul QWORD rbx\n");
+                fprintf(file,"\t" "add [rsp], rax\n"); // add to pointer
+                break;
+            case OP_load:
+                fprintf(file,"\t" "pop rbx\n");
+                fprintf(file,"\t" "xor rax, rax\n");
+                if      (t->u64_value == 8) fprintf(file,"\t" "mov rax, [rbx]\n");
+                else if (t->u64_value == 4) fprintf(file,"\t" "mov eax, [rbx]\n");
+                else if (t->u64_value == 2) fprintf(file,"\t" "mov  ax, [rbx]\n");
+                else if (t->u64_value == 1) fprintf(file,"\t" "mov  al, [rbx]\n");
+                else NOT_IMPLEMENTED("Generating asm for OP_load with storages size %lu is not implemented.\n", t->u64_value);
+
+                fprintf(file,"\t" "push rax\n");
+                break;
             default:
                 fprintf(stderr, "%s:%d Generating %s opcode is not implemented yet.\n", __FILE__, __LINE__, opcode_name(t->kind));
                 exit(EXIT_FAILURE);

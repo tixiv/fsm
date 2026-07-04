@@ -70,10 +70,16 @@ const char *get_type_name_r(char print_buf[1024], Type *type);
 
 bool is_integer_kind(Type *t);
 bool is_boolean_kind(Type *t);
+bool is_array_kind(Type *t);
+bool is_reference_kind(Type *t);
+
 
 bool types_are_equivalent(Type *t1, Type *t2);
+Type *get_ref_type_for_array_type(Type *t);
+Type *dereferenced_type(Type *t);
 
-bool is_castable_to_integer(Type *t, const char **out_warn);
+size_t get_storage_size(Type *t);
+
 bool is_castable_to(Type *to, Type *from, const char **out_warn);
 
 struct AST_node_s;

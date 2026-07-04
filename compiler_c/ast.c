@@ -49,6 +49,10 @@ void ast_insert_node(AST_node **at, AST_node *new_node) {
             new_node->_cast.body = child;
             break;
         
+        case AST_load:
+            new_node->_load.addr = child;
+            break;
+        
         default:
             NOT_IMPLEMENTED("Inserting AST node of kind %s is not implemented yet.\n", ast_kind_name(new_node->kind));
 
@@ -120,7 +124,13 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_cast:
             if (n->_cast.body) visit(n->_cast.body, arg);
             break;
-            
+        case AST_array_access:
+            if (n->_array.array) visit(n->_array.array, arg);
+            if (n->_array.index) visit(n->_array.index, arg);
+            break;
+        case AST_load:
+            if (n->_load.addr) visit(n->_load.addr, arg);
+            break;
         default:
             NOT_IMPLEMENTED("Visiting %s is not implemented yet.\n", ast_kind_name(n->kind));
             break;

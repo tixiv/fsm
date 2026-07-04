@@ -4,6 +4,7 @@
 #include "tokenizer.h"
 #include "type.h"
 #include "common.h"
+#include "string_builder.h"
 #include <stdarg.h>
 #include <stdint.h>
 
@@ -89,29 +90,39 @@ void annotate_used_visitor(AST_node *n, uint64_t used) {
     }
 }
 
-void try_convert_to_type_if_necessary(AST_node **node, Type *target_type, const char *desc) {
-    AST_node *n = *node;
-    if (n->type == target_type) return;
+void try_convert_to_type_if_necessary(AST_node **n, Type *target_type, const char *desc) {
+    
+    if (!is_reference_kind(target_type) && is_reference_kind((*n)->type)) {
+        AST_node *load = ast_alloc(AST_load, 0);
+        load->type = dereferenced_type((*n)->type);
+        ast_insert_node(n, load);
+    }
+    
+    if ((*n)->type == target_type) return;
 
     const char *warning;
-    if (is_castable_to(target_type, n->type, &warning)) {
-        ast_insert_node(node, make_cast(target_type, n->type));
-        if (warning) type_checker_warning(n->line_number, warning);
-    } else {
+    if (is_castable_to(target_type, (*n)->type, &warning)) {
+        ast_insert_node(n, make_cast(target_type, (*n)->type));
+        if (warning) type_checker_warning((*n)->line_number, warning);
+    }
+    else {
         char buf_1[1024], buf_2[1024];
-        type_checker_error(n->line_number, "Can't convert %s of type '%s' to '%s'.\n",
-            desc, get_type_name_r(buf_1, n->type), get_type_name_r(buf_2, target_type));
+        type_checker_error((*n)->line_number, "Can't convert %s of type '%s' to '%s'.\n",
+            desc, get_type_name_r(buf_1, (*n)->type), get_type_name_r(buf_2, target_type));
     }
 }
 
 void type_propagate_binary_operator(AST_node *n) {
+    TokenKind tk = n->binary.token_kind;
+
+    char buf_1[1024]; SB sb_left; sb_init (&sb_left, buf_1, 1024);
+    char buf_2[1024]; SB sb_right; sb_init (&sb_right, buf_2, 1024);
+
+    sb_printf(&sb_left, "left argument of binary operator %s", token_kind_printable(tk));
+    sb_printf(&sb_right, "left argument of binary operator %s", token_kind_printable(tk));
+
     Type *left_type = n->binary.left->type;
     Type *right_type = n->binary.right->type;
-
-    char buf_1[1024];
-    char buf_2[1024];
-
-    TokenKind tk = n->binary.token_kind;
 
     switch(tk) {
         case TOK_plus:
@@ -123,18 +134,16 @@ void type_propagate_binary_operator(AST_node *n) {
         case TOK_lower:
         case TOK_greater_equal:
         case TOK_lower_equal:
-            if (!is_integer_kind(left_type) || !is_integer_kind(right_type)) {
-                type_checker_error(n->line_number, "Operator %s can't accept non integer arguments. Have '%s' and '%s'.\n",
-                    token_kind_printable(tk), get_type_name_r(buf_1, left_type), get_type_name_r(buf_2, right_type));
-            
-            }
+            try_convert_to_type_if_necessary(&n->binary.left, &builtin_i64, sb_left.buffer);
+            try_convert_to_type_if_necessary(&n->binary.right, &builtin_i64, sb_right.buffer);
+
             n->type = &builtin_i64;
             break;
         
         case TOK_boolean_and:
         case TOK_boolean_or:
-            try_convert_to_type_if_necessary(&n->binary.left, &builtin_bool, "left argument of logical operator");
-            try_convert_to_type_if_necessary(&n->binary.right, &builtin_bool, "right argument of logical operator");
+            try_convert_to_type_if_necessary(&n->binary.left, &builtin_bool, sb_left.buffer);
+            try_convert_to_type_if_necessary(&n->binary.right, &builtin_bool, sb_right.buffer);
             n->type = &builtin_bool;            
             break;
         
@@ -285,11 +294,29 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             n->type = &builtin_u8_array;
             break;
 
+        case AST_array_access:
+            if (!is_array_kind(n->_array.array->type)) {
+                type_checker_error(n->line_number,
+                    "Invalid use of [] operator on something that is not an array. Have '%s'.\n",
+                    get_type_name_r(buf_1, n->_array.array->type));
+            }
+            if (!is_integer_kind(n->_array.index->type)) {
+                type_checker_error(n->line_number,
+                    "Invalid use of non integer type '%s' as an array index.\n",
+                    get_type_name_r(buf_1, n->_array.index->type));
+
+            }
+            n->type = get_ref_type_for_array_type(n->_array.array->type);
+            break;
+
         // these have void type
         case AST_arg_list:
         case AST_program:
         case AST_scope:
             n->type = &builtin_void;
+            break;
+        default:
+            NOT_IMPLEMENTED("Type checking %s is not implemented yet.\n", ast_kind_name(n->kind));
             break;
     }
 

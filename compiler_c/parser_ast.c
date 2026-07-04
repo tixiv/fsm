@@ -190,9 +190,19 @@ static AST_node *parse_primary()
             n = ast_alloc(AST_call, CT->line_number);
             n->call.name = *name;
             n->call.args = parse_call_arguments(name);
-        } else {
+        }
+        else {
             n = ast_alloc(AST_symbol, CT->line_number);
             n->symbol.name = *name;
+
+            if (CT->kind == TOK_lbracket) {
+                AST_node *ast_arr = ast_alloc(AST_array_access, CT->line_number);
+                MOVE_NEXT();
+                ast_arr->_array.array = n;
+                ast_arr->_array.index = parse_expression();
+                n = ast_arr;
+                take_expected(TOK_rbracket);
+            }
         }
     }
     else if (CT->kind == TOK_lparen) {

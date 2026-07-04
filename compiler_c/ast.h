@@ -46,6 +46,8 @@ typedef struct {
     X(AST_while) \
     X(AST_for) \
     X(AST_cast) \
+    X(AST_array_access) \
+    X(AST_load) \
 
 typedef enum {
 #define X(name) name,
@@ -137,6 +139,16 @@ typedef struct AST_node_s {
             struct AST_node_s *body;
             Type *right_type; // the left type is the type of the AST node
         } _cast;
+
+        struct {
+            struct AST_node_s *array;
+            struct AST_node_s *index;
+        } _array;
+
+        struct {
+            // the load type is the type of the AST node
+            struct AST_node_s *addr;
+        } _load;
     };
     AST_kind kind;
     int line_number;
