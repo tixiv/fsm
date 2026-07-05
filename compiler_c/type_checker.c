@@ -1,6 +1,7 @@
 
 #include "type_checker.h"
 #include "ast.h"
+#include "sv.h"
 #include "tokenizer.h"
 #include "type.h"
 #include "common.h"
@@ -168,6 +169,9 @@ void type_propagate_binary_operator(AST_node *n) {
             else if (is_integer_kind(left_type) && is_integer_kind(right_type)) {
                 // TODO: Warn if sizes / signs are different
             }
+            else if (is_reference_kind(left_type) && is_integer_kind(dereferenced_type(left_type)) && is_integer_kind(right_type)) {
+                // We will assign to the referenced integer on the left
+            }
             else {
                 type_checker_error(n->line_number, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
                     token_kind_printable(tk), get_type_name_r(buf_1, left_type), get_type_name_r(buf_2, right_type));
@@ -225,8 +229,17 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             n->type = &builtin_i64;
             break;
         case AST_var_decl:
-            if (n->var_decl.initializer)
+            if (n->var_decl._typedecl) {
+                Type *t = n->var_decl._typedecl->type;
+                if (type_should_be_handled_as_ref(t)) {
+                    t = make_ref_to(t);
+                    n->var_decl.symbol->push_as_ref = true;    
+                }
+                n->var_decl.symbol->type = t;
+            }
+            else if (n->var_decl.initializer) {
                 n->var_decl.symbol->type = n->var_decl.initializer->type;
+            }
             else
                 n->var_decl.symbol->type = &builtin_i64;
             n->type = &builtin_void; // the declaration itself has no value.
@@ -324,6 +337,29 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                     get_type_name_r(buf_1, n->deref.body->type));
             }
             n->type = dereferenced_type(n->deref.body->type);
+            break;
+
+        case AST_member_access: {
+            Type *container_type = n->member_access.body->type;
+            ASSERT(container_type, "Unresolved conatainer type encountered.\n")
+            if (!type_can_have_members(container_type))
+                type_checker_error(n->line_number, "Cannot access member in something that is not a struct. Have '%s'.\n",
+                        get_type_name_r(buf_1, container_type));
+
+            size_t offset;
+            Type *t = get_member_type_and_offset(container_type, &n->member_access.name, &offset);
+            if (!t) type_checker_error(n->line_number, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->member_access.name),
+                    get_type_name_r(buf_1, container_type));
+
+            n->type = make_ref_to(t);
+            n->member_access.offset = offset;
+            break;
+        }
+
+        case AST_typename:
+        case AST_member_def:
+        case AST_struct:
+            // already filled in by type resolver
             break;
 
         // these have void type

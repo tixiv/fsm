@@ -3,24 +3,25 @@
 #include "ast.h"
 #include "common.h"
 #include "string_builder.h"
+#include "sv.h"
 #include <malloc.h>
 #include <stdio.h>
 #include <string.h>
 
 Type builtin_void = (Type){T_void};
-Type builtin_bool = (Type){T_boolean};
+Type builtin_bool = (Type){T_boolean, .storage_size = 8};
 
-Type builtin_u64 = (Type){T_unsigned_integer, .integer.storage_size = 8, .integer.num_bits = 64};
-Type builtin_i64 = (Type){T_signed_integer,   .integer.storage_size = 8, .integer.num_bits = 64};
-Type builtin_u32 = (Type){T_unsigned_integer, .integer.storage_size = 4, .integer.num_bits = 32};
-Type builtin_i32 = (Type){T_signed_integer,   .integer.storage_size = 4, .integer.num_bits = 32};
-Type builtin_u16 = (Type){T_unsigned_integer, .integer.storage_size = 2, .integer.num_bits = 16};
-Type builtin_i16 = (Type){T_signed_integer,   .integer.storage_size = 2, .integer.num_bits = 16};
-Type builtin_u8 =  (Type){T_unsigned_integer, .integer.storage_size = 1, .integer.num_bits =  8};
-Type builtin_i8 =  (Type){T_signed_integer,   .integer.storage_size = 1, .integer.num_bits =  8};
+Type builtin_u64 = (Type){T_unsigned_integer, .storage_size = 8, .integer.num_bits = 64};
+Type builtin_i64 = (Type){T_signed_integer,   .storage_size = 8, .integer.num_bits = 64};
+Type builtin_u32 = (Type){T_unsigned_integer, .storage_size = 4, .integer.num_bits = 32};
+Type builtin_i32 = (Type){T_signed_integer,   .storage_size = 4, .integer.num_bits = 32};
+Type builtin_u16 = (Type){T_unsigned_integer, .storage_size = 2, .integer.num_bits = 16};
+Type builtin_i16 = (Type){T_signed_integer,   .storage_size = 2, .integer.num_bits = 16};
+Type builtin_u8 =  (Type){T_unsigned_integer, .storage_size = 1, .integer.num_bits =  8};
+Type builtin_i8 =  (Type){T_signed_integer,   .storage_size = 1, .integer.num_bits =  8};
 
-Type builtin_u8_reference = (Type){T_reference, .reference.target_type = &builtin_u8};
-Type builtin_u8_array = (Type){T_array, .array.element_type = &builtin_u8};
+Type builtin_u8_reference = (Type){T_reference, .storage_size = 8, .reference.target_type = &builtin_u8};
+Type builtin_u8_array = (Type){T_array,         .storage_size = 8, .array.element_type = &builtin_u8};
 
 Type *type_alloc(TypeKind kind) {
     Type *t = malloc(sizeof(Type));
@@ -63,6 +64,9 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
         case T_array:
             sb_printf(&sb, "%s[]", get_type_name_r(child_print_buf, type->reference.target_type));
             break;
+        case T_struct:
+            sb_printf(&sb, "struct %.*s", SV_prnt(type->name));
+            break;
         default:
             NOT_IMPLEMENTED("Dumping type kind %d is not implemented yet.\n", type->kind);
             break;
@@ -87,28 +91,20 @@ bool is_reference_kind(Type *t) {
     return t->kind == T_reference;
 }
 
-size_t get_storage_size(Type *t) {
-    char buf[1024];
-    switch (t->kind) {
-        case T_signed_integer:
-        case T_unsigned_integer:
-            return t->integer.storage_size;
-        case T_boolean: return 8;
-        case T_reference: return 8;
-        default:
-            NOT_IMPLEMENTED("get_storage_size() is not implemented yet for %s\n", get_type_name_r(buf, t));
-            return 0;
-    }
-}
-
 Type *dereferenced_type(Type *t) {
     char buf[1024];
     ASSERT(is_reference_kind(t), "Tried to dereference '%s' which is not a reference.\n",
         get_type_name_r(buf, t));
 
-    if (t == &builtin_u8_reference) return &builtin_u8;
+    return t->reference.target_type;
+}
 
-    NOT_IMPLEMENTED("dereferenced_type() is not implemented yet for %s\n", get_type_name_r(buf, t));
+bool type_can_have_members(Type *t) {
+    return t->kind == T_struct || (is_reference_kind(t) && dereferenced_type(t)->kind == T_struct);
+}
+
+size_t get_storage_size(Type *t) {
+    return t->storage_size;
 }
 
 bool types_are_equivalent(Type *t1, Type *t2) {
@@ -159,4 +155,46 @@ AST_node *make_cast(Type *to, Type *from) {
     n->_cast.right_type = from;
 
     return n;
+}
+
+Type *get_member_type_and_offset(Type *_struct, SV *member_name, size_t *out_offset) {
+
+    if (is_reference_kind(_struct)) _struct = dereferenced_type(_struct);
+    ASSERT(_struct->kind == T_struct,"get_member_type_and_offset() called on something that is not a struct or a struct reference.\n")
+
+    size_t offset = 0;
+    for (int i = 0; i < _struct->_struct.num_members; i++) {
+        TypeMember *member = &_struct->_struct.members[i];
+
+        if (sv_equal(&member->name, member_name)) {
+            if (out_offset) *out_offset = offset;
+            return member->type;
+        }
+        offset += member->type->storage_size;
+    }
+
+    return nullptr;
+}
+
+void calculate_storage_size(Type *_struct) {
+    ASSERT(_struct->kind == T_struct,"calculate_storage_size() called on something that is not a struct.\n")
+    size_t offset = 0;
+    for (int i = 0; i < _struct->_struct.num_members; i++) {
+        TypeMember *member = &_struct->_struct.members[i];
+        offset += member->type->storage_size;
+    }
+    _struct->storage_size = offset;
+}
+
+Type *make_ref_to(Type *t) {
+    // leaky memory, I don't care for now
+    Type *ref = type_alloc(T_reference);
+    ref->reference.target_type = t;
+    ref->storage_size = 8;
+    return ref;
+}
+
+bool type_should_be_handled_as_ref(Type *t) {
+    if (t->kind == T_struct) return true;
+    return false;
 }

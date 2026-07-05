@@ -10,6 +10,7 @@
 #include "operator_chaining.h"
 #include "resolver.h"
 #include "type_checker.h"
+#include "type_resolver.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -67,6 +68,8 @@ int main (int argc, const char *argv[]) {
     AST_node *ast = parse_program_ast();
 
     chain_operators(ast);
+
+    run_type_resolver(ast);
 
     resolver(ast);
 

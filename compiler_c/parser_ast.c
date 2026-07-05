@@ -44,9 +44,33 @@ static Token *current_token;
 #define CT current_token
 #define MOVE_NEXT() (current_token++)
 
+static void expect_token(TokenKind tok) {
+    if (CT->kind != tok) {
+        parser_error(CT->line_number, "Expected %s but got %s",
+            token_kind_printable(tok), token_kind_printable(CT->kind));
+    }
+}
+
+static void take_expected(TokenKind tok) {
+    expect_token(tok);
+    MOVE_NEXT();
+}
+
 static AST_node *parse_statement();
 static AST_node *parse_expression();
 static AST_node *parse_scope_body();
+
+static AST_node *try_parse_typedef() {
+    if(CT->kind == TOK_colon) {
+        AST_node *ast_typedef = ast_alloc(AST_typename, CT->line_number);
+        MOVE_NEXT();
+        expect_token(TOK_identifier);
+        ast_typedef->_typename.name = CT->value;
+        MOVE_NEXT();
+        return ast_typedef;
+    }
+    return nullptr;
+}
 
 static AST_node *parse_if() {
     debug_log_parser("Entering %s\n", __func__);
@@ -104,18 +128,6 @@ static AST_node *parse_while() {
     debug_log_parser("Leaving %s\n", __func__);
 
     return n;
-}
-
-static void expect_token(TokenKind tok) {
-    if (CT->kind != tok) {
-        parser_error(CT->line_number, "Expected %s but got %s",
-            token_kind_printable(tok), token_kind_printable(CT->kind));
-    }
-}
-
-static void take_expected(TokenKind tok) {
-    expect_token(tok);
-    MOVE_NEXT();
 }
 
 static AST_node *parse_for() {
@@ -206,6 +218,14 @@ static AST_node *parse_primary()
                 
                 n = ast_deref;
                 take_expected(TOK_rbracket);
+            } else if (CT->kind == TOK_dot) {
+                AST_node *ast_member_access = ast_alloc(AST_member_access, CT->line_number);
+                MOVE_NEXT();
+                expect_token(TOK_identifier);
+                ast_member_access->member_access.body = n;
+                ast_member_access->member_access.name = CT->value;
+                n = ast_member_access;
+                MOVE_NEXT();
             }
         }
     }
@@ -313,6 +333,8 @@ static AST_node *parse_statement()
         n->var_decl.name = CT->value;
         MOVE_NEXT();
 
+        n->var_decl._typedecl = try_parse_typedef();
+
         if (CT->kind == TOK_equal_assign) {
             MOVE_NEXT();
             n->var_decl.initializer = parse_expression();
@@ -387,24 +409,15 @@ static void insert_implicit_return(AST_node *scope) {
 static AST_node *parse_function() {
     debug_log_parser("Entering %s\n", __func__);
 
-    assert(CT->kind == TOK_keyword_fn);
+    expect_token(TOK_keyword_fn);
     AST_node *ast_fn = ast_alloc(AST_function, CT->line_number);
     MOVE_NEXT();
 
-    if (CT->kind != TOK_identifier) {
-        parser_error(CT->line_number, "Expected function name but got %s",
-            token_kind_name(CT->kind));
-    }
-
+    expect_token(TOK_identifier);
     ast_fn->fun.name = CT->value;
     MOVE_NEXT();
 
-    if (CT->kind != TOK_lparen) {
-        parser_error(CT->line_number, "Expected '(' but got %s",
-            token_kind_name(CT->kind));
-    }
-    MOVE_NEXT();
-
+    take_expected(TOK_lparen);
 
     // Function arguments
     {
@@ -443,7 +456,6 @@ static AST_node *parse_function() {
     }
 
     expect_token(TOK_lbrace);
-
     ast_fn->fun.body = parse_scope_body();
 
     insert_implicit_return(ast_fn->fun.body);
@@ -451,6 +463,55 @@ static AST_node *parse_function() {
     debug_log_parser("Leaving %s\n", __func__);
     return ast_fn;
 }
+
+static AST_node *parse_struct() {
+    debug_log_parser("Entering %s\n", __func__);
+
+    expect_token(TOK_keyword_struct);
+    AST_node *ast_struct = ast_alloc(AST_struct, CT->line_number);
+    MOVE_NEXT();
+
+    expect_token(TOK_identifier);
+    ast_struct->_struct.name = CT->value;
+    MOVE_NEXT();
+
+    take_expected(TOK_lbrace);
+
+    // Members
+    {
+        AST_node *latest = nullptr;
+
+        while (1) {
+            if (CT->kind == TOK_rbrace) {
+                MOVE_NEXT();
+                break;
+            }
+            else if(CT->kind == TOK_identifier) {
+                AST_node *member = ast_alloc(AST_member_def, CT->line_number);
+                member->member_def.name = CT->value;
+                MOVE_NEXT();
+                member->member_def._typedef = try_parse_typedef();
+
+                if (latest) {
+                    latest->next = member;
+                } else {
+                    ast_struct->_struct.body = member;
+                }
+                latest = member;
+
+                take_expected(TOK_semicolon);
+            }
+            else {
+                parser_error(CT->line_number, "Expected '}' or struct member definition but got %s",
+                    token_kind_name(CT->kind));
+            }
+        }
+    }
+
+    debug_log_parser("Leaving %s\n", __func__);
+    return ast_struct;
+}
+
 
 AST_node *parse_program_ast() {
     debug_log_parser("Entering %s\n", __func__);
@@ -468,11 +529,19 @@ AST_node *parse_program_ast() {
                 root->program.body = fun;
             last = fun;
         }
+        else if (CT->kind == TOK_keyword_struct) {
+            AST_node *n = parse_struct();
+            if (last) 
+                last->next = n;
+            else
+                root->program.body = n;
+            last = n;
+        }
         else if (CT->kind == TOK_eof) {
             break;
         } else {
-            parser_error(CT->line_number, "Expected 'fn' or EOF but got %s",
-                token_kind_name(CT->kind));
+            parser_error(CT->line_number, "Expected 'fn' or 'struct' or EOF but got %s",
+                token_kind_printable(CT->kind));
         }
     }
     debug_log_parser("Leaving %s\n", __func__);

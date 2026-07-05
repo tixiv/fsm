@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include "sv.h"
 
 typedef enum {
     T_void,
@@ -12,14 +13,23 @@ typedef enum {
     T_function,
     T_reference,
     T_array,
+    T_struct,
 } TypeKind;
+
+struct Type_s;
+
+typedef struct {
+    SV name;
+    struct Type_s *type;
+} TypeMember;
 
 typedef struct Type_s {
     TypeKind kind;
+    SV name;
+    size_t storage_size;
     union {
         struct {
             size_t num_bits;
-            size_t storage_size;
         } integer;
         
         struct {
@@ -35,6 +45,11 @@ typedef struct Type_s {
             struct Type_s **argument_types;
             struct Type_s *return_type;
         } fun;
+
+        struct {
+            int num_members;
+            TypeMember *members;
+        } _struct;
     };
 } Type;
 
@@ -73,12 +88,19 @@ bool is_boolean_kind(Type *t);
 bool is_array_kind(Type *t);
 bool is_reference_kind(Type *t);
 
+bool type_can_have_members(Type *t);
+
 
 bool types_are_equivalent(Type *t1, Type *t2);
 Type *get_ref_type_for_array_type(Type *t);
 Type *dereferenced_type(Type *t);
+Type *get_member_type_and_offset(Type *_struct, SV *member_name, size_t *out_offset);
 
 size_t get_storage_size(Type *t);
+void calculate_storage_size(Type *t);
+
+Type *make_ref_to(Type *t);
+bool type_should_be_handled_as_ref(Type *t);
 
 bool is_castable_to(Type *to, Type *from, const char **out_warn);
 

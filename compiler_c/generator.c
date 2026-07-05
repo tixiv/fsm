@@ -211,6 +211,10 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "mov rax, [rbp-%lu]\n", 8 + 8 * t->u64_value);
                 fprintf(file,"\t" "push rax\n");
                 break;
+            case OP_push_local_var_ref:
+                fprintf(file,"\t" "lea rax, [rbp-%lu]\n", 8 + 8 * t->u64_value);
+                fprintf(file,"\t" "push rax\n");
+                break;
             case OP_assign_local_var:
                 fprintf(file,"\t" "pop rax\n");
                 fprintf(file,"\t" "mov [rbp-%lu],rax\n", 8 + 8 * t->u64_value);
@@ -252,6 +256,10 @@ void output_asm(const char *asm_file_name) {
                     fprintf(file,"\t" "mov rbx, %lu\n", t->u64_value);
                     fprintf(file,"\t" "mul QWORD rbx\n");
                 }
+                fprintf(file,"\t" "add [rsp], rax\n"); // add to pointer
+                break;
+            case OP_member_access:
+                fprintf(file,"\t" "mov rax, %lu\n", t->u64_value); // offset
                 fprintf(file,"\t" "add [rsp], rax\n"); // add to pointer
                 break;
             case OP_load:

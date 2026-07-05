@@ -19,6 +19,7 @@ typedef struct {
     X(TOK_keyword_else) \
     X(TOK_keyword_while) \
     X(TOK_keyword_for) \
+    X(TOK_keyword_struct) \
     X(TOK_lparen) \
     X(TOK_rparen) \
     X(TOK_lbrace) \
@@ -40,7 +41,9 @@ typedef struct {
     X(TOK_boolean_and) \
     X(TOK_boolean_or) \
     X(TOK_komma) \
+    X(TOK_colon) \
     X(TOK_semicolon) \
+    X(TOK_dot) \
     X(TOK_identifier) \
     X(TOK_string) \
     X(TOK_number) \

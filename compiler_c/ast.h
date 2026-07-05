@@ -24,6 +24,8 @@ typedef struct {
     SymbolKind kind;
     Type *type;
 
+    bool push_as_ref;
+
     size_t size; // stack frame size for functions
     size_t offset; // stack offset for args and local vars
 } Symbol;
@@ -49,6 +51,10 @@ typedef struct {
     X(AST_array_access) \
     X(AST_dereference) \
     X(AST_load) \
+    X(AST_struct) \
+    X(AST_member_def) \
+    X(AST_typename) \
+    X(AST_member_access) \
 
 typedef enum {
 #define X(name) name,
@@ -101,6 +107,7 @@ typedef struct AST_node_s {
 
         struct {
             struct AST_node_s *initializer;
+            struct AST_node_s *_typedecl;
             Symbol *symbol;
             SV name;
         } var_decl;
@@ -154,6 +161,26 @@ typedef struct AST_node_s {
         struct {
             struct AST_node_s *body;
         } deref;
+
+        struct {
+            struct AST_node_s *body;
+            SV name;
+        } _struct;
+
+        struct {
+            struct AST_node_s *_typedef;
+            SV name;
+        } member_def;
+
+        struct {
+            struct AST_node_s *body;
+            SV name;
+            size_t offset;
+        } member_access;
+
+        struct {
+            SV name;
+        } _typename;
     };
     AST_kind kind;
     int line_number;

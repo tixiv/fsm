@@ -83,7 +83,7 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen) {
             il_gen_visitor(n->binary.right, gen);
             il_gen_assign_var(s);
         }
-        if(n->binary.left->kind == AST_dereference) {
+        else if(n->binary.left->kind == AST_dereference) {
             il_gen_visitor(n->binary.left->deref.body, gen);
             il_gen_visitor(n->binary.right, gen);
             push_opcode(OP_store, nullptr, get_storage_size(n->binary.left->type));
@@ -187,8 +187,13 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
                 if (n->result_used)
                     push_opcode(OP_push_arg, nullptr, s->offset);
             } else if (s->kind == SYM_local) {
-                if (n->result_used)
-                    push_opcode(OP_push_local_var, nullptr, s->offset);
+                if (n->result_used) {
+                    if (s->push_as_ref) {
+                        push_opcode(OP_push_local_var_ref, nullptr, s->offset);
+                    } else {
+                        push_opcode(OP_push_local_var, nullptr, s->offset);
+                    }
+                }
             } else {
                 NOT_IMPLEMENTED("Generating IL for AST_symbol with %s is not implemented yet.\n", symbol_kind_name(s->kind));
             }
@@ -243,12 +248,6 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             }
             break;
 
-        case AST_arg_list:
-        case AST_program:
-        case AST_scope:
-            ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
-            break;
-
         case AST_arg_decl:
             // Nothing to do here for an arg decl, as it can't have an initializer
             break;
@@ -271,6 +270,20 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         case AST_array_access:
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             push_opcode(OP_array_access, nullptr, get_storage_size(n->_array.array->type->array.element_type));
+            break;
+        
+        case AST_member_access:
+            ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
+            push_opcode(OP_member_access, nullptr, n->member_access.offset);
+            break;
+
+        case AST_arg_list:
+        case AST_program:
+        case AST_scope:
+        case AST_struct:
+        case AST_member_def:
+        case AST_typename:
+            ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             break;
 
         default:

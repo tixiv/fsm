@@ -23,6 +23,7 @@
     X(OP_push_literal) \
     X(OP_push_string_literal) \
     X(OP_push_local_var) \
+    X(OP_push_local_var_ref) \
     X(OP_assign_local_var) \
     X(OP_if) \
     X(OP_else) \
@@ -32,6 +33,7 @@
     X(OP_while_end) \
     X(OP_to_bool) \
     X(OP_array_access) \
+    X(OP_member_access) \
     X(OP_load) \
     X(OP_store) \
 

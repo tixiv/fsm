@@ -91,6 +91,7 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             if (n->ret.return_val) visit(n->ret.return_val, arg);
             break;
         case AST_var_decl:
+            if (n->var_decl._typedecl) visit(n->var_decl._typedecl, arg);
             if (n->var_decl.initializer) visit(n->var_decl.initializer, arg);
             break;
         case AST_symbol:
@@ -134,6 +135,17 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_dereference:
             if (n->deref.body) visit(n->deref.body, arg);
             break;
+        case AST_struct:
+            ast_visit_chain(n->_struct.body, visit, arg);
+            break;
+        case AST_member_def:
+            if (n->member_def._typedef) visit(n->member_def._typedef, arg);
+            break;
+        case AST_member_access:
+            if (n->member_access.body) visit(n->member_access.body, arg);
+            break;
+        case AST_typename:
+            break;
         default:
             NOT_IMPLEMENTED("Visiting %s is not implemented yet.\n", ast_kind_name(n->kind));
             break;
@@ -163,7 +175,27 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
         case AST_return:
         case AST_while:
         case AST_for:
-            printf("%.*s%s\n", (int)spaces, spc, kind_name);
+            printf("%.*s%s \n", (int)spaces, spc, kind_name);
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_load:
+            printf("%.*s%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf, n->type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_struct:
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->_struct.name), get_type_name_r(buf, n->type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_member_def:
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->member_def.name), get_type_name_r(buf, n->type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_member_access:
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->member_access.name), get_type_name_r(buf, n->type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_typename:
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->_typename.name), get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_dereference:

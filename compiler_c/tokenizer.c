@@ -74,6 +74,7 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_keyword_else: return("'else'");
         case TOK_keyword_while: return("'while'");
         case TOK_keyword_for: return("'for'");
+        case TOK_keyword_struct: return("'struct'");
         case TOK_lparen: return("'('");
         case TOK_rparen: return("')'");
         case TOK_lbrace: return("'{'");
@@ -95,7 +96,9 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_boolean_and: return("'&&'");
         case TOK_boolean_or: return("'||'");
         case TOK_komma: return("','");
+        case TOK_colon: return("':'");
         case TOK_semicolon: return("';'");
+        case TOK_dot: return("'.'");
         case TOK_identifier: return("identifier");
         case TOK_string: return("string constant");
         case TOK_number: return("number");
@@ -137,6 +140,9 @@ void handle_word(SV *word, int line_number) {
     }
     else if (sv_compare_cstr(word, "for")) {
         push_token(TOK_keyword_for, nullptr, line_number);
+    }
+    else if (sv_compare_cstr(word, "struct")) {
+        push_token(TOK_keyword_struct, nullptr, line_number);
     }
     else {
         push_token(TOK_identifier, word, line_number);
@@ -186,9 +192,17 @@ void tokenizer(SV *code) {
             sv_pop(code);
             push_token(TOK_rbracket, nullptr, line_number);
         }
+        else if (':' == c) {
+            sv_pop(code);
+            push_token(TOK_colon, nullptr, line_number);
+        }
         else if (';' == c) {
             sv_pop(code);
             push_token(TOK_semicolon, nullptr, line_number);
+        }
+        else if ('.' == c) {
+            sv_pop(code);
+            push_token(TOK_dot, nullptr, line_number);
         }
         else if (',' == c) {
             sv_pop(code);
