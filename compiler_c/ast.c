@@ -131,6 +131,9 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_load:
             if (n->_load.addr) visit(n->_load.addr, arg);
             break;
+        case AST_dereference:
+            if (n->deref.body) visit(n->deref.body, arg);
+            break;
         default:
             NOT_IMPLEMENTED("Visiting %s is not implemented yet.\n", ast_kind_name(n->kind));
             break;
@@ -161,6 +164,11 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
         case AST_while:
         case AST_for:
             printf("%.*s%s\n", (int)spaces, spc, kind_name);
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_dereference:
+        case AST_array_access:
+            printf("%.*s%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_function:

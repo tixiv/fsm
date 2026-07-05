@@ -83,8 +83,19 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen) {
             il_gen_visitor(n->binary.right, gen);
             il_gen_assign_var(s);
         }
+        if(n->binary.left->kind == AST_dereference) {
+            il_gen_visitor(n->binary.left->deref.body, gen);
+            il_gen_visitor(n->binary.right, gen);
+            push_opcode(OP_store, nullptr, get_storage_size(n->binary.left->type));
+        }
+        else if(is_reference_kind(n->binary.left->type)) {
+            ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
+            push_opcode(OP_store, nullptr,
+                    get_storage_size(dereferenced_type(n->binary.left->type)));
+        }
         else {
-            il_gen_error(n->line_number,"Trying to assign to something that is not a symbol\n");
+            il_gen_error(n->line_number,"Trying to assign to something that is not a symbol. Have %s.\n",
+                    ast_kind_name(n->binary.left->kind));
         }
     } else {
         ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
@@ -250,7 +261,8 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         case AST_string:
             push_opcode(OP_push_string_literal, &n->str.value, num_strings++);
             break;
-        
+
+        case AST_dereference:
         case AST_load:
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             push_opcode(OP_load, nullptr, get_storage_size(n->type));

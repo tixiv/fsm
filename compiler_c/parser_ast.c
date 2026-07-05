@@ -200,7 +200,11 @@ static AST_node *parse_primary()
                 MOVE_NEXT();
                 ast_arr->_array.array = n;
                 ast_arr->_array.index = parse_expression();
-                n = ast_arr;
+
+                AST_node *ast_deref = ast_alloc(AST_dereference, CT->line_number);
+                ast_deref->deref.body = ast_arr;
+                
+                n = ast_deref;
                 take_expected(TOK_rbracket);
             }
         }

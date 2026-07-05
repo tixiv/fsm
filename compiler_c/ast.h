@@ -47,6 +47,7 @@ typedef struct {
     X(AST_for) \
     X(AST_cast) \
     X(AST_array_access) \
+    X(AST_dereference) \
     X(AST_load) \
 
 typedef enum {
@@ -149,6 +150,10 @@ typedef struct AST_node_s {
             // the load type is the type of the AST node
             struct AST_node_s *addr;
         } _load;
+
+        struct {
+            struct AST_node_s *body;
+        } deref;
     };
     AST_kind kind;
     int line_number;

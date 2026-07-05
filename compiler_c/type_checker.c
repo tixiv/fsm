@@ -160,7 +160,15 @@ void type_propagate_binary_operator(AST_node *n) {
         }
 
         case TOK_equal_assign:
-            if (!types_are_equivalent(left_type, right_type)) {
+            if (types_are_equivalent(left_type, right_type)) {
+            }
+            else if (is_array_kind(left_type) && is_reference_kind(right_type)) {
+                // TODO: check if target type is compatible
+            }
+            else if (is_integer_kind(left_type) && is_integer_kind(right_type)) {
+                // TODO: Warn if sizes / signs are different
+            }
+            else {
                 type_checker_error(n->line_number, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
                     token_kind_printable(tk), get_type_name_r(buf_1, left_type), get_type_name_r(buf_2, right_type));
             }
@@ -307,6 +315,15 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
             }
             n->type = get_ref_type_for_array_type(n->_array.array->type);
+            break;
+
+        case AST_dereference:
+            if (!is_reference_kind(n->deref.body->type)) {
+                type_checker_error(n->line_number,
+                    "Dereferencing something that is not a reference. Have '%s'.\n",
+                    get_type_name_r(buf_1, n->deref.body->type));
+            }
+            n->type = dereferenced_type(n->deref.body->type);
             break;
 
         // these have void type

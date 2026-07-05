@@ -31,8 +31,9 @@
     X(OP_while_check) \
     X(OP_while_end) \
     X(OP_to_bool) \
-    X(OP_load) \
     X(OP_array_access) \
+    X(OP_load) \
+    X(OP_store) \
 
 enum Op_Kind {
 #define X(name) name,

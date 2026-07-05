@@ -11,7 +11,7 @@ void output_asm(const char *asm_file_name) {
 
     const char* header =
     "format ELF64 executable\n"
-    "segment readable executable\n"
+    "segment readable writeable executable\n"
     "entry _start\n"
     "_start:\n"
     "call fn_main\n"
@@ -248,8 +248,10 @@ void output_asm(const char *asm_file_name) {
                 break;
             case OP_array_access:
                 fprintf(file,"\t" "pop rax\n"); // index
-                fprintf(file,"\t" "mov rbx, %lu\n", t->u64_value); // storage size
-                fprintf(file,"\t" "mul QWORD rbx\n");
+                if (t->u64_value != 1) { // storage size
+                    fprintf(file,"\t" "mov rbx, %lu\n", t->u64_value);
+                    fprintf(file,"\t" "mul QWORD rbx\n");
+                }
                 fprintf(file,"\t" "add [rsp], rax\n"); // add to pointer
                 break;
             case OP_load:
@@ -262,6 +264,15 @@ void output_asm(const char *asm_file_name) {
                 else NOT_IMPLEMENTED("Generating asm for OP_load with storages size %lu is not implemented.\n", t->u64_value);
 
                 fprintf(file,"\t" "push rax\n");
+                break;
+            case OP_store:
+                fprintf(file,"\t" "pop rax\n");
+                fprintf(file,"\t" "pop rbx\n");
+                if      (t->u64_value == 8) fprintf(file,"\t" "mov [rbx], rax\n");
+                else if (t->u64_value == 4) fprintf(file,"\t" "mov [rbx], eax\n");
+                else if (t->u64_value == 2) fprintf(file,"\t" "mov [rbx],  ax\n");
+                else if (t->u64_value == 1) fprintf(file,"\t" "mov [rbx],  al\n");
+                else NOT_IMPLEMENTED("Generating asm for OP_store with storages size %lu is not implemented.\n", t->u64_value);
                 break;
             default:
                 fprintf(stderr, "%s:%d Generating %s opcode is not implemented yet.\n", __FILE__, __LINE__, opcode_name(t->kind));
