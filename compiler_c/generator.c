@@ -211,13 +211,13 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "mov rax, [rbp-%lu]\n", t->u64_value);
                 fprintf(file,"\t" "push rax\n");
                 break;
-            case OP_push_local_var_ref:
-                fprintf(file,"\t" "lea rax, [rbp-%lu]\n", t->u64_value);
+            case OP_push_arg_address:
+                fprintf(file,"\t" "lea rax, [rbp+%lu]\n", 16 + t->u64_value);
                 fprintf(file,"\t" "push rax\n");
                 break;
-            case OP_assign_local_var:
-                fprintf(file,"\t" "pop rax\n");
-                fprintf(file,"\t" "mov [rbp-%lu],rax\n", t->u64_value);
+            case OP_push_local_var_address:
+                fprintf(file,"\t" "lea rax, [rbp-%lu]\n", t->u64_value);
+                fprintf(file,"\t" "push rax\n");
                 break;
             case OP_if:
                 fprintf(file,"\t" "pop rax\n");

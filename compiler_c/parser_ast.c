@@ -202,6 +202,11 @@ static AST_node *parse_primary()
         n->str.value = CT->value;
         MOVE_NEXT();
     }
+    else if (CT->kind == TOK_ampersand) {
+        n = ast_alloc(AST_reference, CT->line_number);
+        MOVE_NEXT();
+        n->reference.body = parse_primary();
+    }
     else if (CT->kind == TOK_identifier) {
         SV* name = &CT->value;
         MOVE_NEXT();

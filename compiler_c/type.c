@@ -209,11 +209,6 @@ Type *get_ref_type_for(Type *t) {
     return ref;
 }
 
-bool type_should_be_handled_as_ref(Type *t) {
-    if (t->kind == T_struct) return true;
-    return false;
-}
-
 size_t get_stack_offset_for(Type *t) {
     ASSERT(t, "get_stack_offset_for() called with nullptr.\n");
     int size = t->storage_size;

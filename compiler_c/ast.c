@@ -49,8 +49,8 @@ void ast_insert_node(AST_node **at, AST_node *new_node) {
             new_node->_cast.body = child;
             break;
         
-        case AST_load:
-            new_node->_load.addr = child;
+        case AST_dereference:
+            new_node->deref.body = child;
             break;
         
         default:
@@ -132,11 +132,11 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             if (n->_array.array) visit(n->_array.array, arg);
             if (n->_array.index) visit(n->_array.index, arg);
             break;
-        case AST_load:
-            if (n->_load.addr) visit(n->_load.addr, arg);
-            break;
         case AST_dereference:
             if (n->deref.body) visit(n->deref.body, arg);
+            break;
+        case AST_reference:
+            if (n->reference.body) visit(n->reference.body, arg);
             break;
         case AST_struct:
             ast_visit_chain(n->_struct.body, visit, arg);
@@ -184,7 +184,10 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             printf("%.*s%s \n", (int)spaces, spc, kind_name);
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
-        case AST_load:
+        case AST_type_ref:
+        case AST_dereference:
+        case AST_reference:
+        case AST_array_access:
             printf("%.*s%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
@@ -202,11 +205,6 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             break;
         case AST_typename:
             printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->_typename.name), get_type_name_r(buf, n->type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_dereference:
-        case AST_array_access:
-            printf("%.*s%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_function:

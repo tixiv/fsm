@@ -165,10 +165,12 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_string:
         case AST_array_access:
         case AST_dereference:
+        case AST_reference:
         case AST_struct:
         case AST_member_def:
         case AST_member_access:
         case AST_typename:
+        case AST_type_ref:
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             break;
 

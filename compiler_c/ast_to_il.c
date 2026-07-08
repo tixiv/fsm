@@ -27,16 +27,56 @@ static int num_strings;
 typedef struct {
 } IL_gen;
 
-void il_gen_assign_var(Symbol *s) {
-    ASSERT(s, "IL gen tried to assign to null symbol\n");
+static void il_gen_push_symbol_address(Symbol *s) {
     if (s->kind == SYM_local) {
-        push_opcode(OP_assign_local_var, nullptr, s->offset);
+        push_opcode(OP_push_local_var_address, nullptr, s->offset);
+    } else if (s->kind == SYM_arg) {
+        push_opcode(OP_push_arg_address, nullptr, s->offset);
     } else {
-        NOT_IMPLEMENTED("Generating IL for assigning to %s '%.*s' is not implemented yet.\n", symbol_kind_name(s->kind), SV_prnt(s->name));
+        NOT_IMPLEMENTED("Pushing address for symbol kind %s is not implemented yet.", symbol_kind_name(s->kind));
+    }
+}
+
+static void il_gen_push_symbol(Symbol *s) {
+    if (s->kind == SYM_arg) {
+        push_opcode(OP_push_arg, nullptr, s->offset);
+    } else if (s->kind == SYM_local) {
+        push_opcode(OP_push_local_var, nullptr, s->offset);
+    } else {
+        NOT_IMPLEMENTED("Generating IL for AST_symbol with %s is not implemented yet.\n", symbol_kind_name(s->kind));
     }
 }
 
 static void il_gen_visitor(AST_node *n, IL_gen *gen);
+
+static void il_gen_address_visitor(AST_node *n, IL_gen *gen) {
+
+    switch (n->kind) {
+        case AST_symbol: {
+            Symbol *s = n->symbol.symbol;
+            ASSERT(s, "Symbol for variable assignment to '%.*s' is not resolved\n", SV_prnt(n->symbol.name));
+            if (is_reference_kind(s->type))
+                il_gen_push_symbol(s);
+            else
+                il_gen_push_symbol_address(s);
+            break;
+        }
+
+        case AST_dereference:
+            ast_visit_children(n, (AstVisitor)il_gen_address_visitor, gen);
+            break;
+        
+        case AST_member_access:
+            ast_visit_children(n, (AstVisitor)il_gen_address_visitor, gen);
+            push_opcode(OP_member_access, nullptr, n->member_access.offset);
+            break;
+
+        default:
+            NOT_IMPLEMENTED("il_gen_address_visitor for %s is not implemented yet.\n", ast_kind_name(n->kind));
+            break;
+    }
+    
+}
 
 
 static void gen_binary_operators(AST_node *n, IL_gen *gen) {
@@ -76,27 +116,14 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen) {
         push_opcode(OP_end_if, nullptr, if_num);
     }
     else if (TOK_equal_assign == n->binary.token_kind) {
-        if(n->binary.left->kind == AST_symbol) {
-            Symbol *s = n->binary.left->symbol.symbol;
-            ASSERT(s, "Symbol for variable assignment to '%.*s' is not resolved\n", SV_prnt(n->binary.left->symbol.name))
-            
-            il_gen_visitor(n->binary.right, gen);
-            il_gen_assign_var(s);
-        }
-        else if(n->binary.left->kind == AST_dereference) {
-            il_gen_visitor(n->binary.left->deref.body, gen);
-            il_gen_visitor(n->binary.right, gen);
-            push_opcode(OP_store, nullptr, get_storage_size(n->binary.left->type));
-        }
-        else if(is_reference_kind(n->binary.left->type)) {
-            ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
-            push_opcode(OP_store, nullptr,
-                    get_storage_size(dereferenced_type(n->binary.left->type)));
-        }
-        else {
-            il_gen_error(n->line_number,"Trying to assign to something that is not a symbol. Have %s.\n",
+        if (!n->binary.left->addressable) {
+            il_gen_error(n->line_number,"Trying to assign to something that is not addressable. Have %s.\n",
                     ast_kind_name(n->binary.left->kind));
         }
+        il_gen_address_visitor(n->binary.left, gen);
+        il_gen_visitor(n->binary.right, gen);
+
+        push_opcode(OP_store, nullptr, get_storage_size(n->binary.left->type));
     } else {
         ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
 
@@ -189,19 +216,8 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         case AST_symbol: {
             Symbol *s = n->symbol.symbol;
             ASSERT(s, "symbol '%.*s' was not resolved\n", SV_prnt(n->symbol.name));
-            if (s->kind == SYM_arg) {
-                if (n->result_used)
-                    push_opcode(OP_push_arg, nullptr, s->offset);
-            } else if (s->kind == SYM_local) {
-                if (n->result_used) {
-                    if (s->push_as_ref) {
-                        push_opcode(OP_push_local_var_ref, nullptr, s->offset);
-                    } else {
-                        push_opcode(OP_push_local_var, nullptr, s->offset);
-                    }
-                }
-            } else {
-                NOT_IMPLEMENTED("Generating IL for AST_symbol with %s is not implemented yet.\n", symbol_kind_name(s->kind));
+            if (n->result_used) {
+                il_gen_push_symbol(s);
             }
             break;
         }
@@ -249,8 +265,9 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
 
         case AST_var_decl:
             if (n->var_decl.initializer) {
+                il_gen_push_symbol_address(n->var_decl.symbol);                
                 il_gen_visitor(n->var_decl.initializer, gen);
-                il_gen_assign_var(n->var_decl.symbol);
+                push_opcode(OP_store, nullptr, get_storage_size(n->var_decl.symbol->type));
             }
             break;
 
@@ -268,19 +285,23 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             break;
 
         case AST_dereference:
-        case AST_load:
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             push_opcode(OP_load, nullptr, get_storage_size(n->type));
             break;
+
+        case AST_reference:
+            ast_visit_children(n, (AstVisitor)il_gen_address_visitor, gen);
+            break;
         
         case AST_array_access:
-            ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
+            ast_visit_children(n, (AstVisitor)il_gen_address_visitor, gen);
             push_opcode(OP_array_access, nullptr, get_storage_size(n->_array.array->type->array.element_type));
             break;
         
         case AST_member_access:
-            ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
+            ast_visit_children(n, (AstVisitor)il_gen_address_visitor, gen);
             push_opcode(OP_member_access, nullptr, n->member_access.offset);
+            push_opcode(OP_load, nullptr, get_storage_size(n->type));
             break;
 
         case AST_arg_list:
@@ -289,6 +310,7 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         case AST_struct:
         case AST_member_def:
         case AST_typename:
+        case AST_type_ref:
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             break;
 

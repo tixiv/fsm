@@ -24,8 +24,6 @@ typedef struct {
     SymbolKind kind;
     Type *type;
 
-    bool push_as_ref;
-
     size_t size; // stack frame size for functions
     size_t offset; // stack offset for args and local vars
 } Symbol;
@@ -50,7 +48,7 @@ typedef struct {
     X(AST_cast) \
     X(AST_array_access) \
     X(AST_dereference) \
-    X(AST_load) \
+    X(AST_reference) \
     X(AST_struct) \
     X(AST_member_def) \
     X(AST_typename) \
@@ -68,6 +66,7 @@ const char *ast_kind_name(AST_kind kind);
 typedef struct AST_node_s {
     struct AST_node_s *next;
     Type *type;
+    bool addressable;
     bool result_used;
     union {
         struct {
@@ -161,13 +160,12 @@ typedef struct AST_node_s {
         } _array;
 
         struct {
-            // the load type is the type of the AST node
-            struct AST_node_s *addr;
-        } _load;
+            struct AST_node_s *body;
+        } deref;
 
         struct {
             struct AST_node_s *body;
-        } deref;
+        } reference;
 
         struct {
             struct AST_node_s *body;

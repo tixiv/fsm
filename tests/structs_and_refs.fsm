@@ -1,0 +1,43 @@
+
+struct Foo {
+    f: Foo&;
+    a: u64;
+    b: u64;
+    c: u64;
+}
+
+fn bar (s: Foo&) {
+    let r = s.f;
+    puts("-------- r --------\n");
+    print (r.a);
+    print (r.b);
+    print (r.c);
+    puts("-------- s --------\n");
+    print (s.a);
+    print (s.b);
+    print (s.c);
+}
+
+fn main () {
+    let s: Foo;
+    let r: Foo;
+
+    s.f = &r;
+    
+    s.a = 2342;
+    s.b = 23;
+    s.c = 1337;
+
+    r.a = 1;
+    r.b = 2;
+    r.c = 3;
+    
+    puts("-------- s direct --------\n");
+    print (s.a);
+    print (s.b);
+    print (s.c);
+
+    bar(&s);
+    r.a = s.a
+    bar(&s);
+}

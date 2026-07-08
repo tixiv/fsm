@@ -23,8 +23,8 @@
     X(OP_push_literal) \
     X(OP_push_string_literal) \
     X(OP_push_local_var) \
-    X(OP_push_local_var_ref) \
-    X(OP_assign_local_var) \
+    X(OP_push_local_var_address) \
+    X(OP_push_arg_address) \
     X(OP_if) \
     X(OP_else) \
     X(OP_end_if) \

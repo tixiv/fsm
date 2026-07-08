@@ -93,14 +93,19 @@ void annotate_used_visitor(AST_node *n, uint64_t used) {
     }
 }
 
+void auto_dereference(AST_node **n) {
+    if (!is_reference_kind((*n)->type)) return;
+    AST_node *deref = ast_alloc(AST_dereference, 0);
+    deref->type = dereferenced_type((*n)->type);
+    deref->addressable = true;
+    ast_insert_node(n, deref);
+}
+
 void try_convert_to_type_if_necessary(AST_node **n, Type *target_type, const char *desc) {
-    
-    if (!is_reference_kind(target_type) && is_reference_kind((*n)->type)) {
-        AST_node *load = ast_alloc(AST_load, 0);
-        load->type = dereferenced_type((*n)->type);
-        ast_insert_node(n, load);
-    }
-    
+    if ((*n)->type == target_type) return;
+
+    auto_dereference(n);
+
     if ((*n)->type == target_type) return;
 
     const char *warning;
@@ -169,22 +174,26 @@ void type_propagate_binary_operator(AST_node *n) {
         }
 
         case TOK_equal_assign:
-            if (types_are_equivalent(left_type, right_type)) {
-            }
-            else if (is_array_kind(left_type) && is_reference_kind(right_type)) {
-                // TODO: check if target type is compatible
-            }
-            else if (is_integer_kind(left_type) && is_integer_kind(right_type)) {
-                // TODO: Warn if sizes / signs are different
-            }
-            else if (is_reference_kind(left_type) && is_integer_kind(dereferenced_type(left_type)) && is_integer_kind(right_type)) {
-                // We will assign to the referenced integer on the left
+            if (is_reference_kind(n->binary.left->type) && is_reference_kind(n->binary.right->type) &&
+                dereferenced_type(n->binary.left->type) == dereferenced_type(n->binary.right->type))
+            {
+                // Assign a new value to a reference
             }
             else {
-                type_checker_error(n->line_number, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
-                    token_kind_printable(tk), get_type_name_r(buf_1, left_type), get_type_name_r(buf_2, right_type));
+                auto_dereference(&n->binary.left);
+                auto_dereference(&n->binary.right);
+
+                if (types_are_equivalent(left_type, right_type)) {
+                }
+                else if (is_integer_kind(left_type) && is_integer_kind(right_type)) {
+                    // TODO: Warn if sizes / signs are different
+                }
+                else {
+                    type_checker_error(n->line_number, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
+                        token_kind_printable(tk), get_type_name_r(buf_1, left_type), get_type_name_r(buf_2, right_type));
+                }
             }
-            n->type = right_type;
+            n->type = n->binary.right->type;
             break;
 
         default:
@@ -254,6 +263,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
     switch (n->kind) {
         case AST_number:
             n->type = &builtin_i64;
+            n->addressable = false;
             break;
         case AST_var_decl: {
             Type *t;
@@ -265,9 +275,6 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             }
             else {
                 t = &builtin_i64;
-            }
-            if (type_should_be_handled_as_ref(t)) {
-                n->var_decl.symbol->push_as_ref = true;    
             }
             n->var_decl.symbol->type = t;
 
@@ -281,11 +288,6 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             else
                 t = &builtin_i64;
 
-            if (type_should_be_handled_as_ref(t)) {
-                type_checker_error(n->line_number, "Passing complex types by value is not supported. Please pass object of type '%s' by reference.\n",
-                        get_type_name_r(buf_1, t));
-            }
-
             n->arg_decl.symbol->type = t;
             dyn_array_push_p(&prop->arg_symbols, n->arg_decl.symbol);
             n->type = &builtin_void; // the declaration itself has no value.
@@ -293,25 +295,24 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
         }
         case AST_symbol: {
             Type *t = n->symbol.symbol->type;
-            if (type_should_be_handled_as_ref(t)) {
-                t = get_ref_type_for(t);
-                n->var_decl.symbol->push_as_ref = true;    
-            }
             n->type = t;
+            n->addressable = true;
             break;
         }
-            
 
         case AST_binary:
             type_propagate_binary_operator(n);
+            n->addressable = false;
             break;
         case AST_call:
             type_check_call_args(n);
             n->type = n->call.symbol->type->fun.return_type;
+            n->addressable = false;
             break;
         
         case AST_cast:
             ASSERT(n->type, "Cast without a type. It should have been set at construction.\n");
+            n->addressable = n->_cast.body->addressable;
             break;
 
         case AST_return:
@@ -334,21 +335,25 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                 }
             }
             n->type = &builtin_void; // The return itself always has 'void' type.
+            n->addressable = false;
             break;
 
         case AST_function:
             // function return type is handled in the 'case' for 'AST_return'.
             n->type = n->fun.symbol->type;
+            n->addressable = false;
             break;
 
         case AST_while:
             try_convert_to_type_if_necessary(&n->_while.condition, &builtin_bool, "'while' loop condition");
             n->type = &builtin_void;
+            n->addressable = false;
             break;
 
         case AST_for:
             try_convert_to_type_if_necessary(&n->_for.condition, &builtin_bool, "'for' loop condition");
             n->type = &builtin_void;
+            n->addressable = false;
             break;
         
         case AST_if:
@@ -361,10 +366,12 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                     get_type_name_r(buf_1, _if_type), get_type_name_r(buf_2, _else_type));
             }
             n->type = _if_type;
+            n->addressable = false;
             break;
 
         case AST_string:
             n->type = &builtin_u8_array;
+            n->addressable = true;
             break;
 
         case AST_array_access:
@@ -380,15 +387,23 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
             }
             n->type = get_ref_type_for_array_type(n->_array.array->type);
+            n->addressable = true;
             break;
 
         case AST_dereference:
+            printf("%s:%d Type checking AST_dereference for '%s'\n", current_filename, n->line_number, get_type_name_r(buf_1, n->deref.body->type));
             if (!is_reference_kind(n->deref.body->type)) {
                 type_checker_error(n->line_number,
                     "Dereferencing something that is not a reference. Have '%s'.\n",
                     get_type_name_r(buf_1, n->deref.body->type));
             }
             n->type = dereferenced_type(n->deref.body->type);
+            n->addressable = true;
+            break;
+
+        case AST_reference:
+            n->type = get_ref_type_for(n->reference.body->type);
+            n->addressable = false;
             break;
 
         case AST_member_access: {
@@ -403,8 +418,9 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             if (!t) type_checker_error(n->line_number, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->member_access.name),
                     get_type_name_r(buf_1, container_type));
 
-            n->type = get_ref_type_for(t);
+            n->type = t;
             n->member_access.offset = offset;
+            n->addressable = true;
             break;
         }
 
