@@ -2,6 +2,7 @@
 #include "type.h"
 #include "ast.h"
 #include "common.h"
+#include "dyn_array.h"
 #include "string_builder.h"
 #include "sv.h"
 #include <malloc.h>
@@ -186,11 +187,25 @@ void calculate_storage_size(Type *_struct) {
     _struct->storage_size = offset;
 }
 
-Type *make_ref_to(Type *t) {
-    // leaky memory, I don't care for now
+Type *make_ref_type_for(Type *t) {
     Type *ref = type_alloc(T_reference);
     ref->reference.target_type = t;
     ref->storage_size = 8;
+    return ref;
+}
+
+Dyn_array ref_types;
+
+Type *get_ref_type_for(Type *t) {
+    if (ref_types.capacity == 0)
+        dyn_array_init(&ref_types, sizeof(Type*), 16);
+
+    for (int i = 0; i < ref_types.count; i++) {
+        Type *ref = ((Type**)ref_types.data)[i];
+        if (ref->reference.target_type == t) return ref;
+    }
+    Type *ref = make_ref_type_for(t);
+    dyn_array_push_p(&ref_types, ref);
     return ref;
 }
 

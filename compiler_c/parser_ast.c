@@ -62,12 +62,20 @@ static AST_node *parse_scope_body();
 
 static AST_node *try_parse_typedef() {
     if(CT->kind == TOK_colon) {
-        AST_node *ast_typedef = ast_alloc(AST_typename, CT->line_number);
         MOVE_NEXT();
+        AST_node *ast_type = ast_alloc(AST_typename, CT->line_number);
         expect_token(TOK_identifier);
-        ast_typedef->_typename.name = CT->value;
+        ast_type->_typename.name = CT->value;
         MOVE_NEXT();
-        return ast_typedef;
+
+        if (CT->kind == TOK_ampersand) {
+            AST_node *ast_ref = ast_alloc(AST_type_ref, CT->line_number);
+            ast_ref->_type_ref.body = ast_type;
+            ast_type = ast_ref;
+            MOVE_NEXT();
+        }
+
+        return ast_type;
     }
     return nullptr;
 }

@@ -149,6 +149,9 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             break;
         case AST_typename:
             break;
+        case AST_type_ref:
+            if (n->_type_ref.body) visit(n->_type_ref.body, arg);
+            break;
         default:
             NOT_IMPLEMENTED("Visiting %s is not implemented yet.\n", ast_kind_name(n->kind));
             break;

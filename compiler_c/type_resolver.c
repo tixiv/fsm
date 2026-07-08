@@ -108,10 +108,16 @@ void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
         }
 
         case AST_typename: {
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
             n->type = get_type_by_name(&n->_typename.name);
             if (!n->type) type_resolver_error(n->line_number, "The typename '%.*s' could not be resolved.\n", SV_prnt(n->_typename.name));
             break;
         }
+
+        case AST_type_ref:
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
+            n->type = get_ref_type_for(n->_type_ref.body->type);
+            break;
 
         default:
             ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);

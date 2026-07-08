@@ -54,6 +54,7 @@ typedef struct {
     X(AST_struct) \
     X(AST_member_def) \
     X(AST_typename) \
+    X(AST_type_ref) \
     X(AST_member_access) \
 
 typedef enum {
@@ -187,6 +188,10 @@ typedef struct AST_node_s {
         struct {
             SV name;
         } _typename;
+
+        struct {
+            struct AST_node_s *body;
+        } _type_ref;
     };
     AST_kind kind;
     int line_number;

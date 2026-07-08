@@ -274,19 +274,27 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             n->type = &builtin_void; // the declaration itself has no value.
             break;
         }
-        case AST_arg_decl:
+        case AST_arg_decl: {
+            Type *t;
             if (n->arg_decl._typedecl)
-                n->arg_decl.symbol->type = n->arg_decl._typedecl->type;
+                t = n->arg_decl._typedecl->type;
             else
-                n->arg_decl.symbol->type = &builtin_i64;
+                t = &builtin_i64;
 
+            if (type_should_be_handled_as_ref(t)) {
+                type_checker_error(n->line_number, "Passing complex types by value is not supported. Please pass object of type '%s' by reference.\n",
+                        get_type_name_r(buf_1, t));
+            }
+
+            n->arg_decl.symbol->type = t;
             dyn_array_push_p(&prop->arg_symbols, n->arg_decl.symbol);
             n->type = &builtin_void; // the declaration itself has no value.
             break;
+        }
         case AST_symbol: {
             Type *t = n->symbol.symbol->type;
             if (type_should_be_handled_as_ref(t)) {
-                t = make_ref_to(t);
+                t = get_ref_type_for(t);
                 n->var_decl.symbol->push_as_ref = true;    
             }
             n->type = t;
@@ -395,7 +403,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             if (!t) type_checker_error(n->line_number, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->member_access.name),
                     get_type_name_r(buf_1, container_type));
 
-            n->type = make_ref_to(t);
+            n->type = get_ref_type_for(t);
             n->member_access.offset = offset;
             break;
         }
@@ -403,6 +411,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
         case AST_typename:
         case AST_member_def:
         case AST_struct:
+        case AST_type_ref:
             // already filled in by type resolver
             break;
 

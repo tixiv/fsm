@@ -99,7 +99,7 @@ Type *get_member_type_and_offset(Type *_struct, SV *member_name, size_t *out_off
 size_t get_storage_size(Type *t);
 void calculate_storage_size(Type *t);
 
-Type *make_ref_to(Type *t);
+Type *get_ref_type_for(Type *t);
 bool type_should_be_handled_as_ref(Type *t);
 
 bool is_castable_to(Type *to, Type *from, const char **out_warn);
