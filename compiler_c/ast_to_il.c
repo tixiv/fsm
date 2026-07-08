@@ -139,6 +139,12 @@ static void gen_cast(AST_node *n) {
     {
         // No cast needed.
     }
+    else if (to->kind == T_signed_integer && from->kind == T_signed_integer) {
+        NOT_IMPLEMENTED("Generating cast for sign extension is not implemented yet.\n")
+    }
+    else if (is_integer_kind(to) && from->kind == T_signed_integer) {
+        // Just put no cast for now, let's fix potential problems later
+    }
     else {
         char buf_1[1024], buf_2[1024];
         NOT_IMPLEMENTED("Generating IL for cast to '%s' from '%s' is not implemented yet.\n",
@@ -166,7 +172,7 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             Symbol *s_call = n->call.symbol;
             ASSERT(s_call, "Symbol for called function '%.*s' is not resolved\n", SV_prnt(n->call.name))
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
-            push_opcode(OP_call, &n->call.name, s_call->type->fun.num_arguments);
+            push_opcode(OP_call, &n->call.name, s_call->type->fun.num_arguments * 8);
 
             // printf("IL Gen AST_call: num_fn_returns = %d, result_used = %d, name = '%.*s'\n", s_call->num_fn_returns, n->result_used, SV_prnt(n->call.name));
 

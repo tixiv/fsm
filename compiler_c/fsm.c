@@ -11,6 +11,7 @@
 #include "resolver.h"
 #include "type_checker.h"
 #include "type_resolver.h"
+#include "calculate_stacks.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -49,7 +50,7 @@ void read_file(SV *contents, const char *path)
 
 bool debug_tokens = false;
 bool debug_opcodes = false;
-bool debug_ast = true;
+bool debug_ast = false;
 
 int main (int argc, const char *argv[]) {
     
@@ -77,6 +78,8 @@ int main (int argc, const char *argv[]) {
 
     if (debug_ast)
         ast_dump_tree(ast);
+
+    calculate_stacks(ast);
     
     ast_to_il(ast);
 

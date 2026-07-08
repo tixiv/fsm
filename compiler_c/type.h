@@ -104,5 +104,7 @@ bool type_should_be_handled_as_ref(Type *t);
 
 bool is_castable_to(Type *to, Type *from, const char **out_warn);
 
+size_t get_stack_offset_for(Type *t);
+
 struct AST_node_s;
 struct AST_node_s *make_cast(Type *to, Type *from);

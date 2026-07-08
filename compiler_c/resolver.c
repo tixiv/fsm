@@ -34,7 +34,7 @@ Symbol *alloc_symbol(SymbolKind kind, SV *name) {
     return s;
 }
 
-static Symbol *get_symbol(Dyn_array *arr, size_t index) {
+Symbol *get_symbol(Dyn_array *arr, size_t index) {
     ASSERT(index < arr->count, "Tried to access symbol that does not exist at index %lu\n", index);
     return ((Symbol**)arr->data)[index];
 }
@@ -56,50 +56,6 @@ static void push_symbol(Dyn_array *arr, Symbol *s, int line_number) {
 
     dyn_array_push_p(arr, s);
 }       
-
-static void calculate_function_stack(Resolver *res, Symbol *s_fun) {
-    {
-        int arg_count = 0;
-        for (int i = res->local_symbols.count-1; i >= 0; i--) {
-            Symbol *s = get_symbol(&res->local_symbols, i);
-            if (s->kind == SYM_arg) {
-                s->offset = arg_count;
-                arg_count ++;
-            }
-        }
-
-        Type **arg_types = malloc(sizeof(Type*) * arg_count);
-        for (int i = 0; i < arg_count; i++) {
-            arg_types[i] = get_symbol(&res->local_symbols, i)->type;
-        }
-        s_fun->type = type_alloc(T_function);
-        s_fun->type->fun.num_arguments = arg_count;
-        s_fun->type->fun.argument_types = arg_types;
-    }
-    {
-        int var_count = 0;
-        for (int i = 0; i < res->local_symbols.count; i++) {
-            Symbol *s = get_symbol(&res->local_symbols, i);
-            if (s->kind == SYM_local) {
-                s->offset = var_count;
-                var_count ++;
-            }
-        }
-        s_fun->size = var_count;
-    }
-}
-
-static void resolver_enter_function(Resolver *res, Symbol *s_fun) {
-    res->current_function = s_fun;
-    res->local_symbols.count = 0;
-}
-
-static void resolver_leave_function(Resolver *res) {
-    ASSERT(res->current_function, "Resolver leave function called without active function\n");
-    calculate_function_stack(res, res->current_function);
-    res->current_function = nullptr;
-    res->local_symbols.count = 0;
-}
 
 Type *builtin_print_argument_types[] = { &builtin_i64 };
 
@@ -144,6 +100,17 @@ static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number) 
     return nullptr;
 }
 
+static void resolver_enter_function(Resolver *res, Symbol *s_fun) {
+    res->current_function = s_fun;
+    res->local_symbols.count = 0;
+}
+
+static void resolver_leave_function(Resolver *res) {
+    ASSERT(res->current_function, "Resolver leave function called without active function\n");
+    res->current_function = nullptr;
+    res->local_symbols.count = 0;
+}
+
 static void resolver_visitor(AST_node *n, Resolver *res) {
     switch (n->kind) {
 
@@ -158,11 +125,10 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         }
 
         case AST_arg_decl: {
-            ASSERT(res->current_function, "Found function argument declaration for '%.*s' outside of function\n", SV_prnt(n->var_decl.name));
-            Symbol *s_arg = alloc_symbol(SYM_arg, &n->var_decl.name);
-            s_arg->type = &builtin_i64;
+            ASSERT(res->current_function, "Found function argument declaration for '%.*s' outside of function\n", SV_prnt(n->arg_decl.name));
+            Symbol *s_arg = alloc_symbol(SYM_arg, &n->arg_decl.name);
             push_symbol(&res->local_symbols, s_arg, n->line_number);
-            n->var_decl.symbol = s_arg;
+            n->arg_decl.symbol = s_arg;
             break;
         }
 

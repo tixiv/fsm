@@ -433,7 +433,10 @@ static AST_node *parse_function() {
             }
             else if(CT->kind == TOK_identifier) {
                 AST_node *ast_arg = ast_alloc(AST_arg_decl, CT->line_number);
-                ast_arg->var_decl.name = CT->value;
+                ast_arg->arg_decl.name = CT->value;
+                MOVE_NEXT();
+
+                ast_arg->arg_decl._typedecl = try_parse_typedef();
                 
                 if (latest_arg) {
                     latest_arg->next = ast_arg;
@@ -441,8 +444,6 @@ static AST_node *parse_function() {
                     ast_arglist->arg_list.body = ast_arg;
                 }
                 latest_arg = ast_arg;
-
-                MOVE_NEXT();
 
                 if(CT->kind == TOK_komma) {
                     MOVE_NEXT();

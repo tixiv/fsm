@@ -113,6 +113,12 @@ typedef struct AST_node_s {
         } var_decl;
 
         struct {
+            struct AST_node_s *_typedecl;
+            Symbol *symbol;
+            SV name;
+        } arg_decl;
+
+        struct {
             SV name;
             Symbol *symbol;
         } symbol;

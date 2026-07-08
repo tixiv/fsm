@@ -91,7 +91,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"fn_" SV_FMT ":\n", SV_prnt(t->string_value));
                 fprintf(file,"\t" "push rbp\n");
                 fprintf(file,"\t" "mov rbp, rsp\n");
-                if (t->u64_value) fprintf(file,"\t" "sub rsp, %lu\n", t->u64_value * 8);
+                if (t->u64_value) fprintf(file,"\t" "sub rsp, %lu\n", t->u64_value);
                 break;
             case OP_return:
                 if (t->u64_value) fprintf(file,"\t" "pop rax\n");
@@ -198,26 +198,26 @@ void output_asm(const char *asm_file_name) {
                 break;
             case OP_call:
                 fprintf(file,"\t" "call fn_" SV_FMT "\n", SV_prnt(t->string_value));
-                if (t->u64_value) fprintf(file,"\t" "add rsp, %lu\n", t->u64_value * 8);
+                if (t->u64_value) fprintf(file,"\t" "add rsp, %lu\n", t->u64_value);
                 break;
             case OP_push_result:
                 fprintf(file,"\t" "push rax\n");
                 break;
             case OP_push_arg:
-                fprintf(file,"\t" "mov rax, [rbp+%lu]\n", 16 + 8 * t->u64_value);
+                fprintf(file,"\t" "mov rax, [rbp+%lu]\n", 16 + t->u64_value);
                 fprintf(file,"\t" "push rax\n");
                 break;
             case OP_push_local_var:
-                fprintf(file,"\t" "mov rax, [rbp-%lu]\n", 8 + 8 * t->u64_value);
+                fprintf(file,"\t" "mov rax, [rbp-%lu]\n", t->u64_value);
                 fprintf(file,"\t" "push rax\n");
                 break;
             case OP_push_local_var_ref:
-                fprintf(file,"\t" "lea rax, [rbp-%lu]\n", 8 + 8 * t->u64_value);
+                fprintf(file,"\t" "lea rax, [rbp-%lu]\n", t->u64_value);
                 fprintf(file,"\t" "push rax\n");
                 break;
             case OP_assign_local_var:
                 fprintf(file,"\t" "pop rax\n");
-                fprintf(file,"\t" "mov [rbp-%lu],rax\n", 8 + 8 * t->u64_value);
+                fprintf(file,"\t" "mov [rbp-%lu],rax\n", t->u64_value);
                 break;
             case OP_if:
                 fprintf(file,"\t" "pop rax\n");

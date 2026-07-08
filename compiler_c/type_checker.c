@@ -1,11 +1,13 @@
 
 #include "type_checker.h"
 #include "ast.h"
+#include "dyn_array.h"
 #include "sv.h"
 #include "tokenizer.h"
 #include "type.h"
 #include "common.h"
 #include "string_builder.h"
+#include "resolver.h"
 #include <stdarg.h>
 #include <stdint.h>
 
@@ -131,6 +133,12 @@ void type_propagate_binary_operator(AST_node *n) {
         case TOK_asterisk:
         case TOK_slash:
         case TOK_percent:
+            try_convert_to_type_if_necessary(&n->binary.left, &builtin_i64, sb_left.buffer);
+            try_convert_to_type_if_necessary(&n->binary.right, &builtin_i64, sb_right.buffer);
+
+            n->type = &builtin_i64;
+            break;
+
         case TOK_greater:
         case TOK_lower:
         case TOK_greater_equal:
@@ -138,7 +146,7 @@ void type_propagate_binary_operator(AST_node *n) {
             try_convert_to_type_if_necessary(&n->binary.left, &builtin_i64, sb_left.buffer);
             try_convert_to_type_if_necessary(&n->binary.right, &builtin_i64, sb_right.buffer);
 
-            n->type = &builtin_i64;
+            n->type = &builtin_bool;
             break;
         
         case TOK_boolean_and:
@@ -204,6 +212,7 @@ void type_check_call_args(AST_node *n_call) {
 
 typedef struct {
     Symbol *current_function_symbol;
+    Dyn_array arg_symbols;
 } PropagationVisitorData;
 
 void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
@@ -213,10 +222,28 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
     switch (n->kind) {
         case AST_function:
             prop->current_function_symbol = n->fun.symbol;
-            n->type = n->fun.symbol->type;
             ast_visit_children(n, (AstVisitor)type_propagation_visitor, prop);
             prop->current_function_symbol = nullptr;
             break;
+
+        case AST_arg_list: {
+            Symbol *s_fun = prop->current_function_symbol;
+            ASSERT(s_fun, "Encountered arglist without active function symbol.\n");
+            prop->arg_symbols.count = 0;
+
+            // visiting the children of the arg list will fill up 'arg_symbols'
+            ast_visit_children(n, (AstVisitor)type_propagation_visitor, prop);
+
+            Type **arg_types = malloc(sizeof(Type*) * prop->arg_symbols.count);
+            for (int i = 0; i < prop->arg_symbols.count; i++) {
+                arg_types[i] = get_symbol(&prop->arg_symbols, i)->type;
+            }
+
+            s_fun->type = type_alloc(T_function);
+            s_fun->type->fun.num_arguments = prop->arg_symbols.count;
+            s_fun->type->fun.argument_types = arg_types;
+            break;
+        }
 
         default:
             ast_visit_children(n, (AstVisitor)type_propagation_visitor, prop);
@@ -228,29 +255,45 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
         case AST_number:
             n->type = &builtin_i64;
             break;
-        case AST_var_decl:
+        case AST_var_decl: {
+            Type *t;
             if (n->var_decl._typedecl) {
-                Type *t = n->var_decl._typedecl->type;
-                if (type_should_be_handled_as_ref(t)) {
-                    t = make_ref_to(t);
-                    n->var_decl.symbol->push_as_ref = true;    
-                }
-                n->var_decl.symbol->type = t;
+                t = n->var_decl._typedecl->type;
             }
             else if (n->var_decl.initializer) {
-                n->var_decl.symbol->type = n->var_decl.initializer->type;
+                t = n->var_decl.initializer->type;
             }
-            else
-                n->var_decl.symbol->type = &builtin_i64;
+            else {
+                t = &builtin_i64;
+            }
+            if (type_should_be_handled_as_ref(t)) {
+                n->var_decl.symbol->push_as_ref = true;    
+            }
+            n->var_decl.symbol->type = t;
+
             n->type = &builtin_void; // the declaration itself has no value.
             break;
+        }
         case AST_arg_decl:
-            n->var_decl.symbol->type = &builtin_i64;
+            if (n->arg_decl._typedecl)
+                n->arg_decl.symbol->type = n->arg_decl._typedecl->type;
+            else
+                n->arg_decl.symbol->type = &builtin_i64;
+
+            dyn_array_push_p(&prop->arg_symbols, n->arg_decl.symbol);
             n->type = &builtin_void; // the declaration itself has no value.
             break;
-        case AST_symbol:
-            n->type = n->symbol.symbol->type;
+        case AST_symbol: {
+            Type *t = n->symbol.symbol->type;
+            if (type_should_be_handled_as_ref(t)) {
+                t = make_ref_to(t);
+                n->var_decl.symbol->push_as_ref = true;    
+            }
+            n->type = t;
             break;
+        }
+            
+
         case AST_binary:
             type_propagate_binary_operator(n);
             break;
@@ -287,6 +330,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
         case AST_function:
             // function return type is handled in the 'case' for 'AST_return'.
+            n->type = n->fun.symbol->type;
             break;
 
         case AST_while:
@@ -378,6 +422,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
 void run_typechecking(AST_node *root) {
     PropagationVisitorData pvd = {0};
+    dyn_array_init(&pvd.arg_symbols, sizeof(void*), 8);
     type_propagation_visitor(root, &pvd);
 
     annotate_used_visitor(root, 0);

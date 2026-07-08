@@ -198,3 +198,13 @@ bool type_should_be_handled_as_ref(Type *t) {
     if (t->kind == T_struct) return true;
     return false;
 }
+
+size_t get_stack_offset_for(Type *t) {
+    ASSERT(t, "get_stack_offset_for() called with nullptr.\n");
+    int size = t->storage_size;
+
+    //char buf[1024];
+    //printf("%s: %s %d %d", __FUNCTION__, get_type_name_r(buf, t), size, ((size + 7) / 8) * 8);
+
+    return ((size + 7) / 8) * 8;
+}

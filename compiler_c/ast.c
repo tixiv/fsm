@@ -94,8 +94,11 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             if (n->var_decl._typedecl) visit(n->var_decl._typedecl, arg);
             if (n->var_decl.initializer) visit(n->var_decl.initializer, arg);
             break;
-        case AST_symbol:
         case AST_arg_decl:
+            if (n->arg_decl._typedecl) visit(n->arg_decl._typedecl, arg);
+            break;
+
+        case AST_symbol:
         case AST_number:
         case AST_string:
             break;
@@ -208,9 +211,14 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_var_decl:
-        case AST_arg_decl:
             printf("%.*s%s '%.*s' ", (int)spaces, spc, kind_name, SV_prnt(n->var_decl.name));
             print_symbol(n->var_decl.symbol);
+            printf("\n");
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_arg_decl:
+            printf("%.*s%s '%.*s' ", (int)spaces, spc, kind_name, SV_prnt(n->arg_decl.name));
+            print_symbol(n->arg_decl.symbol);
             printf("\n");
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
