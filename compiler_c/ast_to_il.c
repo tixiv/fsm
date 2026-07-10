@@ -25,6 +25,7 @@ static int num_whiles;
 static int num_strings;
 
 typedef struct {
+    bool addr_dereferenced;
 } IL_gen;
 
 static void il_gen_push_symbol_address(Symbol *s) {
@@ -43,7 +44,7 @@ static void il_gen_push_symbol(Symbol *s) {
     } else if (s->kind == SYM_local) {
         push_opcode(OP_push_local_var, nullptr, s->offset);
     } else {
-        NOT_IMPLEMENTED("Generating IL for AST_symbol with %s is not implemented yet.\n", symbol_kind_name(s->kind));
+        NOT_IMPLEMENTED("Pushing symbol kind %s is not implemented yet.\n", symbol_kind_name(s->kind));
     }
 }
 
@@ -51,11 +52,15 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen);
 
 static void il_gen_address_visitor(AST_node *n, IL_gen *gen) {
 
+    // char buf[1024];
+
     switch (n->kind) {
         case AST_symbol: {
             Symbol *s = n->symbol.symbol;
             ASSERT(s, "Symbol for variable assignment to '%.*s' is not resolved\n", SV_prnt(n->symbol.name));
-            if (is_reference_kind(s->type))
+
+            // printf("Address visitor for pushing '%.*s', type = '%s'\n", SV_prnt(n->symbol.name), get_type_name_r(buf, s->type));
+            if (gen->addr_dereferenced)
                 il_gen_push_symbol(s);
             else
                 il_gen_push_symbol_address(s);
@@ -63,10 +68,17 @@ static void il_gen_address_visitor(AST_node *n, IL_gen *gen) {
         }
 
         case AST_dereference:
+            gen->addr_dereferenced = true;
+            ast_visit_children(n, (AstVisitor)il_gen_address_visitor, gen);
+            break;
+        
+        case AST_reference:
+            gen->addr_dereferenced = false;
             ast_visit_children(n, (AstVisitor)il_gen_address_visitor, gen);
             break;
         
         case AST_member_access:
+            gen->addr_dereferenced = true;
             ast_visit_children(n, (AstVisitor)il_gen_address_visitor, gen);
             push_opcode(OP_member_access, nullptr, n->member_access.offset);
             break;
@@ -120,30 +132,41 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen) {
             il_gen_error(n->line_number,"Trying to assign to something that is not addressable. Have %s.\n",
                     ast_kind_name(n->binary.left->kind));
         }
+        gen->addr_dereferenced = false;
         il_gen_address_visitor(n->binary.left, gen);
         il_gen_visitor(n->binary.right, gen);
 
         push_opcode(OP_store, nullptr, get_storage_size(n->binary.left->type));
-    } else {
+    }
+    else if (TOK_bind_ref == n->binary.token_kind) {
+        if (!n->binary.left->addressable) {
+            il_gen_error(n->line_number,"Trying to assign to something that is not addressable. Have %s.\n",
+                    ast_kind_name(n->binary.left->kind));
+        }
+        gen->addr_dereferenced = false;
+        il_gen_address_visitor(n->binary.left, gen);
+        il_gen_visitor(n->binary.right, gen);
+
+        push_opcode(OP_store, nullptr, get_storage_size(n->binary.left->type));
+    }
+    else {
         ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
 
-        if (n->result_used) {
-            switch (n->binary.token_kind) {
-                case TOK_plus: push_opcode(OP_add, nullptr, 0); break;
-                case TOK_minus: push_opcode(OP_sub, nullptr, 0); break;
-                case TOK_asterisk: push_opcode(OP_mul, nullptr, 0); break;
-                case TOK_slash: push_opcode(OP_div, nullptr, 0); break;
-                case TOK_percent: push_opcode(OP_mod, nullptr, 0); break;
-                case TOK_equal: push_opcode(OP_equal, nullptr, 0); break;
-                case TOK_unequal: push_opcode(OP_unequal, nullptr, 0); break;
-                case TOK_greater: push_opcode(OP_compare_GT, nullptr, 0); break;
-                case TOK_lower: push_opcode(OP_compare_LT, nullptr, 0); break;
-                case TOK_greater_equal: push_opcode(OP_compare_GE, nullptr, 0); break;
-                case TOK_lower_equal: push_opcode(OP_compare_LE, nullptr, 0); break;
+        switch (n->binary.token_kind) {
+            case TOK_plus:          if (n->result_used) push_opcode(OP_add, nullptr, 0); break;
+            case TOK_minus:         if (n->result_used) push_opcode(OP_sub, nullptr, 0); break;
+            case TOK_asterisk:      if (n->result_used) push_opcode(OP_mul, nullptr, 0); break;
+            case TOK_slash:         if (n->result_used) push_opcode(OP_div, nullptr, 0); break;
+            case TOK_percent:       if (n->result_used) push_opcode(OP_mod, nullptr, 0); break;
+            case TOK_equal:         if (n->result_used) push_opcode(OP_equal, nullptr, 0); break;
+            case TOK_unequal:       if (n->result_used) push_opcode(OP_unequal, nullptr, 0); break;
+            case TOK_greater:       if (n->result_used) push_opcode(OP_compare_GT, nullptr, 0); break;
+            case TOK_lower:         if (n->result_used) push_opcode(OP_compare_LT, nullptr, 0); break;
+            case TOK_greater_equal: if (n->result_used) push_opcode(OP_compare_GE, nullptr, 0); break;
+            case TOK_lower_equal:   if (n->result_used) push_opcode(OP_compare_LE, nullptr, 0); break;
 
-                default:
-                    NOT_IMPLEMENTED("Generating IL for binary operator %s is not implemented yet.\n", token_kind_name(n->binary.token_kind));
-            }
+            default:
+                NOT_IMPLEMENTED("Generating IL for binary operator %s is not implemented yet.\n", token_kind_name(n->binary.token_kind));
         }
     }
 }

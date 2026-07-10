@@ -5,8 +5,19 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
-#define FSM_TOKENIZER "[FSM Tokenizer]: "
+static void tokenizer_error(int line_number, const char * fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    fprintf(stderr, "[FSM Tokenizer] %s:%d Error: ", current_filename, line_number);
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
+
+    exit(EXIT_FAILURE);
+    va_end(args);
+}
 
 bool is_whitespace(char c) { return c == ' ' ||  c == '\t' || c == '\r'; }
 bool is_numeric(char c) { return c >= '0' && c <= '9'; }
@@ -38,18 +49,18 @@ void read_number(SV *num, SV *input) {
     }
 }
 
-void read_string(SV *str, SV *input) {
+void read_string(SV *str, SV *input, int *line_number) {
     sv_pop(input); // initial '"'
     str->begin = input->begin;
     str->len = 0;
     while(input->len && '"' != *input->begin) {
-        sv_pop(input);
+        if ('\n' == sv_pop(input)) (*line_number)++;
         str->len++;
     }
     if (input->len) {
         sv_pop(input); // closing '"'
     } else {
-        fprintf(stderr, FSM_TOKENIZER "Error: unmatched '\"'. Quitting.");
+        tokenizer_error(*line_number,  "Error: unmatched '\"'. Quitting.");
         exit(EXIT_FAILURE);
     }
 }
@@ -87,6 +98,7 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_slash: return("'/'");
         case TOK_percent: return("'%'");
         case TOK_equal_assign: return("'='");
+        case TOK_bind_ref: return("'=>'");
         case TOK_equal: return("'=='");
         case TOK_unequal: return("'!='");
         case TOK_greater: return("'>'");
@@ -225,6 +237,15 @@ void tokenizer(SV *code) {
             while(code->len && *code->begin != '\n')
                 sv_pop(code);
         }
+        else if (sv_starts_with(code, "/*")) {
+            while(code->len && !sv_starts_with(code, "*/")) {
+                if ('\n' == sv_pop(code)) line_number++;
+            }
+            sv_pop(code); sv_pop(code);
+        }
+        else if (sv_starts_with(code, "*/")) {
+            tokenizer_error(line_number, "Encountered '*/' outside of comment.\n");
+        }
         else if ('/' == c) {
             sv_pop(code);
             push_token(TOK_slash, nullptr, line_number);
@@ -232,6 +253,10 @@ void tokenizer(SV *code) {
         else if ('%' == c) {
             sv_pop(code);
             push_token(TOK_percent, nullptr, line_number);
+        }
+        else if (sv_starts_with(code, "=>")) {
+            sv_pop(code);  sv_pop(code);
+            push_token(TOK_bind_ref, nullptr, line_number);
         }
         else if (sv_starts_with(code, "==")) {
             sv_pop(code);  sv_pop(code);
@@ -275,7 +300,7 @@ void tokenizer(SV *code) {
         }
         else if ('"' == c) {
             SV str;
-            read_string(&str, code);
+            read_string(&str, code, &line_number);
             push_token(TOK_string, &str, line_number);
         }
         else if (is_allowed_at_start_of_identifier(c)) {
@@ -284,7 +309,7 @@ void tokenizer(SV *code) {
             handle_word(&word, line_number);
         }
         else {
-            fprintf(stderr, FSM_TOKENIZER "encountered unhandled character '%c' = 0x%02X. Quitting.\n", c, c);
+            tokenizer_error(line_number,  "encountered unhandled character '%c' = 0x%02X. Quitting.\n", c, c);
             exit(EXIT_FAILURE);
         }
     }

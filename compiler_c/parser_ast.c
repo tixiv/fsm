@@ -220,25 +220,28 @@ static AST_node *parse_primary()
             n = ast_alloc(AST_symbol, CT->line_number);
             n->symbol.name = *name;
 
-            if (CT->kind == TOK_lbracket) {
-                AST_node *ast_arr = ast_alloc(AST_array_access, CT->line_number);
-                MOVE_NEXT();
-                ast_arr->_array.array = n;
-                ast_arr->_array.index = parse_expression();
+            while (CT->kind == TOK_lbracket || CT->kind == TOK_dot) {
+                if (CT->kind == TOK_lbracket) {
+                    AST_node *ast_arr = ast_alloc(AST_array_access, CT->line_number);
+                    MOVE_NEXT();
+                    ast_arr->_array.array = n;
+                    ast_arr->_array.index = parse_expression();
 
-                AST_node *ast_deref = ast_alloc(AST_dereference, CT->line_number);
-                ast_deref->deref.body = ast_arr;
-                
-                n = ast_deref;
-                take_expected(TOK_rbracket);
-            } else if (CT->kind == TOK_dot) {
-                AST_node *ast_member_access = ast_alloc(AST_member_access, CT->line_number);
-                MOVE_NEXT();
-                expect_token(TOK_identifier);
-                ast_member_access->member_access.body = n;
-                ast_member_access->member_access.name = CT->value;
-                n = ast_member_access;
-                MOVE_NEXT();
+                    AST_node *ast_deref = ast_alloc(AST_dereference, CT->line_number);
+                    ast_deref->deref.body = ast_arr;
+                    
+                    n = ast_deref;
+                    take_expected(TOK_rbracket);
+                } 
+                if (CT->kind == TOK_dot) {
+                    AST_node *ast_member_access = ast_alloc(AST_member_access, CT->line_number);
+                    MOVE_NEXT();
+                    expect_token(TOK_identifier);
+                    ast_member_access->member_access.body = n;
+                    ast_member_access->member_access.name = CT->value;
+                    n = ast_member_access;
+                    MOVE_NEXT();
+                }
             }
         }
     }
@@ -276,7 +279,7 @@ static AST_node *parse_primary()
 #define NUM_MAX_OPERATORS_IN_PRIO 4
 
 const uint8_t operator_table[NUM_PRIOS][NUM_MAX_OPERATORS_IN_PRIO] =  {
-    { TOK_equal_assign, 0, 0, 0},
+    { TOK_equal_assign, TOK_bind_ref, 0, 0},
     { TOK_boolean_or, 0, 0, 0},
     { TOK_boolean_and, 0, 0, 0},
     { TOK_greater, TOK_lower, TOK_greater_equal, TOK_lower_equal},
@@ -348,7 +351,8 @@ static AST_node *parse_statement()
 
         n->var_decl._typedecl = try_parse_typedef();
 
-        if (CT->kind == TOK_equal_assign) {
+        if (CT->kind == TOK_equal_assign || CT->kind == TOK_bind_ref) {
+            n->var_decl.initializer_operator = CT->kind;
             MOVE_NEXT();
             n->var_decl.initializer = parse_expression();
         }

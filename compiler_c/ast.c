@@ -52,6 +52,10 @@ void ast_insert_node(AST_node **at, AST_node *new_node) {
         case AST_dereference:
             new_node->deref.body = child;
             break;
+
+        case AST_reference:
+            new_node->reference.body = child;
+            break;
         
         default:
             NOT_IMPLEMENTED("Inserting AST node of kind %s is not implemented yet.\n", ast_kind_name(new_node->kind));

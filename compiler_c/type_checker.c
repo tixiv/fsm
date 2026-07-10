@@ -101,6 +101,13 @@ void auto_dereference(AST_node **n) {
     ast_insert_node(n, deref);
 }
 
+void insert_take_reference(AST_node **n) {
+    AST_node *ref = ast_alloc(AST_reference, 0);
+    ref->type = get_ref_type_for((*n)->type);
+    ref->addressable = false;
+    ast_insert_node(n, ref);
+}
+
 void try_convert_to_type_if_necessary(AST_node **n, Type *target_type, const char *desc) {
     if ((*n)->type == target_type) return;
 
@@ -121,84 +128,95 @@ void try_convert_to_type_if_necessary(AST_node **n, Type *target_type, const cha
 }
 
 void type_propagate_binary_operator(AST_node *n) {
+    char buf_1[1024];
+    char buf_2[1024];
     TokenKind tk = n->binary.token_kind;
 
-    char buf_1[1024]; SB sb_left; sb_init (&sb_left, buf_1, 1024);
-    char buf_2[1024]; SB sb_right; sb_init (&sb_right, buf_2, 1024);
-
-    sb_printf(&sb_left, "left argument of binary operator %s", token_kind_printable(tk));
-    sb_printf(&sb_right, "left argument of binary operator %s", token_kind_printable(tk));
-
-    Type *left_type = n->binary.left->type;
-    Type *right_type = n->binary.right->type;
-
-    switch(tk) {
-        case TOK_plus:
-        case TOK_minus:
-        case TOK_asterisk:
-        case TOK_slash:
-        case TOK_percent:
-            try_convert_to_type_if_necessary(&n->binary.left, &builtin_i64, sb_left.buffer);
-            try_convert_to_type_if_necessary(&n->binary.right, &builtin_i64, sb_right.buffer);
-
-            n->type = &builtin_i64;
-            break;
-
-        case TOK_greater:
-        case TOK_lower:
-        case TOK_greater_equal:
-        case TOK_lower_equal:
-            try_convert_to_type_if_necessary(&n->binary.left, &builtin_i64, sb_left.buffer);
-            try_convert_to_type_if_necessary(&n->binary.right, &builtin_i64, sb_right.buffer);
-
-            n->type = &builtin_bool;
-            break;
-        
-        case TOK_boolean_and:
-        case TOK_boolean_or:
-            try_convert_to_type_if_necessary(&n->binary.left, &builtin_bool, sb_left.buffer);
-            try_convert_to_type_if_necessary(&n->binary.right, &builtin_bool, sb_right.buffer);
-            n->type = &builtin_bool;            
-            break;
-        
-        case TOK_equal:
-        case TOK_unequal: {
-            // TODO: improve this check
-            bool okay = left_type == right_type || (is_integer_kind(left_type) && is_integer_kind(right_type));
-            if (!okay) {
-                type_checker_error(n->line_number, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
-                    token_kind_printable(tk), get_type_name_r(buf_1, left_type), get_type_name_r(buf_2, right_type));
-            }
-            n->type = &builtin_bool;
-            break;
+    if (tk == TOK_bind_ref) {
+        if (!is_reference_kind(n->binary.left->type)) {
+            type_checker_error(n->line_number, "Operator %s requires a reference type on the left side. Have '%s' and '%s'.\n",
+                token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.left->type));
         }
+        if (!is_reference_kind(n->binary.right->type))
+            insert_take_reference(&n->binary.right);
 
-        case TOK_equal_assign:
-            if (is_reference_kind(n->binary.left->type) && is_reference_kind(n->binary.right->type) &&
-                dereferenced_type(n->binary.left->type) == dereferenced_type(n->binary.right->type))
-            {
-                // Assign a new value to a reference
+        if (n->binary.left->type != n->binary.right->type) {
+            type_checker_error(n->line_number, "Operator %s requires the type on the right side to be referenceable by the left type. Have '%s' and '%s'.\n",
+                token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.left->type));
+        }
+        
+        n->type = n->binary.right->type;
+    }
+    else {
+        SB sb_left; sb_init (&sb_left, buf_1, 1024);
+        SB sb_right; sb_init (&sb_right, buf_2, 1024);
+
+        sb_printf(&sb_left, "left argument of binary operator %s", token_kind_printable(tk));
+        sb_printf(&sb_right, "left argument of binary operator %s", token_kind_printable(tk));
+
+        switch(tk) {
+            case TOK_plus:
+            case TOK_minus:
+            case TOK_asterisk:
+            case TOK_slash:
+            case TOK_percent:
+                try_convert_to_type_if_necessary(&n->binary.left, &builtin_i64, sb_left.buffer);
+                try_convert_to_type_if_necessary(&n->binary.right, &builtin_i64, sb_right.buffer);
+
+                n->type = &builtin_i64;
+                break;
+
+            case TOK_greater:
+            case TOK_lower:
+            case TOK_greater_equal:
+            case TOK_lower_equal:
+                try_convert_to_type_if_necessary(&n->binary.left, &builtin_i64, sb_left.buffer);
+                try_convert_to_type_if_necessary(&n->binary.right, &builtin_i64, sb_right.buffer);
+
+                n->type = &builtin_bool;
+                break;
+            
+            case TOK_boolean_and:
+            case TOK_boolean_or:
+                try_convert_to_type_if_necessary(&n->binary.left, &builtin_bool, sb_left.buffer);
+                try_convert_to_type_if_necessary(&n->binary.right, &builtin_bool, sb_right.buffer);
+                n->type = &builtin_bool;            
+                break;
+            
+            case TOK_equal:
+            case TOK_unequal: {
+                // TODO: improve this check
+                bool okay = n->binary.left->type == n->binary.right->type || (is_integer_kind(n->binary.left->type) && is_integer_kind(n->binary.right->type));
+                if (!okay) {
+                    type_checker_error(n->line_number, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
+                        token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.left->type));
+                }
+                n->type = &builtin_bool;
+                break;
             }
-            else {
+
+            case TOK_equal_assign:
                 auto_dereference(&n->binary.left);
                 auto_dereference(&n->binary.right);
 
-                if (types_are_equivalent(left_type, right_type)) {
+                if (types_are_equivalent(n->binary.left->type, n->binary.right->type)) {
                 }
-                else if (is_integer_kind(left_type) && is_integer_kind(right_type)) {
+                else if (is_integer_kind(n->binary.left->type) && is_integer_kind(n->binary.right->type)) {
                     // TODO: Warn if sizes / signs are different
                 }
                 else {
                     type_checker_error(n->line_number, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
-                        token_kind_printable(tk), get_type_name_r(buf_1, left_type), get_type_name_r(buf_2, right_type));
+                        token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.left->type));
                 }
-            }
-            n->type = n->binary.right->type;
-            break;
+                n->type = n->binary.right->type;
+                break;
 
-        default:
-            NOT_IMPLEMENTED("Type checking binary operator of kind %s is not implemented yet.\n", token_kind_name(n->binary.token_kind));
-            break;
+        
+
+            default:
+                NOT_IMPLEMENTED("Type checking binary operator of kind %s is not implemented yet.\n", token_kind_name(n->binary.token_kind));
+                break;
+        }
     }
 
 }
@@ -407,16 +425,18 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_member_access: {
-            Type *container_type = n->member_access.body->type;
-            ASSERT(container_type, "Unresolved conatainer type encountered.\n")
-            if (!type_can_have_members(container_type))
+            ASSERT(n->member_access.body->type, "Unresolved conatainer type encountered.\n")
+            if (!type_can_have_members(n->member_access.body->type))
                 type_checker_error(n->line_number, "Cannot access member in something that is not a struct. Have '%s'.\n",
-                        get_type_name_r(buf_1, container_type));
+                        get_type_name_r(buf_1, n->member_access.body->type));
 
             size_t offset;
-            Type *t = get_member_type_and_offset(container_type, &n->member_access.name, &offset);
+            Type *t = get_member_type_and_offset(n->member_access.body->type, &n->member_access.name, &offset);
             if (!t) type_checker_error(n->line_number, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->member_access.name),
-                    get_type_name_r(buf_1, container_type));
+                    get_type_name_r(buf_1, n->member_access.body->type));
+
+            if (!is_reference_kind(n->member_access.body->type))
+                insert_take_reference(&n->member_access.body);
 
             n->type = t;
             n->member_access.offset = offset;

@@ -88,8 +88,9 @@ bool is_boolean_kind(Type *t);
 bool is_array_kind(Type *t);
 bool is_reference_kind(Type *t);
 
-bool type_can_have_members(Type *t);
+int get_ref_order(Type *t);
 
+bool type_can_have_members(Type *t);
 
 bool types_are_equivalent(Type *t1, Type *t2);
 Type *get_ref_type_for_array_type(Type *t);

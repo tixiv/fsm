@@ -92,6 +92,15 @@ bool is_reference_kind(Type *t) {
     return t->kind == T_reference;
 }
 
+int get_ref_order(Type *t) {
+    int ord = 0;
+    while (is_reference_kind(t)) {
+        ord++;
+        t = t->reference.target_type;
+    }
+    return ord;
+}
+
 Type *dereferenced_type(Type *t) {
     char buf[1024];
     ASSERT(is_reference_kind(t), "Tried to dereference '%s' which is not a reference.\n",

@@ -110,6 +110,7 @@ typedef struct AST_node_s {
             struct AST_node_s *_typedecl;
             Symbol *symbol;
             SV name;
+            TokenKind initializer_operator;
         } var_decl;
 
         struct {

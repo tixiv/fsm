@@ -32,6 +32,7 @@ typedef struct {
     X(TOK_slash) \
     X(TOK_percent) \
     X(TOK_equal_assign) \
+    X(TOK_bind_ref) \
     X(TOK_equal) \
     X(TOK_unequal) \
     X(TOK_greater) \

@@ -1,13 +1,13 @@
 
 struct Foo {
-    f: Foo&;
     a: u64;
     b: u64;
     c: u64;
+    f: Foo&;
 }
 
 fn bar (s: Foo&) {
-    let r = s.f;
+    let r =& s.f;
     puts("-------- r --------\n");
     print (r.a);
     print (r.b);
@@ -22,7 +22,7 @@ fn main () {
     let s: Foo;
     let r: Foo;
 
-    s.f = &r;
+    s.f =& r;
     
     s.a = 2342;
     s.b = 23;
