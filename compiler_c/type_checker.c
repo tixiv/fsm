@@ -93,12 +93,18 @@ void annotate_used_visitor(AST_node *n, uint64_t used) {
     }
 }
 
-void auto_dereference(AST_node **n) {
-    if (!is_reference_kind((*n)->type)) return;
+
+void insert_dereference(AST_node **n) {
+    ASSERT (is_reference_kind((*n)->type), "Trying to insert dereference for something that is not a reference.\n")
     AST_node *deref = ast_alloc(AST_dereference, 0);
     deref->type = dereferenced_type((*n)->type);
     deref->addressable = true;
     ast_insert_node(n, deref);
+}
+
+void auto_dereference(AST_node **n) {
+    if (!is_reference_kind((*n)->type)) return;
+    insert_dereference(n);
 }
 
 void insert_take_reference(AST_node **n) {
@@ -289,7 +295,28 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                 t = n->var_decl._typedecl->type;
             }
             else if (n->var_decl.initializer) {
-                t = n->var_decl.initializer->type;
+                if (n->var_decl.initializer_operator == TOK_equal_assign) {
+                    t = n->var_decl.initializer->type;
+                    int ord = get_ref_order(t);
+                    if (ord >= 2) {
+                        type_checker_error(n->line_number, "Can't dereference references of order >1 in value initialization. Have '%'",
+                            get_type_name_r(buf_1, t));
+                    }
+                    else if (ord) {
+                        insert_dereference(&n->var_decl.initializer);
+                        t = dereferenced_type(t);
+                    }
+                } else if (n->var_decl.initializer_operator == TOK_bind_ref) {
+                    if (!is_reference_kind(n->var_decl.initializer->type)) {
+                        t = get_ref_type_for(n->var_decl.initializer->type);
+                        insert_take_reference(&n->var_decl.initializer);
+                    }
+                    else {
+                        t = n->var_decl.initializer->type;
+                    }
+                } else {
+                    NOT_IMPLEMENTED("Initialization with operator %s is not implemented.\n", token_kind_name(n->var_decl.initializer_operator));
+                }
             }
             else {
                 t = &builtin_i64;
@@ -409,7 +436,6 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_dereference:
-            printf("%s:%d Type checking AST_dereference for '%s'\n", current_filename, n->line_number, get_type_name_r(buf_1, n->deref.body->type));
             if (!is_reference_kind(n->deref.body->type)) {
                 type_checker_error(n->line_number,
                     "Dereferencing something that is not a reference. Have '%s'.\n",
@@ -438,7 +464,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             if (!is_reference_kind(n->member_access.body->type))
                 insert_take_reference(&n->member_access.body);
 
-            n->type = t;
+            n->type = get_ref_type_for(t);
             n->member_access.offset = offset;
             n->addressable = true;
             break;

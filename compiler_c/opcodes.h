@@ -36,6 +36,7 @@
     X(OP_member_access) \
     X(OP_load) \
     X(OP_store) \
+    X(OP_store_and_dup) \
 
 enum Op_Kind {
 #define X(name) name,

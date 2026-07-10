@@ -235,11 +235,13 @@ static AST_node *parse_primary()
                 } 
                 if (CT->kind == TOK_dot) {
                     AST_node *ast_member_access = ast_alloc(AST_member_access, CT->line_number);
+                    AST_node *deref = ast_alloc(AST_dereference, CT->line_number);
                     MOVE_NEXT();
                     expect_token(TOK_identifier);
                     ast_member_access->member_access.body = n;
                     ast_member_access->member_access.name = CT->value;
-                    n = ast_member_access;
+                    deref->deref.body = ast_member_access;
+                    n = deref;
                     MOVE_NEXT();
                 }
             }

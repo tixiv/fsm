@@ -1,43 +1,95 @@
 
 struct Foo {
-    a: u64;
-    b: u64;
-    c: u64;
+    x: u64;
+    y: u64;
+    z: u64;
     f: Foo&;
 }
 
 fn bar (s: Foo&) {
-    let r =& s.f;
-    puts("-------- r --------\n");
-    print (r.a);
-    print (r.b);
-    print (r.c);
-    puts("-------- s --------\n");
-    print (s.a);
-    print (s.b);
-    print (s.c);
+    let r => s.f
+    puts("-------- r --------\n")
+    print (r.x)
+    print (r.y)
+    print (r.z)
+    puts("-------- s --------\n")
+    print (s.x)
+    print (s.y)
+    print (s.z)
 }
 
-fn main () {
+fn test_call_and_basics () {
     let s: Foo;
     let r: Foo;
 
-    s.f =& r;
+    s.f => r
     
-    s.a = 2342;
-    s.b = 23;
-    s.c = 1337;
+    s.x = 2342
+    s.y = 23
+    s.z = 1337
 
-    r.a = 1;
-    r.b = 2;
-    r.c = 3;
+    r.x = 1
+    r.y = 2
+    r.z = 3
     
-    puts("-------- s direct --------\n");
-    print (s.a);
-    print (s.b);
-    print (s.c);
+    puts("-------- s direct --------\n")
+    print (s.x)
+    print (s.y)
+    print (s.z)
 
-    bar(&s);
-    r.a = s.a
-    bar(&s);
+    bar(&s)
+    r.x = s.x
+    bar(&s)
+}
+
+fn test_rebinding () {
+    puts ("----- rebinding -----\n")
+    let a: Foo;
+    let b: Foo;
+
+    let r: Foo&;
+
+    r => &a
+    r.x = 1
+
+    r => b
+    r.x = 2
+
+    print(a.x) // 1
+    print(b.x) // 2
+}
+
+fn test_chains () {
+    puts ("----- chains -----\n")
+    let a: Foo;
+    let b: Foo;
+    let c: Foo;
+
+    a.f => b
+    b.f => c
+
+    c.x = 3
+
+    a.f.f.x = 123
+
+    print(c.x) // 123
+}
+
+fn test_aliasing () {
+    puts ("----- aliasing -----\n")
+    let a: Foo;
+
+    let r1 => a
+    let r2 => r1
+
+    r2.x = 42
+
+    print(r1.x)
+}
+
+fn main() {
+    test_call_and_basics()
+    test_rebinding()
+    test_chains()
+    test_aliasing()
 }
