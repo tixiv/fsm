@@ -5,7 +5,8 @@ fn foo (a: i64[4][32]&, j) {
     }
 }
 
-fn main () {
+fn test_two_dimensional_array_and_passing_to_function () {
+    puts("--- two_dimensional_array_and_passing_to_function ---\n")
     let a: i64[4][32];
 
     for (let i = 0; i < a[0].len; i = i + 1) {
@@ -19,4 +20,58 @@ fn main () {
     foo (&a, 1)
     foo (&a, 2)
     foo (&a, 3)
+}
+
+struct Inner {
+    value: i64;
+}
+
+struct Outer {
+    data: Inner[8];
+}
+
+fn test_struct_in_array_in_struct() {
+    puts("--- struct_in_array_in_struct ---\n")
+    let o: Outer;
+
+    for (let i = 0; i < o.data.len; i = i + 1)
+        o.data[i].value = i * 10;
+
+    for (i = 0; i < o.data.len; i = i + 1)
+        print(o.data[i].value);
+}
+
+struct Point {
+    x: i64;
+    y: i64;
+}
+
+fn test_struct_in_array() {
+    puts("--- struct_in_array ---\n")
+    let points: Point[10];
+
+    points[3].x = 123;
+    points[3].y = 456;
+
+    print(points[3].x);
+    print(points[3].y);
+}
+
+struct Matrix {
+    rows: i64[4][4];
+}
+
+fn test_array_in_struct() {
+    puts("--- array_in_struct ---\n")
+    let m: Matrix;
+
+    m.rows[2][3] = 42;
+    print(m.rows[2][3]);
+}
+
+fn main () {
+    test_two_dimensional_array_and_passing_to_function()
+    test_struct_in_array_in_struct()
+    test_struct_in_array()
+    test_array_in_struct()
 }

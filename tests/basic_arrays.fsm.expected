@@ -1,3 +1,4 @@
+--- two_dimensional_array_and_passing_to_function ---
 0
 2
 4
@@ -126,3 +127,17 @@
 1337
 1337
 1337
+--- struct_in_array_in_struct ---
+0
+10
+20
+30
+40
+50
+60
+70
+--- struct_in_array ---
+123
+456
+--- array_in_struct ---
+42

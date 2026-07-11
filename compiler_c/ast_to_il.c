@@ -340,6 +340,7 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         case AST_member_def:
         case AST_typename:
         case AST_type_ref:
+        case AST_type_array:
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             break;
         default:
