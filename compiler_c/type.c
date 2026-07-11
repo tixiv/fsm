@@ -299,6 +299,11 @@ bool is_slice_type(Type *t) {
     return false;
 }
 
+Type *get_slice_element_type(Type *t) {
+    ASSERT(is_slice_type(t), "Tried to get slice element type for non slice type.\n");
+    return dereferenced_type(t->_struct.members[0].type);
+}
+
 size_t get_stack_offset_for(Type *t) {
     ASSERT(t, "get_stack_offset_for() called with nullptr.\n");
     int size = t->storage_size;

@@ -103,6 +103,7 @@ Type *get_ref_type_for(Type *t);
 
 Type *get_array_type(Type *element_type, size_t n_elements);
 Type *get_sclice_type(Type *element_type);
+Type *get_slice_element_type(Type *slice);
 
 bool is_castable_to(Type *to, Type *from, const char **out_warn);
 

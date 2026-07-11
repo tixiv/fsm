@@ -57,6 +57,7 @@ typedef struct {
     X(AST_type_array) \
     X(AST_type_slice) \
     X(AST_member_access) \
+    X(AST_array_to_slice) \
 
 typedef enum {
 #define X(name) name,
@@ -160,6 +161,10 @@ typedef struct AST_node_s {
             struct AST_node_s *body;
             Type *right_type; // the left type is the type of the AST node
         } _cast;
+
+        struct {
+            struct AST_node_s *body;
+        } _array_to_slice;
 
         struct {
             struct AST_node_s *array;

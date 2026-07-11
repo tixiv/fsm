@@ -126,6 +126,7 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen, bool result_used) {
 
 static void gen_cast(AST_node *n) {
     ASSERT(n->kind == AST_cast, "gen_cast() called on wrong kind of AST node\n");
+    char buf_1[1024], buf_2[1024];
 
     Type *to = n->type;
     Type *from = n->_cast.right_type;
@@ -149,7 +150,6 @@ static void gen_cast(AST_node *n) {
         // Just put no cast for now, let's fix potential problems later
     }
     else {
-        char buf_1[1024], buf_2[1024];
         NOT_IMPLEMENTED("Generating IL for cast to '%s' from '%s' is not implemented yet.\n",
             get_type_name_r(buf_1, to), get_type_name_r(buf_2, from));
     }
@@ -235,6 +235,11 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
         case AST_cast:
             ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
             gen_cast(n);
+            break;
+        
+        case AST_array_to_slice:
+            push_opcode(OP_push_literal, nullptr, n->_array_to_slice.body->type->_array.n_elements);
+            gen_address_visitor(n->_array_to_slice.body, gen);
             break;
         
         case AST_string:

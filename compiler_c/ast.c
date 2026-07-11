@@ -57,6 +57,10 @@ void ast_insert_node(AST_node **at, AST_node *new_node) {
             new_node->reference.body = child;
             break;
         
+        case AST_array_to_slice:
+            new_node->_array_to_slice.body = child;
+            break;
+        
         default:
             NOT_IMPLEMENTED("Inserting AST node of kind %s is not implemented yet.\n", ast_kind_name(new_node->kind));
 
@@ -152,6 +156,9 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_cast:
             visit_non_null(n->_cast.body, visit, arg);
             break;
+        case AST_array_to_slice:
+            visit_non_null(n->_array_to_slice.body, visit, arg);
+            break;
         case AST_array_access:
             visit_non_null(n->_array.array, visit, arg);
             visit_non_null(n->_array.index, visit, arg);
@@ -223,10 +230,12 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             break;
         case AST_type_ref:
         case AST_type_array:
+        case AST_type_slice:
         case AST_dereference:
         case AST_reference:
         case AST_array_access:
         case AST_array_len:
+        case AST_array_to_slice:
             printf("%.*s%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;

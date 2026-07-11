@@ -115,13 +115,31 @@ void insert_take_reference(AST_node **n) {
 }
 
 void try_convert_to_type_if_necessary(AST_node **n, Type *target_type, const char *desc) {
+    char buf_1[1024], buf_2[1024];
+
     Type *original_type = (*n)->type;
 
     if (target_type == original_type) return;
 
-    if (is_reference_kind(original_type) && !is_reference_kind(target_type)) {
+    if (!is_reference_kind(target_type) && is_reference_kind(original_type)) {
         insert_dereference(n);
-    } else if (!is_reference_kind(original_type) && is_reference_kind(target_type)) {
+    }
+    
+    if (is_slice_type(target_type) && is_array_kind((*n)->type)) {
+        
+        if (get_slice_element_type(target_type) == (*n)->type->_array.element_type) {
+            AST_node *conv = ast_alloc(AST_array_to_slice, (*n)->line_number);
+            conv->type = get_sclice_type((*n)->type->_array.element_type);
+            ast_insert_node(n, conv);
+            return;
+        }
+        else {
+            type_checker_error((*n)->line_number, "Can't convert %s of type '%s' to '%s'.\n",
+                desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
+        }
+    }
+
+    if (is_reference_kind(target_type) && !is_reference_kind(original_type)) {
         insert_take_reference(n);
     }
 
@@ -133,7 +151,6 @@ void try_convert_to_type_if_necessary(AST_node **n, Type *target_type, const cha
         if (warning) type_checker_warning((*n)->line_number, warning);
     }
     else {
-        char buf_1[1024], buf_2[1024];
         type_checker_error((*n)->line_number, "Can't convert %s of type '%s' to '%s'.\n",
             desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
     }
