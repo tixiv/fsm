@@ -89,6 +89,7 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             break;
         case AST_function:
             if (n->fun.args) visit(n->fun.args, arg);
+            if (n->fun.ret_typedecl) visit(n->fun.ret_typedecl, arg);
             ast_visit_chain(n->fun.body, visit, arg);            
             break;
         case AST_return:

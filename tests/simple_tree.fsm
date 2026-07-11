@@ -1,0 +1,47 @@
+
+struct TreeNode {
+    type: i64;
+    value: i64;
+    left: TreeNode&;
+    right: TreeNode&;
+}
+
+fn init_number (n: TreeNode&, v) {
+    n.type = 0;
+    n.value = v;
+}
+
+fn init_add (n: TreeNode&, left: TreeNode&, right: TreeNode&) {
+    n.type = 1;
+    n.left => left;
+    n.right => right;
+}
+
+fn tree_visitor(n: TreeNode&) : i64 {
+    if (n.type == 1) {
+        let a = tree_visitor(n.left)
+        let b = tree_visitor(n.right)
+        puts("+\n=")
+        print (a + b)
+        return a + b
+    } else {
+        print (n.value)
+        return n.value
+    }
+    return 0
+}
+
+fn main () {
+    let a: TreeNode;
+    init_number(&a, 42);    
+    let b: TreeNode;
+    init_number(&b, 2300);
+    let c: TreeNode;
+    init_number(&c, 13370000);
+    let add_1: TreeNode;
+    init_add(&add_1, &a, &b);
+    let add_2: TreeNode;
+    init_add(&add_2, &add_1, &c);
+
+    tree_visitor(&add_2)
+}

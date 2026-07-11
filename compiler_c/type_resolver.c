@@ -28,6 +28,7 @@ Type *get_struct(size_t index) {
 }
 
 Type *get_type_by_name(const SV *name) {
+    if (sv_compare_cstr(name,"void")) return &builtin_void;
     if (sv_compare_cstr(name,"u64")) return &builtin_u64;
     if (sv_compare_cstr(name,"i64")) return &builtin_i64;
     if (sv_compare_cstr(name,"u32")) return &builtin_u32;

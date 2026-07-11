@@ -60,7 +60,7 @@ static AST_node *parse_statement();
 static AST_node *parse_expression();
 static AST_node *parse_scope_body();
 
-static AST_node *try_parse_typedef() {
+static AST_node *try_parse_typedecl() {
     if(CT->kind == TOK_colon) {
         MOVE_NEXT();
         AST_node *ast_type = ast_alloc(AST_typename, CT->line_number);
@@ -351,7 +351,7 @@ static AST_node *parse_statement()
         n->var_decl.name = CT->value;
         MOVE_NEXT();
 
-        n->var_decl._typedecl = try_parse_typedef();
+        n->var_decl._typedecl = try_parse_typedecl();
 
         if (CT->kind == TOK_equal_assign || CT->kind == TOK_bind_ref) {
             n->var_decl.initializer_operator = CT->kind;
@@ -455,7 +455,7 @@ static AST_node *parse_function() {
                 ast_arg->arg_decl.name = CT->value;
                 MOVE_NEXT();
 
-                ast_arg->arg_decl._typedecl = try_parse_typedef();
+                ast_arg->arg_decl._typedecl = try_parse_typedecl();
                 
                 if (latest_arg) {
                     latest_arg->next = ast_arg;
@@ -474,6 +474,8 @@ static AST_node *parse_function() {
             }
         }
     }
+
+    ast_fn->fun.ret_typedecl = try_parse_typedecl();
 
     expect_token(TOK_lbrace);
     ast_fn->fun.body = parse_scope_body();
@@ -510,7 +512,7 @@ static AST_node *parse_struct() {
                 AST_node *member = ast_alloc(AST_member_def, CT->line_number);
                 member->member_def.name = CT->value;
                 MOVE_NEXT();
-                member->member_def._typedef = try_parse_typedef();
+                member->member_def._typedef = try_parse_typedecl();
 
                 if (latest) {
                     latest->next = member;

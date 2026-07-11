@@ -78,6 +78,7 @@ typedef struct AST_node_s {
         struct {
             struct AST_node_s *args;
             struct AST_node_s *body;
+            struct AST_node_s *ret_typedecl;
             Symbol *symbol;
             SV name;
         } fun;

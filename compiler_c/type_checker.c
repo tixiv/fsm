@@ -255,7 +255,15 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
     switch (n->kind) {
         case AST_function:
             prop->current_function_symbol = n->fun.symbol;
-            ast_visit_children(n, (AstVisitor)type_propagation_visitor, prop);
+            n->fun.symbol->type = type_alloc(T_function);
+            
+            if (n->fun.ret_typedecl) {
+                printf ("Have typedecl for '%.*s'\n", SV_prnt(n->fun.name));
+                type_propagation_visitor(n->fun.ret_typedecl, prop);
+                n->fun.symbol->type->fun.return_type = n->fun.ret_typedecl->type;
+            }
+            if (n->fun.args) type_propagation_visitor(n->fun.args, prop);
+            if (n->fun.body) type_propagation_visitor(n->fun.body, prop);
             prop->current_function_symbol = nullptr;
             break;
 
@@ -272,7 +280,6 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                 arg_types[i] = get_symbol(&prop->arg_symbols, i)->type;
             }
 
-            s_fun->type = type_alloc(T_function);
             s_fun->type->fun.num_arguments = prop->arg_symbols.count;
             s_fun->type->fun.argument_types = arg_types;
             break;
@@ -349,9 +356,13 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             type_propagate_binary_operator(n);
             n->addressable = false;
             break;
+
         case AST_call:
             type_check_call_args(n);
             n->type = n->call.symbol->type->fun.return_type;
+            if (!n->type) type_checker_error(n->line_number,
+                "The return type for recursive function '%.*s' can't be determined automatically, please specify it!",
+                SV_prnt(n->call.symbol->name));
             n->addressable = false;
             break;
         
