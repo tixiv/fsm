@@ -37,6 +37,7 @@ test: $(FSM)
 		./out > $$t.out && \
 		diff -u $$t.expected $$t.out || exit 1; \
 	done
+	@echo All tests succeeded.
 
 clean:
 	rm -rf $(BUILD_DIR)/*

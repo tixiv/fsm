@@ -194,19 +194,6 @@ static void gen_address_visitor(AST_node *n, IL_gen *gen) {
             ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
             break;
 
-/*
-        case AST_reference:
-            ast_visit_children(n, (AstVisitor)gen_address_visitor, gen);
-            break;
-
-
-        
-        case AST_member_access:
-            ast_visit_children(n, (AstVisitor)gen_address_visitor, gen);
-            push_opcode(OP_member_access, nullptr, n->member_access.offset);
-            break;
-*/
-
         default:
             NOT_IMPLEMENTED("il_gen_address_visitor for %s is not implemented yet.\n", ast_kind_name(n->kind));
             break;
@@ -223,16 +210,13 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             break;
 
         case AST_number:
-            if (n->result_used)
-                push_opcode(OP_push_literal, &n->number.value, 0);
+            push_opcode(OP_push_literal, &n->number.value, 0);
             break;
         
         case AST_symbol: {
             Symbol *s = n->symbol.symbol;
             ASSERT(s, "symbol '%.*s' was not resolved\n", SV_prnt(n->symbol.name));
-            if (n->result_used) {
-                il_gen_push_symbol(s);
-            }
+            il_gen_push_symbol(s);
             break;
         }
 
