@@ -86,6 +86,8 @@ bool is_array_kind(Type *t);
 bool is_struct_kind(Type *t);
 bool is_reference_kind(Type *t);
 
+bool is_slice_type(Type *t);
+
 int get_ref_order(Type *t);
 
 bool type_can_have_members(Type *t);
@@ -100,6 +102,7 @@ void calculate_storage_size(Type *t);
 Type *get_ref_type_for(Type *t);
 
 Type *get_array_type(Type *element_type, size_t n_elements);
+Type *get_sclice_type(Type *element_type);
 
 bool is_castable_to(Type *to, Type *from, const char **out_warn);
 

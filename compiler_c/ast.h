@@ -209,7 +209,6 @@ typedef struct AST_node_s {
 
         struct {
             struct AST_node_s *body;
-            size_t n_elements;
         } _type_slice;
     };
 } AST_node;

@@ -80,7 +80,15 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
             print_array_type(&sb, type);
             break;
         case T_struct:
-            sb_printf(&sb, "struct %.*s", SV_prnt(type->name));
+            if (is_slice_type(type)) {
+                sb_printf(&sb, "%s[]", get_type_name_r(child_print_buf, dereferenced_type(type->_struct.members[0].type)));
+            }
+            else if (type->name.begin) {
+                sb_printf(&sb, "struct %.*s", SV_prnt(type->name));
+            }
+            else {
+                sb_printf(&sb, "anonymous struct", SV_prnt(type->name));
+            }
             break;
         default:
             NOT_IMPLEMENTED("Dumping type kind %d is not implemented yet.\n", type->kind);
@@ -214,6 +222,8 @@ static Type *make_ref_type_for(Type *t) {
 Dyn_array ref_types;
 
 Type *get_ref_type_for(Type *t) {
+    if (t == &builtin_u8) return &builtin_u8_reference;
+
     if (ref_types.capacity == 0)
         dyn_array_init(&ref_types, sizeof(Type*), 16);
 
@@ -248,6 +258,45 @@ Type *get_array_type(Type *element_type, size_t n_elements) {
     Type *ref = make_array_type(element_type, n_elements);
     dyn_array_push_p(&array_types, ref);
     return ref;
+}
+
+static Type *make_slice_type(Type *element_type) {
+    Type *slice_t = type_alloc(T_struct);
+    slice_t->_struct.num_members = 2;
+
+    size_t size = 2 * sizeof(TypeMember);
+    slice_t->_struct.members = malloc(size);
+    slice_t->_struct.members[0].type = get_ref_type_for(element_type);
+    slice_t->_struct.members[0].name = mkSV("data");
+    slice_t->_struct.members[1].type = &builtin_i64;
+    slice_t->_struct.members[1].name = mkSV("len");
+
+    calculate_storage_size(slice_t);
+    return slice_t;
+}
+
+Dyn_array slice_types;
+
+Type *get_sclice_type(Type *element_type) {
+    if (slice_types.capacity == 0)
+        dyn_array_init(&slice_types, sizeof(Type*), 16);
+
+    for (int i = 0; i < slice_types.count; i++) {
+        Type *slice = ((Type**)slice_types.data)[i];
+        if (slice->_struct.members[0].type == get_ref_type_for(element_type))
+            return slice;
+    }
+    Type *slice = make_slice_type(element_type);
+    dyn_array_push_p(&slice_types, slice);
+    return slice;
+}
+
+bool is_slice_type(Type *t) {
+    for (int i = 0; i < slice_types.count; i++) {
+        Type *slice = ((Type**)slice_types.data)[i];
+        if (t == slice) return true;
+    }
+    return false;
 }
 
 size_t get_stack_offset_for(Type *t) {

@@ -122,11 +122,14 @@ void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
 
         case AST_type_array:
             ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
-            Type *array_t = type_alloc(T_array);
-            array_t->_array.element_type = n->_type_array.body->type;
-            array_t->_array.n_elements = n->_type_array.n_elements;
             n->type = get_array_type(n->_type_array.body->type, n->_type_array.n_elements);
             break;
+
+        case AST_type_slice: {
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
+            n->type = get_sclice_type(n->_type_slice.body->type);
+            break;
+        }
 
         default:
             ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);

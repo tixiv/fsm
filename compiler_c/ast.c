@@ -179,6 +179,9 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_type_array:
             visit_non_null(n->_type_array.body, visit, arg);
             break;
+        case AST_type_slice:
+            visit_non_null(n->_type_slice.body, visit, arg);
+            break;
 
         case AST_symbol:
         case AST_number:

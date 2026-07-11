@@ -115,9 +115,15 @@ void insert_take_reference(AST_node **n) {
 }
 
 void try_convert_to_type_if_necessary(AST_node **n, Type *target_type, const char *desc) {
-    if ((*n)->type == target_type) return;
+    Type *original_type = (*n)->type;
 
-    auto_dereference(n);
+    if (target_type == original_type) return;
+
+    if (is_reference_kind(original_type) && !is_reference_kind(target_type)) {
+        insert_dereference(n);
+    } else if (!is_reference_kind(original_type) && is_reference_kind(target_type)) {
+        insert_take_reference(n);
+    }
 
     if ((*n)->type == target_type) return;
 
@@ -129,7 +135,7 @@ void try_convert_to_type_if_necessary(AST_node **n, Type *target_type, const cha
     else {
         char buf_1[1024], buf_2[1024];
         type_checker_error((*n)->line_number, "Can't convert %s of type '%s' to '%s'.\n",
-            desc, get_type_name_r(buf_1, (*n)->type), get_type_name_r(buf_2, target_type));
+            desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
     }
 }
 
@@ -518,6 +524,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
         case AST_struct:
         case AST_type_ref:
         case AST_type_array:
+        case AST_type_slice:
             // already filled in by type resolver
             break;
 
