@@ -189,7 +189,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "push rcx\n");
                 break;
             case OP_push_literal:
-                fprintf(file,"\t" "mov rax,%lu\n", strtoul(t->string_value.begin, 0, 10));
+                fprintf(file,"\t" "mov rax,%lu\n", t->string_value.begin ? strtoul(t->string_value.begin, 0, 10) : t->u64_value);
                 fprintf(file,"\t" "push rax\n");
                 break;
             case OP_push_string_literal:

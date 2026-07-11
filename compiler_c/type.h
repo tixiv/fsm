@@ -13,6 +13,7 @@ typedef enum {
     T_function,
     T_reference,
     T_array,
+    T_slice,
     T_struct,
 } TypeKind;
 
@@ -38,7 +39,13 @@ typedef struct Type_s {
 
         struct {
             struct Type_s *element_type;
-        } array;
+            size_t n_elements;
+        } _array;
+
+        struct {
+            struct Type_s *element_type;
+            size_t capacity;
+        } slice;
 
         struct {
             int num_arguments;
@@ -65,17 +72,7 @@ extern Type builtin_i16;
 extern Type builtin_u8;
 extern Type builtin_i8;
 
-extern Type builtin_u64_literal;
-extern Type builtin_i64_literal;
-extern Type builtin_u32_literal;
-extern Type builtin_i32_literal;
-extern Type builtin_u16_literal;
-extern Type builtin_i16_literal;
-extern Type builtin_u8_literal;
-extern Type builtin_i8_literal;
-
 extern Type builtin_u8_reference;
-extern Type builtin_u8_array;
 
 Type *type_alloc(TypeKind kind);
 
@@ -86,6 +83,7 @@ const char *get_type_name_r(char print_buf[1024], Type *type);
 bool is_integer_kind(Type *t);
 bool is_boolean_kind(Type *t);
 bool is_array_kind(Type *t);
+bool is_struct_kind(Type *t);
 bool is_reference_kind(Type *t);
 
 int get_ref_order(Type *t);
@@ -93,7 +91,6 @@ int get_ref_order(Type *t);
 bool type_can_have_members(Type *t);
 
 bool types_are_equivalent(Type *t1, Type *t2);
-Type *get_ref_type_for_array_type(Type *t);
 Type *dereferenced_type(Type *t);
 Type *get_member_type_and_offset(Type *_struct, SV *member_name, size_t *out_offset);
 
@@ -101,7 +98,8 @@ size_t get_storage_size(Type *t);
 void calculate_storage_size(Type *t);
 
 Type *get_ref_type_for(Type *t);
-bool type_should_be_handled_as_ref(Type *t);
+
+Type *get_array_type(Type *element_type, size_t n_elements);
 
 bool is_castable_to(Type *to, Type *from, const char **out_warn);
 

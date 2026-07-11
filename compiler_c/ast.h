@@ -47,12 +47,15 @@ typedef struct {
     X(AST_for) \
     X(AST_cast) \
     X(AST_array_access) \
+    X(AST_array_len) \
     X(AST_dereference) \
     X(AST_reference) \
     X(AST_struct) \
     X(AST_member_def) \
     X(AST_typename) \
     X(AST_type_ref) \
+    X(AST_type_array) \
+    X(AST_type_slice) \
     X(AST_member_access) \
 
 typedef enum {
@@ -65,6 +68,8 @@ const char *ast_kind_name(AST_kind kind);
 
 typedef struct AST_node_s {
     struct AST_node_s *next;
+    AST_kind kind;
+    int line_number;
     Type *type;
     bool addressable;
     bool result_used;
@@ -182,8 +187,12 @@ typedef struct AST_node_s {
         struct {
             struct AST_node_s *body;
             SV name;
-            size_t offset;
+            size_t offset;                
         } member_access;
+
+        struct {
+            size_t len;
+        } array_len;
 
         struct {
             SV name;
@@ -192,15 +201,24 @@ typedef struct AST_node_s {
         struct {
             struct AST_node_s *body;
         } _type_ref;
+
+        struct {
+            struct AST_node_s *body;
+            size_t n_elements;
+        } _type_array;
+
+        struct {
+            struct AST_node_s *body;
+            size_t n_elements;
+        } _type_slice;
     };
-    AST_kind kind;
-    int line_number;
 } AST_node;
 
 AST_node *ast_alloc(AST_kind kind, int line_number);
 
 AST_node *get_last_in_chain(AST_node *n);
 void ast_insert_node(AST_node **at, AST_node *new_node);
+void ast_remove_node(AST_node *n);
 
 typedef void (*AstVisitor)(AST_node *, void *);
 

@@ -60,6 +60,67 @@ static AST_node *parse_statement();
 static AST_node *parse_expression();
 static AST_node *parse_scope_body();
 
+
+static void link_arr(AST_node *parent, AST_node *child) {
+    switch (parent->kind) {
+        case AST_type_array: parent->_type_array.body = child; break;
+        case AST_type_slice: parent->_type_slice.body = child; break;
+        default: NOT_IMPLEMENTED("Linking to %s is not implemented yet.\n", ast_kind_name(parent->kind));
+    }
+}
+
+static AST_node *parse_typedecl_postifx(AST_node *inner) {
+    if (CT->kind == TOK_ampersand) {
+        AST_node *ast_ref = ast_alloc(AST_type_ref, CT->line_number);
+        MOVE_NEXT();
+        ast_ref->_type_ref.body = inner;
+        return parse_typedecl_postifx(ast_ref);
+    } else if (CT->kind == TOK_lbracket) {
+        
+        AST_node *first = nullptr;
+        AST_node *latest = nullptr;
+
+        while (CT->kind == TOK_lbracket) {
+            int line_number = CT->line_number;
+            MOVE_NEXT();
+            if (CT->kind == TOK_number) {
+                AST_node *ast_array = ast_alloc(AST_type_array, line_number);
+                ast_array->_type_array.n_elements = strtoul(CT->value.begin, 0, 10);
+                MOVE_NEXT();
+                take_expected(TOK_rbracket);
+
+                if (!first) {
+                    first = ast_array;
+                }
+                if (latest) {
+                    link_arr(latest, ast_array);
+                }
+                latest = ast_array;
+            }
+            else if (CT->kind == TOK_rbracket) {
+                AST_node *ast_slice = ast_alloc(AST_type_slice, line_number);
+                take_expected(TOK_rbracket);
+
+                if (!first) {
+                    first = ast_slice;
+                }
+                if (latest) {
+                    link_arr(latest, ast_slice);
+                }
+                latest = ast_slice;
+            }
+            else {
+                parser_error(CT->line_number, "Expected array size or ']'.\n");
+            }
+        }
+        
+        link_arr(latest, inner);
+        return parse_typedecl_postifx(first);
+    }
+
+    return inner;
+}
+
 static AST_node *try_parse_typedecl() {
     if(CT->kind == TOK_colon) {
         MOVE_NEXT();
@@ -68,14 +129,7 @@ static AST_node *try_parse_typedecl() {
         ast_type->_typename.name = CT->value;
         MOVE_NEXT();
 
-        if (CT->kind == TOK_ampersand) {
-            AST_node *ast_ref = ast_alloc(AST_type_ref, CT->line_number);
-            ast_ref->_type_ref.body = ast_type;
-            ast_type = ast_ref;
-            MOVE_NEXT();
-        }
-
-        return ast_type;
+        return parse_typedecl_postifx(ast_type);
     }
     return nullptr;
 }

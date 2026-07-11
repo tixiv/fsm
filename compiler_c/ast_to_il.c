@@ -212,6 +212,10 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
         case AST_number:
             push_opcode(OP_push_literal, &n->number.value, 0);
             break;
+
+        case AST_array_len:
+            push_opcode(OP_push_literal, nullptr, n->array_len.len);
+            break;
         
         case AST_symbol: {
             Symbol *s = n->symbol.symbol;
@@ -247,17 +251,16 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             break;
 
         case AST_array_access:
-            ast_visit_children(n, (AstVisitor)gen_address_visitor, gen);
-            push_opcode(OP_array_access, nullptr, get_storage_size(n->_array.array->type->array.element_type));
+            gen_address_visitor(n->_array.array, gen);
+            gen_value_visitor(n->_array.index, gen);
+            push_opcode(OP_array_access, nullptr, get_storage_size(n->_array.array->type->_array.element_type));
             break;
-
 
         case AST_member_access:
             ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
             push_opcode(OP_member_access, nullptr, n->member_access.offset);
             break;
-        
-        
+         
         default:
             NOT_IMPLEMENTED("gen_value_visitor for %s is not implemented yet.\n", ast_kind_name(n->kind));
             break;

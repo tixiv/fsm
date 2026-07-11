@@ -1,0 +1,22 @@
+
+fn foo (a: i64[4][32]&, j) {
+    for (let i = 0; i < a[j].len; i = i + 1) {
+        print(a[j][i])
+    }
+}
+
+fn main () {
+    let a: i64[4][32];
+
+    for (let i = 0; i < a[0].len; i = i + 1) {
+        a[0][i] = i * 2;
+        a[1][i] = i + 1;
+        a[2][i] = i + 1001;
+        a[3][i] = 1337;
+    }
+
+    foo (&a, 0)
+    foo (&a, 1)
+    foo (&a, 2)
+    foo (&a, 3)
+}

@@ -68,7 +68,7 @@ Symbol builtin_print = {
     .type = &builtin_print_type,
 };
 
-Type *builtin_puts_argument_types[] = { &builtin_u8_array };
+Type *builtin_puts_argument_types[] = { &builtin_u8_reference };
 
 Type builtin_puts_type = (Type){T_function, .fun.num_arguments = 1, .fun.argument_types = builtin_puts_argument_types, .fun.return_type = &builtin_void};
 
@@ -171,6 +171,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_member_access:
         case AST_typename:
         case AST_type_ref:
+        case AST_type_array:
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             break;
 

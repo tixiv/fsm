@@ -68,11 +68,36 @@ void ast_insert_node(AST_node **at, AST_node *new_node) {
     *at = new_node;
 }
 
+void ast_remove_node(AST_node *n) {
+    AST_node *child = nullptr;
+    switch (n->kind) {        
+        case AST_dereference:
+            child = n->deref.body;
+            break;
+        default:
+            NOT_IMPLEMENTED("Removing AST node of kind %s is not implemented yet.\n", ast_kind_name(n->kind));
+    }
+
+    ASSERT(child->next == nullptr, "Can't remove node when child is linked in a chain.\n")
+    AST_node *saved_next = n->next;
+
+    // just overwrite this node with the contents of the child. This will effectively move
+    // The child to where the old node was.
+    memcpy(n, child, sizeof(AST_node));
+
+    // restore the next pointer in case it is used
+    n->next = saved_next;
+}
+
 void ast_visit_chain(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg) {
     while (n) {
         visit(n, arg);
         n = n->next;
     }
+}
+
+void visit_non_null(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg) {
+    if (n) visit(n, arg);
 }
 
 void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg)
@@ -88,75 +113,79 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             ast_visit_chain(n->arg_list.body, visit, arg);
             break;
         case AST_function:
-            if (n->fun.args) visit(n->fun.args, arg);
-            if (n->fun.ret_typedecl) visit(n->fun.ret_typedecl, arg);
+            visit_non_null(n->fun.args, visit, arg);
+            visit_non_null(n->fun.ret_typedecl, visit, arg);
             ast_visit_chain(n->fun.body, visit, arg);            
             break;
         case AST_return:
-            if (n->ret.return_val) visit(n->ret.return_val, arg);
+            visit_non_null(n->ret.return_val, visit, arg);
             break;
         case AST_var_decl:
-            if (n->var_decl._typedecl) visit(n->var_decl._typedecl, arg);
-            if (n->var_decl.initializer) visit(n->var_decl.initializer, arg);
+            visit_non_null(n->var_decl._typedecl, visit, arg);
+            visit_non_null(n->var_decl.initializer, visit, arg);
             break;
         case AST_arg_decl:
-            if (n->arg_decl._typedecl) visit(n->arg_decl._typedecl, arg);
+            visit_non_null(n->arg_decl._typedecl, visit, arg);
             break;
-
-        case AST_symbol:
-        case AST_number:
-        case AST_string:
-            break;
-
         case AST_if:
-            if (n->_if.condition) visit(n->_if.condition, arg);
-            if (n->_if.if_clause) visit (n->_if.if_clause, arg);
-            if (n->_if.else_clause) visit (n->_if.else_clause, arg);
+            visit_non_null(n->_if.condition, visit, arg);
+            visit_non_null(n->_if.if_clause, visit, arg);
+            visit_non_null(n->_if.else_clause, visit, arg);
             break;
         case AST_while:
-            if (n->_while.condition) visit(n->_while.condition, arg);
-            if (n->_while.body) visit(n->_while.body, arg);
+            visit_non_null(n->_while.condition, visit, arg);
+            visit_non_null(n->_while.body, visit, arg);
             break;
         case AST_for:
-            if (n->_for.initializer) visit(n->_for.initializer, arg);
-            if (n->_for.condition) visit(n->_for.condition, arg);
-            if (n->_for.post_action) visit(n->_for.post_action, arg);
-            if (n->_for.body) visit(n->_for.body, arg);
+            visit_non_null(n->_for.initializer, visit, arg);
+            visit_non_null(n->_for.condition, visit, arg);
+            visit_non_null(n->_for.post_action, visit, arg);
+            visit_non_null(n->_for.body, visit, arg);
             break;
         case AST_binary:
-            if (n->binary.left) visit(n->binary.left, arg);
-            if (n->binary.left) visit(n->binary.right, arg);
+            visit_non_null(n->binary.left, visit, arg);
+            visit_non_null(n->binary.right, visit, arg);
             break;
         case AST_call:
             ast_visit_chain(n->call.args, visit, arg);
             break;
         case AST_cast:
-            if (n->_cast.body) visit(n->_cast.body, arg);
+            visit_non_null(n->_cast.body, visit, arg);
             break;
         case AST_array_access:
-            if (n->_array.array) visit(n->_array.array, arg);
-            if (n->_array.index) visit(n->_array.index, arg);
+            visit_non_null(n->_array.array, visit, arg);
+            visit_non_null(n->_array.index, visit, arg);
             break;
         case AST_dereference:
-            if (n->deref.body) visit(n->deref.body, arg);
+            visit_non_null(n->deref.body, visit, arg);
             break;
         case AST_reference:
-            if (n->reference.body) visit(n->reference.body, arg);
+            visit_non_null(n->reference.body, visit, arg);
             break;
         case AST_struct:
             ast_visit_chain(n->_struct.body, visit, arg);
             break;
         case AST_member_def:
-            if (n->member_def._typedef) visit(n->member_def._typedef, arg);
+            visit_non_null(n->member_def._typedef, visit, arg);
             break;
         case AST_member_access:
-            if (n->member_access.body) visit(n->member_access.body, arg);
+            visit_non_null(n->member_access.body, visit, arg);
             break;
         case AST_typename:
             break;
         case AST_type_ref:
-            if (n->_type_ref.body) visit(n->_type_ref.body, arg);
+            visit_non_null(n->_type_ref.body, visit, arg);
             break;
+        case AST_type_array:
+            visit_non_null(n->_type_array.body, visit, arg);
+            break;
+
+        case AST_symbol:
+        case AST_number:
+        case AST_string:
+        case AST_array_len:
+            break;
+
         default:
             NOT_IMPLEMENTED("Visiting %s is not implemented yet.\n", ast_kind_name(n->kind));
             break;
@@ -190,9 +219,11 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_type_ref:
+        case AST_type_array:
         case AST_dereference:
         case AST_reference:
         case AST_array_access:
+        case AST_array_len:
             printf("%.*s%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;

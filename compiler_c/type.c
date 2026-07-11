@@ -22,13 +22,27 @@ Type builtin_u8 =  (Type){T_unsigned_integer, .storage_size = 1, .integer.num_bi
 Type builtin_i8 =  (Type){T_signed_integer,   .storage_size = 1, .integer.num_bits =  8};
 
 Type builtin_u8_reference = (Type){T_reference, .storage_size = 8, .reference.target_type = &builtin_u8};
-Type builtin_u8_array = (Type){T_array,         .storage_size = 8, .array.element_type = &builtin_u8};
 
 Type *type_alloc(TypeKind kind) {
     Type *t = malloc(sizeof(Type));
     memset(t, 0, sizeof(Type));
     t->kind = kind;
     return t;
+}
+
+static void print_array_type(SB *sb, Type *arr_t) {
+    char child_print_buf[1024];
+
+    Type *t = arr_t;
+    while (is_array_kind(t)) t = t->_array.element_type;
+
+    sb_printf(sb, "%s", get_type_name_r(child_print_buf, t));
+
+    t = arr_t;
+    while (is_array_kind(t)) {
+         sb_printf(sb, "[%lu]", t->_array.n_elements);
+         t = t->_array.element_type;
+    }
 }
 
 const char *get_type_name_r(char print_buf[1024], Type *type) {
@@ -63,7 +77,7 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
             sb_printf(&sb, "%s &", get_type_name_r(child_print_buf, type->reference.target_type));
             break;
         case T_array:
-            sb_printf(&sb, "%s[]", get_type_name_r(child_print_buf, type->reference.target_type));
+            print_array_type(&sb, type);
             break;
         case T_struct:
             sb_printf(&sb, "struct %.*s", SV_prnt(type->name));
@@ -88,6 +102,10 @@ bool is_array_kind(Type *t) {
     return t->kind == T_array;
 }
 
+bool is_struct_kind(Type *t) {
+    return t->kind == T_struct;
+}
+
 bool is_reference_kind(Type *t) {
     return t->kind == T_reference;
 }
@@ -110,7 +128,7 @@ Type *dereferenced_type(Type *t) {
 }
 
 bool type_can_have_members(Type *t) {
-    return t->kind == T_struct || (is_reference_kind(t) && dereferenced_type(t)->kind == T_struct);
+    return t->kind == T_struct || t->kind == T_array || t->kind == T_slice;
 }
 
 size_t get_storage_size(Type *t) {
@@ -122,16 +140,6 @@ bool types_are_equivalent(Type *t1, Type *t2) {
     if (is_integer_kind(t1) && t1->kind == t2->kind && t1->integer.num_bits == t2->integer.num_bits) return true;
     
     return false;
-}
-
-Type *get_ref_type_for_array_type(Type *t) {
-    char buf[1024];
-    ASSERT(is_array_kind(t), "Called get_ref_type_for_array_type on something that is not an array type '%s'.\n",
-        get_type_name_r(buf, t));
-
-    if (t == &builtin_u8_array) return &builtin_u8_reference;
-
-    NOT_IMPLEMENTED("get_ref_type_for_array_type() is not implemented yet for %s\n", get_type_name_r(buf, t));
 }
 
 bool is_castable_to_integer(Type *t, const char **out_warn) {
@@ -196,7 +204,7 @@ void calculate_storage_size(Type *_struct) {
     _struct->storage_size = offset;
 }
 
-Type *make_ref_type_for(Type *t) {
+static Type *make_ref_type_for(Type *t) {
     Type *ref = type_alloc(T_reference);
     ref->reference.target_type = t;
     ref->storage_size = 8;
@@ -215,6 +223,30 @@ Type *get_ref_type_for(Type *t) {
     }
     Type *ref = make_ref_type_for(t);
     dyn_array_push_p(&ref_types, ref);
+    return ref;
+}
+
+static Type *make_array_type(Type *element_type, size_t n_elements) {
+    Type *array_t = type_alloc(T_array);
+    array_t->_array.element_type = element_type;
+    array_t->_array.n_elements = n_elements;
+    array_t->storage_size = element_type->storage_size * n_elements;
+    return array_t;
+}
+
+Dyn_array array_types;
+
+Type *get_array_type(Type *element_type, size_t n_elements) {
+    if (array_types.capacity == 0)
+        dyn_array_init(&array_types, sizeof(Type*), 16);
+
+    for (int i = 0; i < array_types.count; i++) {
+        Type *arr = ((Type**)array_types.data)[i];
+        if (arr->_array.element_type == element_type
+            && arr->_array.n_elements == n_elements) return arr;
+    }
+    Type *ref = make_array_type(element_type, n_elements);
+    dyn_array_push_p(&array_types, ref);
     return ref;
 }
 

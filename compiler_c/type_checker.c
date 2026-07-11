@@ -195,7 +195,7 @@ void type_propagate_binary_operator(AST_node *n) {
                 bool okay = n->binary.left->type == n->binary.right->type || (is_integer_kind(n->binary.left->type) && is_integer_kind(n->binary.right->type));
                 if (!okay) {
                     type_checker_error(n->line_number, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
-                        token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.left->type));
+                        token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
                 }
                 n->type = &builtin_bool;
                 break;
@@ -212,7 +212,7 @@ void type_propagate_binary_operator(AST_node *n) {
                 }
                 else {
                     type_checker_error(n->line_number, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
-                        token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.left->type));
+                        token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
                 }
                 n->type = n->binary.right->type;
                 break;
@@ -258,7 +258,6 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             n->fun.symbol->type = type_alloc(T_function);
             
             if (n->fun.ret_typedecl) {
-                printf ("Have typedecl for '%.*s'\n", SV_prnt(n->fun.name));
                 type_propagation_visitor(n->fun.ret_typedecl, prop);
                 n->fun.symbol->type->fun.return_type = n->fun.ret_typedecl->type;
             }
@@ -426,11 +425,14 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_string:
-            n->type = &builtin_u8_array;
-            n->addressable = true;
+            n->type = &builtin_u8_reference;
+            n->addressable = false;
             break;
 
         case AST_array_access:
+            if (is_reference_kind(n->_array.array->type))
+                insert_dereference(&n->_array.array);
+
             if (!is_array_kind(n->_array.array->type)) {
                 type_checker_error(n->line_number,
                     "Invalid use of [] operator on something that is not an array. Have '%s'.\n",
@@ -442,18 +444,27 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                     get_type_name_r(buf_1, n->_array.index->type));
 
             }
-            n->type = get_ref_type_for_array_type(n->_array.array->type);
+            n->type = get_ref_type_for(n->_array.array->type->_array.element_type);
             n->addressable = true;
             break;
 
         case AST_dereference:
             if (!is_reference_kind(n->deref.body->type)) {
-                type_checker_error(n->line_number,
-                    "Dereferencing something that is not a reference. Have '%s'.\n",
-                    get_type_name_r(buf_1, n->deref.body->type));
+                if (n->deref.body->kind == AST_array_len) {
+                    // Parser inserted dereference for member access. We need
+                    // it for structs, but it needs to be removed if the member access
+                    // is 'fake' because it's an array len
+                    ast_remove_node(n);
+                }
+                else {
+                    type_checker_error(n->line_number,
+                        "Dereferencing something that is not a reference. Have '%s'.\n",
+                        get_type_name_r(buf_1, n->deref.body->type));
+                }
+            } else {
+                n->type = dereferenced_type(n->deref.body->type);
+                n->addressable = true;
             }
-            n->type = dereferenced_type(n->deref.body->type);
-            n->addressable = true;
             break;
 
         case AST_reference:
@@ -462,29 +473,51 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_member_access: {
-            ASSERT(n->member_access.body->type, "Unresolved conatainer type encountered.\n")
-            if (!type_can_have_members(n->member_access.body->type))
-                type_checker_error(n->line_number, "Cannot access member in something that is not a struct. Have '%s'.\n",
-                        get_type_name_r(buf_1, n->member_access.body->type));
+            ASSERT(n->member_access.body->type, "Unresolved type encountered in member access.\n");
+            Type *container = n->member_access.body->type;
+            if (is_reference_kind(container)) container = dereferenced_type(container);
+            
+            if (!type_can_have_members(container))
+                type_checker_error(n->line_number, "Tried to access a member in something that can't have members. Have '%s'.\n",
+                        get_type_name_r(buf_1, container));
 
-            size_t offset;
-            Type *t = get_member_type_and_offset(n->member_access.body->type, &n->member_access.name, &offset);
-            if (!t) type_checker_error(n->line_number, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->member_access.name),
-                    get_type_name_r(buf_1, n->member_access.body->type));
+            if (is_struct_kind(container)) {
+                size_t offset;
+                Type *t = get_member_type_and_offset(container, &n->member_access.name, &offset);
+                if (!t) type_checker_error(n->line_number, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->member_access.name),
+                        get_type_name_r(buf_1, container));
 
-            if (!is_reference_kind(n->member_access.body->type))
-                insert_take_reference(&n->member_access.body);
+                if (!is_reference_kind(n->member_access.body->type))
+                    insert_take_reference(&n->member_access.body);
 
-            n->type = get_ref_type_for(t);
-            n->member_access.offset = offset;
-            n->addressable = true;
+                n->type = get_ref_type_for(t);
+                n->member_access.offset = offset;
+                n->addressable = true;
+            }
+            else if (is_array_kind(container)) {
+                if(sv_compare_cstr(&n->member_access.name, "len")) {
+                    n->kind = AST_array_len;
+                    n->array_len.len = container->_array.n_elements;
+                    n->addressable = false;
+                    n->type = &builtin_i64;
+                }
+                else {
+                    type_checker_error(n->line_number, "Tried to access non existent member '%.*s' on array type. Arrays only have the member 'len' available.\n",
+                            SV_prnt(n->member_access.name));
+                }
+            } else {
+                NOT_IMPLEMENTED("accessing members in '%s' is not implemented yet.\n", get_type_name_r(buf_1, container));
+            }
+
             break;
+            
         }
 
         case AST_typename:
         case AST_member_def:
         case AST_struct:
         case AST_type_ref:
+        case AST_type_array:
             // already filled in by type resolver
             break;
 
