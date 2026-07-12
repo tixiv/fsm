@@ -215,6 +215,17 @@ void calculate_storage_size(Type *_struct) {
     _struct->storage_size = offset;
 }
 
+size_t get_function_arguments_size(Type *t) {
+    ASSERT(t->kind == T_function,"get_function_arguments_size() called on something that is not a function.\n")
+    size_t size = 0;
+    for (int i = 0; i < t->fun.num_arguments; i++) {
+        Type *arg = t->fun.argument_types[i];
+        size += arg->storage_size;
+        if (size % 8) size += 8 - (size % 8);
+    }
+    return size;
+}
+
 static Type *make_ref_type_for(Type *t) {
     Type *ref = type_alloc(T_reference);
     ref->reference.target_type = t;

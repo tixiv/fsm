@@ -1,5 +1,6 @@
 
 #include "opcodes.h"
+#include <stdint.h>
 #include <stdio.h>
 
 const char *opcode_name(enum Op_Kind kind) {
@@ -39,6 +40,17 @@ size_t push_opcode(int kind, SV *value, uint64_t u64_value) {
     op->kind = kind;
     op->u64_value = u64_value;
     if (value) op->string_value = *value;
+
+    return num_opcodes - 1;
+}
+
+size_t push_opcode_sz(int kind, SV *value, uint64_t u64_value, uint64_t size) {
+    Opcode * op = dyn_array_push(&opcodes_dyn);
+
+    op->kind = kind;
+    op->u64_value = u64_value;
+    if (value) op->string_value = *value;
+    op->size = size;
 
     return num_opcodes - 1;
 }

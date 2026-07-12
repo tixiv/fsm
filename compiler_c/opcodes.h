@@ -53,6 +53,7 @@ typedef struct {
         uint64_t u64_value;
         uint32_t u32_value[2];
     };
+    uint64_t size;
 } Opcode;
 
 extern Dyn_array opcodes_dyn;
@@ -63,3 +64,4 @@ extern Dyn_array opcodes_dyn;
 void dump_opcodes();
 
 size_t push_opcode(int kind, SV *value, uint64_t u64_value);
+size_t push_opcode_sz(int kind, SV *value, uint64_t u64_value, uint64_t size);

@@ -100,6 +100,8 @@ Type *get_member_type_and_offset(Type *_struct, SV *member_name, size_t *out_off
 size_t get_storage_size(Type *t);
 void calculate_storage_size(Type *t);
 
+size_t get_function_arguments_size(Type *t);
+
 Type *get_ref_type_for(Type *t);
 
 Type *get_array_type(Type *element_type, size_t n_elements);

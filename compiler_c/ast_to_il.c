@@ -7,6 +7,7 @@
 #include "tokenizer.h"
 #include "type.h"
 #include <stdarg.h>
+#include <stdint.h>
 
 static void il_gen_error(int line_number, const char * fmt, ...) {
     va_list args;
@@ -39,9 +40,9 @@ static void il_gen_push_symbol_address(Symbol *s) {
 
 static void il_gen_push_symbol(Symbol *s) {
     if (s->kind == SYM_arg) {
-        push_opcode(OP_push_arg, nullptr, (s->type->storage_size << 32) | s->offset);
+        push_opcode_sz(OP_push_arg, nullptr, s->offset, s->type->storage_size);
     } else if (s->kind == SYM_local) {
-        push_opcode(OP_push_local_var, nullptr, (s->type->storage_size << 32) | s->offset);
+        push_opcode_sz(OP_push_local_var, nullptr,  s->offset, s->type->storage_size);
     } else {
         NOT_IMPLEMENTED("Pushing symbol kind %s is not implemented yet.\n", symbol_kind_name(s->kind));
     }
@@ -95,9 +96,9 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen, bool result_used) {
         gen_value_visitor(n->binary.right, gen);
 
         if (result_used)
-            push_opcode(OP_store_and_dup, nullptr, get_storage_size(n->binary.left->type));
+            push_opcode_sz(OP_store_and_dup, nullptr, 0,get_storage_size(n->binary.left->type));
         else
-            push_opcode(OP_store, nullptr, get_storage_size(n->binary.left->type));
+            push_opcode_sz(OP_store, nullptr, 0, get_storage_size(n->binary.left->type));
     }
     else {
         if (result_used)
@@ -159,10 +160,10 @@ static void gen_call(AST_node *n, IL_gen *gen, bool result_used) {
     Symbol *s_call = n->call.symbol;
     ASSERT(s_call, "Symbol for called function '%.*s' is not resolved\n", SV_prnt(n->call.name))
     ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
-    push_opcode(OP_call, &n->call.name, s_call->type->fun.num_arguments * 8);
+    push_opcode_sz(OP_call, &n->call.name, 0, get_function_arguments_size(s_call->type));
 
     if (result_used)
-        push_opcode(OP_push_result, nullptr, 0);
+        push_opcode_sz(OP_push_result, nullptr, 0, n->type->storage_size);
 }
 
 static void gen_if(AST_node *n, IL_gen *gen, bool result_used) {
@@ -248,7 +249,7 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
 
         case AST_dereference:
             ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
-            push_opcode(OP_load, nullptr, get_storage_size(n->type));
+            push_opcode_sz(OP_load, nullptr, 0, get_storage_size(n->type));
             break;
 
         case AST_reference:
@@ -258,7 +259,7 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
         case AST_array_access:
             gen_address_visitor(n->_array.array, gen);
             gen_value_visitor(n->_array.index, gen);
-            push_opcode(OP_array_access, nullptr, get_storage_size(n->_array.array->type->_array.element_type));
+            push_opcode_sz(OP_array_access, nullptr, 0, get_storage_size(n->_array.array->type->_array.element_type));
             break;
 
         case AST_member_access:
@@ -285,7 +286,8 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
 
         case AST_return:
             ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
-            push_opcode(OP_return, nullptr, n->ret.return_val ? 1:0);
+            uint64_t return_size = n->ret.return_val ? n->ret.return_val->type->storage_size : 0;
+            push_opcode_sz(OP_return, nullptr, 0, return_size);
             break;
         
         case AST_if:
@@ -324,7 +326,7 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             if (n->var_decl.initializer) {
                 il_gen_push_symbol_address(n->var_decl.symbol);                
                 gen_value_visitor(n->var_decl.initializer, gen);
-                push_opcode(OP_store, nullptr, get_storage_size(n->var_decl.symbol->type));
+                push_opcode_sz(OP_store, nullptr, 0, get_storage_size(n->var_decl.symbol->type));
             }
             break;
 
