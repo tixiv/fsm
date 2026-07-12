@@ -41,6 +41,7 @@ typedef struct {
     X(AST_char_constant) \
     X(AST_symbol) \
     X(AST_binary) \
+    X(AST_not) \
     X(AST_call) \
     X(AST_return) \
     X(AST_if) \
@@ -179,6 +180,10 @@ typedef struct AST_node_s {
         struct {
             struct AST_node_s *body;
         } reference;
+
+        struct {
+            struct AST_node_s *body;
+        } _not;
 
         struct {
             struct AST_node_s *body;

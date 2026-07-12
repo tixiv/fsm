@@ -49,6 +49,7 @@ typedef struct {
     X(TOK_semicolon) \
     X(TOK_dot) \
     X(TOK_ampersand) \
+    X(TOK_exclam) \
     X(TOK_identifier) \
     X(TOK_string) \
     X(TOK_number) \

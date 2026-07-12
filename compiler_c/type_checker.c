@@ -214,7 +214,8 @@ void type_propagate_binary_operator(AST_node *n) {
             
             case TOK_equal:
             case TOK_unequal: {
-                // TODO: improve this check
+                auto_dereference(&n->binary.left);
+                auto_dereference(&n->binary.right);
                 bool okay = n->binary.left->type == n->binary.right->type || (is_integer_kind(n->binary.left->type) && is_integer_kind(n->binary.right->type));
                 if (!okay) {
                     type_checker_error(n->line_number, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
@@ -508,6 +509,12 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
         case AST_reference:
             n->type = get_ref_type_for(n->reference.body->type);
+            n->addressable = false;
+            break;
+
+        case AST_not:
+            try_convert_to_type_if_necessary(&n->_not.body, &builtin_bool, "Argument of not operator");
+            n->type = &builtin_bool;
             n->addressable = false;
             break;
 

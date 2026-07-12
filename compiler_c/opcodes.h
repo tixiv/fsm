@@ -13,6 +13,7 @@
     X(OP_mod) \
     X(OP_equal) \
     X(OP_unequal) \
+    X(OP_not) \
     X(OP_compare_GT) \
     X(OP_compare_LT) \
     X(OP_compare_GE) \

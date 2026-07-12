@@ -150,6 +150,9 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             visit_non_null(n->binary.left, visit, arg);
             visit_non_null(n->binary.right, visit, arg);
             break;
+        case AST_not:
+            visit_non_null(n->_not.body, visit, arg);
+            break;
         case AST_call:
             ast_visit_chain(n->call.args, visit, arg);
             break;
@@ -234,6 +237,7 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
         case AST_type_slice:
         case AST_dereference:
         case AST_reference:
+        case AST_not:
         case AST_array_access:
         case AST_array_len:
         case AST_array_to_slice:

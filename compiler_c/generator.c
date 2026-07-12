@@ -257,6 +257,9 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "cmovnz rcx, rdx\n");
                 fprintf(file,"\t" "push rcx\n");
                 break;
+            case OP_not:
+                fprintf(file,"\t" "xor QWORD [rsp], 1\n");
+                break;
             case OP_equal:
                 fprintf(file,"\t" "mov rcx, 0\n");
                 fprintf(file,"\t" "mov rdx, 1\n");

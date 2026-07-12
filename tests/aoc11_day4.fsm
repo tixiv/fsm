@@ -1,0 +1,103 @@
+
+import * from "std";
+
+fn take_number (str: u8[]&) : u8[]
+{
+    while (!is_numeric(str.data) && str.len) sv_pop(str);
+    
+    let number = str;
+    number.len = 0
+
+    while (is_numeric(str.data) && str.len) {
+        sv_pop(str);
+        number.len = number.len + 1
+    } 
+
+    return number
+}
+
+fn main () {
+    let contents = read_file ("tests/aoc11_day4.input")
+
+    print(contents.len)
+
+    let called_numbers: u8[100][];
+
+    let x = 0;
+
+    while (contents.len && contents.data != '\n') {
+        called_numbers[x] = take_number(contents)
+        x = x + 1;
+    }
+
+    let bingo_boards: u8[100][5][5][];
+    let marked:       u8[100][5][5];
+    let board_won:    u8[100];
+    let bb = 0;
+
+    while (contents.len) {
+        for (let row = 0; row < 5; row = row + 1) {
+            for (let col = 0; col < 5; col = col + 1) {
+                bingo_boards[bb][row][col] = take_number(contents)
+                marked[bb][row][col] = 0
+            }
+        }
+        board_won[bb] = 0;
+        bb = bb + 1;
+    }
+
+    let num_bb = bb;
+
+    puts("Boards: ") print(bb)
+
+    let winning_board = 0;
+    let winning_number = 0;
+    let num_won = 0;
+    
+    for (let i = 0; i < x && winning_board == 0; i = i + 1) {
+        puts ("------------- called: ") puts(called_numbers[i]) puts("\n")
+        for (bb = 0; bb < num_bb; bb = bb + 1) {
+            for (row = 0; row < 5; row = row + 1) {
+                for (col = 0; col < 5; col = col + 1) {
+                    if (sv_equal(bingo_boards[bb][row][col], called_numbers[i])) {
+                        marked[bb][row][col] = 1
+                        // puts ("Match at: ") print(bb) print (row) print (col)
+                    }
+                }
+            }
+
+            for (row = 0; row < 5; row = row + 1) {
+                let rowscore = 0;
+                let colscore = 0;
+                for (col = 0; col < 5; col = col + 1) {
+                    rowscore = rowscore + marked[bb][row][col];
+                    colscore = colscore + marked[bb][col][row];
+                }
+                if ((rowscore == 5 || colscore == 5) && !board_won[bb]) {
+                    board_won[bb] = 1;
+                    num_won = num_won + 1;
+                    if (num_won == num_bb) {
+                        winning_board = bb + 1
+                        winning_number = parse_integer(called_numbers[i])
+                    }
+                    puts ("Board won: ") print (bb + 1)
+                }
+            }
+        }
+    }
+
+    bb = winning_board - 1;
+
+    let sum = 0;
+
+    for (row = 0; row < 5; row = row + 1) {
+        for (col = 0; col < 5; col = col + 1) {
+            if (!marked[bb][row][col]) {
+                sum = sum + parse_integer(bingo_boards[bb][row][col])
+            }
+        }
+    }
+
+    print (sum)
+    print (sum  * winning_number)
+}

@@ -132,6 +132,7 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_semicolon: return("';'");
         case TOK_dot: return("'.'");
         case TOK_ampersand: return("'&'");
+        case TOK_exclam: return("'!'");
         case TOK_identifier: return("identifier");
         case TOK_string: return("string constant");
         case TOK_number: return("number");
@@ -322,6 +323,10 @@ void tokenizer(SV *code) {
         else if (c == '&') {
             sv_pop(code);
             push_token(TOK_ampersand, nullptr, line_number);
+        }
+        else if (c == '!') {
+            sv_pop(code);
+            push_token(TOK_exclam, nullptr, line_number);
         }
         else if ('"' == c) {
             SV str;

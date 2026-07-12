@@ -238,6 +238,11 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             gen_cast(n);
             break;
         
+        case AST_not:
+            ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+            push_opcode(OP_not, nullptr, 0);
+            break;
+        
         case AST_array_to_slice:
             push_opcode(OP_push_literal, nullptr, n->_array_to_slice.body->type->_array.n_elements);
             gen_address_visitor(n->_array_to_slice.body, gen);

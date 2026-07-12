@@ -267,6 +267,11 @@ static AST_node *parse_primary()
         MOVE_NEXT();
         n->reference.body = parse_primary();
     }
+    else if (CT->kind == TOK_exclam) {
+        n = ast_alloc(AST_not, CT->line_number);
+        MOVE_NEXT();
+        n->reference.body = parse_primary();
+    }
     else if (CT->kind == TOK_identifier) {
         SV* name = &CT->value;
         MOVE_NEXT();
