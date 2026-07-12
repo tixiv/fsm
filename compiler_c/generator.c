@@ -78,10 +78,97 @@ void output_asm(const char *asm_file_name) {
     "syscall\n"
     "ret\n";
 
+    const char *open_function =
+    "SYS_OPEN    = 2\n"
+    "SYS_CLOSE   = 3\n"
+    "SYS_FSTAT   = 5\n"
+    "SYS_MMAP    = 9\n"
+    "O_RDONLY    = 0\n"
+    "PROT_READ   = 1\n"
+    "MAP_PRIVATE = 2\n"
+    "STAT_SIZE      = 144          ; sizeof(struct stat) on x86-64 Linux\n"
+    "ST_SIZE_OFFSET = 48           ; offsetof(st_size)\n"
+    "\n"
+    "fn_open: ; open(filename: u8 &, flags: i64) : i64\n"
+    "    mov     eax, SYS_OPEN\n"
+    "    mov     rdi, [rsp+16]     ; filename\n"
+    "    mov     rsi, [rsp+8]      ; flags\n"
+    "    xor     rdx, rdx          ; mode\n"
+    "    syscall                   ; fd is in rax\n"
+    "    ret\n"
+    "\n"
+    "fn_mmap: ; mmap(lenght: i64, fd: i64) : u8 &\n"
+    "   mov     rax, SYS_MMAP\n"
+    "   xor     rdi, rdi          ; addr = NULL\n"
+    "   mov     rsi, [rsp+16]     ; length\n"
+    "   mov     rdx, PROT_READ\n"
+    "   mov     r10, MAP_PRIVATE\n"
+    "   mov     r8,  [rsp+8]      ; fd\n"
+    "   xor     r9, r9            ; offset = 0\n"
+    "   syscall\n"
+    "   ret\n"
+    "\n"
+    "fn_fsize: ; fsize(fd: i64) : i64\n"
+    "   push rbp\n"
+    "   mov rbp, rsp\n"
+    "   sub     rsp, STAT_SIZE\n"
+    "   mov     eax, SYS_FSTAT\n"
+    "   mov     rdi, [rbp+16]    ; fd\n"
+    "   mov     rsi, rsp         ; struct statbuf*\n"
+    "   syscall\n"
+    "   test    rax, rax\n"
+    "   js      .cleanup\n"
+    "   mov     rax, [rsp + ST_SIZE_OFFSET]\n"
+    "   mov rsp, rbp\n"
+    "   pop rbp\n"
+    "   ret\n"
+    ".cleanup:\n"
+    "   xor rax, rax\n"
+    "   mov rsp, rbp\n"
+    "   pop rbp\n"
+    "   ret\n";
+/*
+
+    ;---------------------------------------
+    ; close(fd)
+    ;---------------------------------------
+
+    mov     eax, SYS_CLOSE
+    mov     rdi, r12
+    syscall
+
+    add     rsp, STAT_SIZE
+
+    ; return slice
+    mov     rax, r14
+    mov     rdx, r13
+    ret
+
+.cleanup:
+
+    mov     eax, SYS_CLOSE
+    mov     rdi, r12
+    syscall
+
+    add     rsp, STAT_SIZE
+
+.error:
+
+    xor     eax, eax
+    xor     edx, edx
+    ret
+
+*/
+
+
+
+
+
     fprintf(file, "%s", header);
     fprintf(file, "%s", print_function);
     fprintf(file, "%s", puts_function);
-
+    fprintf(file, "%s", open_function);
+    
     for (int i=0; i<num_opcodes; i++) {
         Opcode *t = &opcodes[i];
 

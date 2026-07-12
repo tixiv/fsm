@@ -79,6 +79,39 @@ Symbol builtin_puts = {
     .type = &builtin_puts_type,
 };
 
+Type *builtin_open_argument_types[] = { &builtin_u8_reference, &builtin_i64 }; // open(filename: u8 &, flags: i64) : i64
+
+Type builtin_open_type = (Type){T_function, .fun.num_arguments = 2, .fun.argument_types = builtin_open_argument_types, .fun.return_type = &builtin_i64};
+
+Symbol builtin_open = {
+    .kind = SYM_global,
+    .name.begin = "open",
+    .name.len = 4,
+    .type = &builtin_open_type,
+};
+
+Type *builtin_mmap_argument_types[] = { &builtin_i64, &builtin_i64 }; // mmap(lenght: i64, fd: i64) : u8 &
+
+Type builtin_mmap_type = (Type){T_function, .fun.num_arguments = 2, .fun.argument_types = builtin_mmap_argument_types, .fun.return_type = &builtin_u8_reference};
+
+Symbol builtin_mmap = {
+    .kind = SYM_global,
+    .name.begin = "mmap",
+    .name.len = 4,
+    .type = &builtin_mmap_type,
+};
+
+Type *builtin_fsize_argument_types[] = { &builtin_i64 }; // fsize(fd: i64) : i64
+
+Type builtin_fsize_type = (Type){T_function, .fun.num_arguments = 1, .fun.argument_types = builtin_fsize_argument_types, .fun.return_type = &builtin_i64};
+
+Symbol builtin_fsize = {
+    .kind = SYM_global,
+    .name.begin = "fsize",
+    .name.len = 5,
+    .type = &builtin_fsize_type,
+};
+
 static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number) {
     // locals
     Symbol *s = get_symbol_by_name(&res->local_symbols, name);
@@ -94,6 +127,15 @@ static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number) 
     }
     if (sv_equal(name, &builtin_puts.name)) {
         return &builtin_puts;
+    }
+    if (sv_equal(name, &builtin_open.name)) {
+        return &builtin_open;
+    }
+    if (sv_equal(name, &builtin_mmap.name)) {
+        return &builtin_mmap;
+    }
+    if (sv_equal(name, &builtin_fsize.name)) {
+        return &builtin_fsize;
     }
 
     resolver_error(line_number, "Undefined symbol %.*s", SV_prnt(*name));
