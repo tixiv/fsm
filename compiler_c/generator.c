@@ -3,6 +3,7 @@
 #include "opcodes.h"
 #include "sv.h"
 #include "common.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -14,6 +15,35 @@ static size_t unescaped_string_len(SV str) {
         len++;
     }
     return len;
+}
+
+uint8_t get_unescaped_char(uint8_t c) {
+    switch (c) {
+        case '\\': return '\\'; break;
+        case 'a':  return '\a'; break;
+        case 'b':  return '\b'; break;
+        case 'e':  return '\e'; break;
+        case 'n':  return '\n'; break;
+        case 'r':  return '\r'; break;
+        case 't':  return '\t'; break;
+        case '"':  return '\"'; break;
+        default:
+            NOT_IMPLEMENTED("Genearating assembly for the escape sequence '\\%c' is not implemented yet.", c);
+            break;
+    }
+}
+
+int32_t get_char_constant(SV str) {
+    int32_t c;
+    if (str.len && *str.begin == '\\') {
+        sv_pop(&str);
+        c = get_unescaped_char(sv_pop(&str));
+    } 
+    else {
+        c = sv_pop(&str);
+    }
+
+    return c;
 }
 
 void output_asm(const char *asm_file_name) {
@@ -291,6 +321,10 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "mov rax, string_literal_%lu\n", t->u64_value);
                 fprintf(file,"\t" "push rax\n");
                 break;
+            case OP_push_char_literal:
+                fprintf(file,"\t" "mov rax,%d\n", get_char_constant(t->string_value));
+                fprintf(file,"\t" "push rax\n");
+                break;
             case OP_call:
                 fprintf(file,"\t" "call fn_" SV_FMT "\n", SV_prnt(t->string_value));
                 if (t->size) fprintf(file,"\t" "add rsp, %lu\n", t->size);
@@ -383,13 +417,18 @@ void output_asm(const char *asm_file_name) {
             case OP_load:
                 fprintf(file,"\t" "pop rbx\n");
                 fprintf(file,"\t" "xor rax, rax\n");
-                if      (t->size == 8) fprintf(file,"\t" "mov rax, [rbx]\n");
-                else if (t->size == 4) fprintf(file,"\t" "mov eax, [rbx]\n");
+                if      (t->size == 1) fprintf(file,"\t" "mov  al, [rbx]\n");
                 else if (t->size == 2) fprintf(file,"\t" "mov  ax, [rbx]\n");
-                else if (t->size == 1) fprintf(file,"\t" "mov  al, [rbx]\n");
+                else if (t->size == 4) fprintf(file,"\t" "mov eax, [rbx]\n");
+                else if (t->size == 8) fprintf(file,"\t" "mov rax, [rbx]\n");
+                else if (t->size == 16) {
+                    fprintf(file,"\t" "mov rcx, [rbx]\n");
+                    fprintf(file,"\t" "mov rax, [rbx+8]\n");
+                }
                 else NOT_IMPLEMENTED("Generating asm for OP_load with storages size %lu is not implemented.\n", t->size);
 
                 fprintf(file,"\t" "push rax\n");
+                if (t->size == 16) fprintf(file,"\t" "push rcx\n");
                 break;
             case OP_store:
                 if      (t->size == 16) fprintf(file,"\t" "pop rcx\n");
@@ -404,6 +443,14 @@ void output_asm(const char *asm_file_name) {
                     fprintf(file,"\t" "mov [rbx+8], rax\n");
                 }
                 else NOT_IMPLEMENTED("Generating asm for OP_store with storages size %lu is not implemented.\n", t->size);
+                break;
+            case OP_sign_extend:
+                fprintf(file,"\t" "pop  rax\n");
+                if      (t->size == 1) fprintf(file,"\t" "movsx  rax,  al\n");
+                else if (t->size == 2) fprintf(file,"\t" "movsx  rax,  ax\n");
+                else if (t->size == 4) fprintf(file,"\t" "movsxd rax, eax\n");
+                else NOT_IMPLEMENTED("Generating asm for OP_sign_extend with storages size %lu is not implemented.\n", t->size);
+                fprintf(file,"\t" "push  rax\n");
                 break;
             default:
                 fprintf(stderr, "%s:%d Generating %s opcode is not implemented yet.\n", __FILE__, __LINE__, opcode_name(t->kind));
@@ -424,21 +471,7 @@ void output_asm(const char *asm_file_name) {
             while(str.len) {
                 if (*str.begin == '\\') {
                     sv_pop(&str);
-                    uint8_t c = ' ';
-                    switch (*str.begin) {
-                        case '\\': c = '\\'; break;
-                        case 'a': c = '\a'; break;
-                        case 'b': c = '\b'; break;
-                        case 'e': c = '\e'; break;
-                        case 'n': c = '\n'; break;
-                        case 'r': c = '\r'; break;
-                        case 't': c = '\t'; break;
-                        case '"': c = '\"'; break;
-                        default:
-                            NOT_IMPLEMENTED("Genearating assembly for the escape sequence '\\%c' is not implemented yet.", *str.begin);
-                            break;
-                    }
-
+                    uint8_t c = get_unescaped_char(*str.begin);
                     fprintf(file, "%d", c);
                     sv_pop(&str);
                 } else {

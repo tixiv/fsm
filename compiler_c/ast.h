@@ -38,6 +38,7 @@ typedef struct {
     X(AST_arg_decl) \
     X(AST_number) \
     X(AST_string) \
+    X(AST_char_constant) \
     X(AST_symbol) \
     X(AST_binary) \
     X(AST_call) \

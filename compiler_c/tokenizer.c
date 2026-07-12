@@ -66,6 +66,23 @@ void read_string(SV *str, SV *input, int *line_number) {
     }
 }
 
+void read_char_constant(SV *str, SV *input, int *line_number) {
+    sv_pop(input); // initial '
+
+    str->begin = input->begin;
+    str->len = 0;
+    while(input->len && '\'' != *input->begin) {
+        if ('\n' == sv_pop(input)) (*line_number)++;
+        str->len++;
+    }
+    if (input->len) {
+        sv_pop(input); // closing '''
+    } else {
+        tokenizer_error(*line_number,  "Error: unmatched '\''. Quitting.");
+        exit(EXIT_FAILURE);
+    }
+}
+
 const char *token_kind_name(TokenKind kind) {
     switch (kind) {
 #define X(name) case name: return #name;
@@ -118,6 +135,7 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_identifier: return("identifier");
         case TOK_string: return("string constant");
         case TOK_number: return("number");
+        case TOK_char_constant: return ("char constant");
         case TOK_eof: return("EOF");
     }
     return token_kind_name(kind);
@@ -309,6 +327,11 @@ void tokenizer(SV *code) {
             SV str;
             read_string(&str, code, &line_number);
             push_token(TOK_string, &str, line_number);
+        }
+        else if ('\'' == c) {
+            SV str;
+            read_char_constant(&str, code, &line_number);
+            push_token(TOK_char_constant, &str, line_number);
         }
         else if (is_allowed_at_start_of_identifier(c)) {
             SV word;

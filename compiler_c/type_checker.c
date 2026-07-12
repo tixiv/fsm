@@ -455,22 +455,35 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             n->addressable = false;
             break;
 
+        case AST_char_constant:
+            n->type = &builtin_i32;
+            n->addressable = false;
+            break;
+
         case AST_array_access:
             if (is_reference_kind(n->_array.array->type))
                 insert_dereference(&n->_array.array);
 
-            if (!is_array_kind(n->_array.array->type)) {
+            if (is_array_kind(n->_array.array->type)) {
+                n->type = get_ref_type_for(n->_array.array->type->_array.element_type);    
+            }
+            else if (is_slice_type(n->_array.array->type)) {
+                n->type = get_ref_type_for(get_slice_element_type(n->_array.array->type));
+            }
+            else {
                 type_checker_error(n->line_number,
-                    "Invalid use of [] operator on something that is not an array. Have '%s'.\n",
+                    "Invalid use of [] operator on something that is not an array or a slice. Have '%s'.\n",
                     get_type_name_r(buf_1, n->_array.array->type));
             }
+
+
             if (!is_integer_kind(n->_array.index->type)) {
                 type_checker_error(n->line_number,
                     "Invalid use of non integer type '%s' as an array index.\n",
                     get_type_name_r(buf_1, n->_array.index->type));
 
             }
-            n->type = get_ref_type_for(n->_array.array->type->_array.element_type);
+            
             n->addressable = true;
             break;
 

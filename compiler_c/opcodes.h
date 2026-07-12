@@ -22,6 +22,7 @@
     X(OP_push_arg) \
     X(OP_push_literal) \
     X(OP_push_string_literal) \
+    X(OP_push_char_literal) \
     X(OP_push_local_var) \
     X(OP_push_local_var_address) \
     X(OP_push_arg_address) \
@@ -32,6 +33,7 @@
     X(OP_while_check) \
     X(OP_while_end) \
     X(OP_to_bool) \
+    X(OP_sign_extend) \
     X(OP_array_access) \
     X(OP_member_access) \
     X(OP_load) \

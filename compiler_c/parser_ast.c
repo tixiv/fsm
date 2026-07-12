@@ -257,6 +257,11 @@ static AST_node *parse_primary()
         n->str.value = CT->value;
         MOVE_NEXT();
     }
+    else if (CT->kind == TOK_char_constant) {
+        n = ast_alloc(AST_char_constant, CT->line_number);
+        n->str.value = CT->value;
+        MOVE_NEXT();
+    }
     else if (CT->kind == TOK_ampersand) {
         n = ast_alloc(AST_reference, CT->line_number);
         MOVE_NEXT();

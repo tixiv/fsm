@@ -145,7 +145,7 @@ static void gen_cast(AST_node *n) {
         // No cast needed.
     }
     else if (to->kind == T_signed_integer && from->kind == T_signed_integer) {
-        NOT_IMPLEMENTED("Generating cast for sign extension is not implemented yet.\n")
+        push_opcode_sz(OP_sign_extend, nullptr, 0, from->storage_size);
     }
     else if (is_integer_kind(to) && from->kind == T_signed_integer) {
         // Just put no cast for now, let's fix potential problems later
@@ -247,6 +247,10 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             push_opcode(OP_push_string_literal, &n->str.value, num_strings++);
             break;
 
+        case AST_char_constant:
+            push_opcode(OP_push_char_literal, &n->str.value, 0);
+            break;
+
         case AST_dereference:
             ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
             push_opcode_sz(OP_load, nullptr, 0, get_storage_size(n->type));
@@ -257,9 +261,19 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             break;
 
         case AST_array_access:
-            gen_address_visitor(n->_array.array, gen);
-            gen_value_visitor(n->_array.index, gen);
-            push_opcode_sz(OP_array_access, nullptr, 0, get_storage_size(n->_array.array->type->_array.element_type));
+            if (is_array_kind(n->_array.array->type)) {
+                gen_address_visitor(n->_array.array, gen);
+                gen_value_visitor(n->_array.index, gen);
+                push_opcode_sz(OP_array_access, nullptr, 0, get_storage_size(n->_array.array->type->_array.element_type));
+            }
+            else if (is_slice_type(n->_array.array->type)) {
+                gen_address_visitor(n->_array.array, gen);
+                push_opcode_sz(OP_load, nullptr, 0, 8); // load the data member
+                gen_value_visitor(n->_array.index, gen);
+                push_opcode_sz(OP_array_access, nullptr, 0, get_storage_size(get_slice_element_type(n->_array.array->type)));
+            }
+            else NOT_IMPLEMENTED("AST_array_access is not implemented for anything that is not an array or a slice.\n")
+
             break;
 
         case AST_member_access:
