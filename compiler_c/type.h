@@ -73,6 +73,7 @@ extern Type builtin_u8;
 extern Type builtin_i8;
 
 extern Type builtin_u8_reference;
+extern Type builtin_u8_slice;
 
 Type *type_alloc(TypeKind kind);
 

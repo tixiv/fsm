@@ -49,8 +49,8 @@ void read_file(SV *contents, const char *path)
 
 
 bool debug_tokens = false;
-bool debug_opcodes = true;
-bool debug_ast = true;
+bool debug_opcodes = false;
+bool debug_ast = false;
 
 int main (int argc, const char *argv[]) {
     

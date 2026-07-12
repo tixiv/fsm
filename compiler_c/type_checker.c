@@ -352,6 +352,9 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             }
             n->var_decl.symbol->type = t;
 
+            if (n->var_decl.initializer)
+                try_convert_to_type_if_necessary(&n->var_decl.initializer, t, "Initializer");
+
             n->type = &builtin_void; // the declaration itself has no value.
             break;
         }
@@ -448,7 +451,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_string:
-            n->type = &builtin_u8_reference;
+            n->type = &builtin_u8_slice;
             n->addressable = false;
             break;
 

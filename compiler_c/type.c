@@ -21,7 +21,10 @@ Type builtin_i16 = (Type){T_signed_integer,   .storage_size = 2, .integer.num_bi
 Type builtin_u8 =  (Type){T_unsigned_integer, .storage_size = 1, .integer.num_bits =  8};
 Type builtin_i8 =  (Type){T_signed_integer,   .storage_size = 1, .integer.num_bits =  8};
 
+
 Type builtin_u8_reference = (Type){T_reference, .storage_size = 8, .reference.target_type = &builtin_u8};
+static TypeMember builtin_u8_slice_members[2] = {{.name = mkSV("data"), .type = &builtin_u8_reference}, {.name = mkSV("len"), .type = &builtin_i64}};
+Type builtin_u8_slice = (Type){T_struct, .storage_size = 16, ._struct.num_members = 2, ._struct.members = builtin_u8_slice_members};
 
 Type *type_alloc(TypeKind kind) {
     Type *t = malloc(sizeof(Type));
@@ -278,6 +281,8 @@ static Type *make_slice_type(Type *element_type) {
 Dyn_array slice_types;
 
 Type *get_sclice_type(Type *element_type) {
+    if (element_type == &builtin_u8) return &builtin_u8_slice;
+    
     if (slice_types.capacity == 0)
         dyn_array_init(&slice_types, sizeof(Type*), 16);
 
@@ -292,6 +297,8 @@ Type *get_sclice_type(Type *element_type) {
 }
 
 bool is_slice_type(Type *t) {
+    if (t == &builtin_u8_slice) return true;
+    
     for (int i = 0; i < slice_types.count; i++) {
         Type *slice = ((Type**)slice_types.data)[i];
         if (t == slice) return true;

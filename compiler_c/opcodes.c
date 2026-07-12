@@ -16,11 +16,19 @@ Dyn_array opcodes_dyn;
 
 void dump_opcodes() {
     for (int i=0; i<num_opcodes; i++) {
-        Opcode *t = &opcodes[i];
-        if (t->string_value.begin) {
-            printf("[%s, \"" SV_FMT "\"]\n", opcode_name(t->kind), SV_prnt(t->string_value));
+        Opcode *op = &opcodes[i];
+        if (op->string_value.begin) {
+            printf("[%s, \"" SV_FMT "\"]\n", opcode_name(op->kind), SV_prnt(op->string_value));
         } else {
-            printf("[%s, %lu]\n", opcode_name(t->kind), t->u64_value);
+            switch (op->kind) {
+                case OP_push_local_var:
+                    printf("[%s, sz:%u, var:%u]\n", opcode_name(op->kind), op->u32_value[1], op->u32_value[0]);
+                    break;
+
+                default:
+                    printf("[%s, %lu]\n", opcode_name(op->kind), op->u64_value);
+                    break;
+            }
         }
     }
 }

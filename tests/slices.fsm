@@ -1,18 +1,20 @@
 
 fn prints (s: u8[]) {
     print(s.len)
-    puts(s.data)
+    puts(s)
 }
 
 fn main () {
-    let a :u8[10];
+    let a :u8[6];
     a[0] = 65;
     a[1] = 66;
     a[2] = 67;
     a[3] = 68;
     a[4] = 69;
     a[5] = 10;
-    a[6] = 0;
+
+    let s = "Hello, Slices!\n";
 
     prints(a)
+    prints(s)
 }

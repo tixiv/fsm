@@ -39,9 +39,9 @@ static void il_gen_push_symbol_address(Symbol *s) {
 
 static void il_gen_push_symbol(Symbol *s) {
     if (s->kind == SYM_arg) {
-        push_opcode(OP_push_arg, nullptr, s->offset);
+        push_opcode(OP_push_arg, nullptr, (s->type->storage_size << 32) | s->offset);
     } else if (s->kind == SYM_local) {
-        push_opcode(OP_push_local_var, nullptr, s->offset);
+        push_opcode(OP_push_local_var, nullptr, (s->type->storage_size << 32) | s->offset);
     } else {
         NOT_IMPLEMENTED("Pushing symbol kind %s is not implemented yet.\n", symbol_kind_name(s->kind));
     }
