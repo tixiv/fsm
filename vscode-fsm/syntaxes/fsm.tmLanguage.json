@@ -1,0 +1,101 @@
+{
+    "scopeName": "source.fsm",
+    "name": "FSM",
+
+    "patterns": [
+        {
+            "include": "#comments"
+        },
+        {
+            "include": "#strings"
+        },
+        {
+            "include": "#numbers"
+        },
+        {
+            "include": "#keywords"
+        },
+        {
+            "include": "#types"
+        },
+        {
+            "include": "#functions"
+        },
+        {
+            "include": "#operators"
+        }
+    ],
+
+    "repository": {
+
+        "comments": {
+            "patterns": [
+                {
+                    "name": "comment.line.double-slash.fsm",
+                    "match": "//.*$"
+                }
+            ]
+        },
+
+        "strings": {
+            "patterns": [
+                {
+                    "name": "string.quoted.double.fsm",
+                    "begin": "\"",
+                    "end": "\"",
+                    "patterns": [
+                        {
+                            "name": "constant.character.escape.fsm",
+                            "match": "\\\\."
+                        }
+                    ]
+                }
+            ]
+        },
+
+        "numbers": {
+            "patterns": [
+                {
+                    "name": "constant.numeric.fsm",
+                    "match": "\\b\\d+\\b"
+                }
+            ]
+        },
+
+        "keywords": {
+            "patterns": [
+                {
+                    "name": "keyword.control.fsm",
+                    "match": "\\b(fn|struct|if|else|while|for|return|let|break|continue)\\b"
+                }
+            ]
+        },
+
+        "types": {
+            "patterns": [
+                {
+                    "name": "storage.type.fsm",
+                    "match": "\\b(i8|i16|i32|i64|u8|u16|u32|u64|bool|void)\\b"
+                }
+            ]
+        },
+
+        "functions": {
+            "patterns": [
+                {
+                    "name": "entity.name.function.fsm",
+                    "match": "\\b([A-Za-z_\\p{L}][A-Za-z0-9_\\p{L}]*)\\s*(?=\\()"
+                }
+            ]
+        },
+
+        "operators": {
+            "patterns": [
+                {
+                    "name": "keyword.operator.fsm",
+                    "match": "=>|==|!=|<=|>=|&&|\\|\\||[+\\-*/%=<>!&|]"
+                }
+            ]
+        }
+    }
+}
