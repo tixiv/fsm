@@ -12,45 +12,15 @@
 #include "type_checker.h"
 #include "type_resolver.h"
 #include "calculate_stacks.h"
+#include "modules.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 
-const char *current_filename;
 
-void read_file(SV *contents, const char *path)
-{
-    current_filename = path;
-    FILE *f = fopen(path, "rb");
-    if (!f) {
-        fprintf(stderr, "[FSM Compiler] Error opening file '%s': %s\n", path, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    rewind(f);
-
-    char *buffer = malloc(size + 1);
-
-    if (fread(buffer, 1, size, f) != size) {
-        fprintf(stderr, "[FSM Compiler] Error reading from file '%s': %s\n", path, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    buffer[size] = '\0';
-
-    contents->begin = buffer;
-    contents->len = size;
-
-    fclose(f);
-}
-
-
-bool debug_tokens = false;
 bool debug_opcodes = false;
-bool debug_ast = false;
 
 int main (int argc, const char *argv[]) {
     
@@ -59,30 +29,14 @@ int main (int argc, const char *argv[]) {
         exit(EXIT_FAILURE);
     }
     
-    SV input;
-    read_file(&input, argv[1]);
-    tokenizer(&input);
+    compile_program(argv[1]);
 
-    if(debug_tokens)
-        dump_tokens();
-
-    AST_node *ast = parse_program_ast();
-
-    chain_operators(ast);
-
-    run_type_resolver(ast);
-
-    resolver(ast);
-
-    run_typechecking(ast);
-
-    if (debug_ast)
-        ast_dump_tree(ast);
-
-    calculate_stacks(ast);
+    ast_to_il_init();
     
-    ast_to_il(ast);
-
+    for (int i = 0; i < modules.count; i++) {
+        ast_to_il(((Module*)modules.data)[i].ast);
+    }
+    
     if (debug_opcodes)
         dump_opcodes();
 

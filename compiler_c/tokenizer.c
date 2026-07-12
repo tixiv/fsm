@@ -2,6 +2,7 @@
 #include "tokenizer.h"
 #include "common.h"
 #include "dyn_array.h"
+#include "modules.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,6 +87,8 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_keyword_while: return("'while'");
         case TOK_keyword_for: return("'for'");
         case TOK_keyword_struct: return("'struct'");
+        case TOK_keyword_import: return("'import'");
+        case TOK_keyword_fsm_debug: return("'fsm_debug'");
         case TOK_lparen: return("'('");
         case TOK_rparen: return("')'");
         case TOK_lbrace: return("'{'");
@@ -120,10 +123,8 @@ const char *token_kind_printable(TokenKind kind) {
     return token_kind_name(kind);
 }
 
-Dyn_array tokens_dyn;
-
 void push_token(int kind, SV *value, int line_number) {
-    Token *token = (Token*) dyn_array_push(&tokens_dyn);
+    Token *token = (Token*) dyn_array_push(&current_module->tokens_dyn);
 
     token->kind = kind;
     if (value)
@@ -157,13 +158,19 @@ void handle_word(SV *word, int line_number) {
     else if (sv_compare_cstr(word, "struct")) {
         push_token(TOK_keyword_struct, nullptr, line_number);
     }
+    else if (sv_compare_cstr(word, "import")) {
+        push_token(TOK_keyword_import, nullptr, line_number);
+    }
+    else if (sv_compare_cstr(word, "fsm_debug")) {
+        push_token(TOK_keyword_fsm_debug, nullptr, line_number);
+    }
     else {
         push_token(TOK_identifier, word, line_number);
     }
 }
 
 void tokenizer(SV *code) {
-    dyn_array_init(&tokens_dyn, sizeof(Token), 16);
+    dyn_array_init(&current_module->tokens_dyn, sizeof(Token), 16);
     int line_number = 1;
     
     while (code->len) {

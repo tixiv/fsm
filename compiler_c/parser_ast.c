@@ -4,6 +4,7 @@
 #include "ast.h"
 #include "tokenizer.h"
 #include "dyn_array.h"
+#include "modules.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -597,7 +598,18 @@ AST_node *parse_program_ast() {
 
     current_token = tokens;
     while (1) {
-        if (CT->kind == TOK_keyword_fn) {
+        if (CT->kind == TOK_keyword_import) {
+            MOVE_NEXT();
+            take_expected(TOK_asterisk);
+            take_expected(TOK_identifier); // from
+            expect_token(TOK_string);
+            Token *saved_token = current_token;
+            if (!resolve_import(CT->value)) parser_error(CT->line_number, "Couldn't resolve import '%.*s'.\n", SV_prnt(CT->value));
+            current_token = saved_token;
+            MOVE_NEXT();
+            take_expected(TOK_semicolon);
+        }
+        else if (CT->kind == TOK_keyword_fn) {
             AST_node *fun = parse_function();
             if (last) 
                 last->next = fun;

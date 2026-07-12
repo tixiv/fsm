@@ -10,4 +10,5 @@ typedef struct {
 } SB;
 
 void sb_init(SB *sb, char *buffer, size_t buffer_size_bytes);
+void sb_reset(SB *sb);
 void sb_printf(SB *sb, const char *fmt, ...);

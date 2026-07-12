@@ -225,10 +225,11 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
 }
 
 void resolver(AST_node *root) {
-    dyn_array_init(&global_symbols, sizeof(Symbol *), 32);
-
     Resolver res;
     dyn_array_init(&res.local_symbols, sizeof(Symbol *), 32);
-
     resolver_visitor(root, &res);
+}
+
+void init_resolver () {
+    dyn_array_init(&global_symbols, sizeof(Symbol *), 32);    
 }

@@ -9,6 +9,10 @@ void sb_init(SB *sb, char *buffer, size_t buffer_size_bytes)  {
     sb->capacity = buffer_size_bytes;
 }
 
+void sb_reset(SB *sb) {
+    sb->len = 0;
+}
+
 void sb_printf(SB *sb, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);

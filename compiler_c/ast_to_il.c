@@ -346,6 +346,7 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         case AST_typename:
         case AST_type_ref:
         case AST_type_array:
+        case AST_type_slice:
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             break;
         default:
@@ -354,11 +355,11 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
     }
 }
 
-
-
 void ast_to_il(AST_node *root) {
-    dyn_array_init(&opcodes_dyn, sizeof(Opcode), 32);
-
     IL_gen gen;
     il_gen_visitor(root, &gen);
+}
+
+void ast_to_il_init() {
+    dyn_array_init(&opcodes_dyn, sizeof(Opcode), 32);
 }
