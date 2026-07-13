@@ -3,15 +3,15 @@ import * from "std";
 
 fn take_number (str: u8[]&) : u8[]
 {
-    while (!is_numeric(str.begin) && str.len) sv_pop(str);
+    while (!is_numeric(str.begin) && str.len) str++;
     
     let number = str;
     number.len = 0
 
     while (is_numeric(str.begin) && str.len) {
-        sv_pop(str);
+        str++;
         number.len = number.len + 1
-    } 
+    }
 
     return number
 }
