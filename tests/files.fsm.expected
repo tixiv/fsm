@@ -1,10 +1,10 @@
 File has been opened
-Read bytes : 411
+Read bytes : 413
 
 fn read_file (filename: u8[])
 {
     let O_RDONLY = 0
-    let fd = open (filename.data, O_RDONLY)
+    let fd = open (filename.begin, O_RDONLY)
 
     if (fd >= 0) {
         puts("File has been opened\n")
@@ -12,7 +12,7 @@ fn read_file (filename: u8[])
         let size = fsize(fd)
         
         let s: u8[];
-        s.data => mmap(size, fd)
+        s.begin => mmap(size, fd)
         s.len = size;
 
         puts("Read bytes : ") print(s.len)

@@ -287,7 +287,7 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             }
             else if (is_slice_type(n->_array.array->type)) {
                 gen_address_visitor(n->_array.array, gen);
-                push_opcode_sz(OP_load, nullptr, 0, 8); // load the data member
+                push_opcode_sz(OP_load, nullptr, 0, 8); // load the 'begin' member
                 gen_value_visitor(n->_array.index, gen);
                 push_opcode_sz(OP_array_access, nullptr, 0, get_storage_size(get_slice_element_type(n->_array.array->type)));
             }

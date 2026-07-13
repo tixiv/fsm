@@ -23,7 +23,7 @@ Type builtin_i8 =  (Type){T_signed_integer,   .storage_size = 1, .integer.num_bi
 
 
 Type builtin_u8_reference = (Type){T_reference, .storage_size = 8, .reference.target_type = &builtin_u8};
-static TypeMember builtin_u8_slice_members[2] = {{.name = mkSV("data"), .type = &builtin_u8_reference}, {.name = mkSV("len"), .type = &builtin_i64}};
+static TypeMember builtin_u8_slice_members[2] = {{.name = mkSV("begin"), .type = &builtin_u8_reference}, {.name = mkSV("len"), .type = &builtin_i64}};
 Type builtin_u8_slice = (Type){T_struct, .storage_size = 16, ._struct.num_members = 2, ._struct.members = builtin_u8_slice_members};
 
 Type *type_alloc(TypeKind kind) {
@@ -281,7 +281,7 @@ static Type *make_slice_type(Type *element_type) {
     size_t size = 2 * sizeof(TypeMember);
     slice_t->_struct.members = malloc(size);
     slice_t->_struct.members[0].type = get_ref_type_for(element_type);
-    slice_t->_struct.members[0].name = mkSV("data");
+    slice_t->_struct.members[0].name = mkSV("begin");
     slice_t->_struct.members[1].type = &builtin_i64;
     slice_t->_struct.members[1].name = mkSV("len");
 

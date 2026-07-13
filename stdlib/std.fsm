@@ -2,7 +2,7 @@
 fn read_file (filename: u8[]) : u8[]
 {
     let O_RDONLY = 0
-    let fd = open (filename.data, O_RDONLY)
+    let fd = open (filename.begin, O_RDONLY)
 
     let s: u8[];
     s.len = 0;
@@ -12,7 +12,7 @@ fn read_file (filename: u8[]) : u8[]
 
         let size = fsize(fd)
         
-        s.data => mmap(size, fd)
+        s.begin => mmap(size, fd)
         s.len = size;
 
         puts("Read bytes: ") print(s.len)
@@ -31,7 +31,7 @@ fn is_allowed_in_identifier(c: i32) { return is_alpha(c) || is_numeric(c) || c =
 fn sv_pop(str :u8[]&)
 {
     if (str.len == 0) return;
-    str.data => str[1]
+    str.begin => str[1]
     str.len = str.len - 1;
 }
 

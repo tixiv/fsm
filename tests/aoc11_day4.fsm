@@ -3,12 +3,12 @@ import * from "std";
 
 fn take_number (str: u8[]&) : u8[]
 {
-    while (!is_numeric(str.data) && str.len) sv_pop(str);
+    while (!is_numeric(str.begin) && str.len) sv_pop(str);
     
     let number = str;
     number.len = 0
 
-    while (is_numeric(str.data) && str.len) {
+    while (is_numeric(str.begin) && str.len) {
         sv_pop(str);
         number.len = number.len + 1
     } 
@@ -25,7 +25,7 @@ fn main () {
 
     let x = 0;
 
-    while (contents.len && contents.data != '\n') {
+    while (contents.len && contents.begin != '\n') {
         called_numbers[x] = take_number(contents)
         x = x + 1;
     }
