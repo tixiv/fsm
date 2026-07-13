@@ -40,6 +40,8 @@
     X(OP_load) \
     X(OP_store) \
     X(OP_store_and_dup) \
+    X(OP_integer_plus_plus) \
+    X(OP_integer_minus_minus) \
 
 enum Op_Kind {
 #define X(name) name,

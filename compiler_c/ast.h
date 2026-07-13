@@ -60,6 +60,8 @@ typedef struct {
     X(AST_type_slice) \
     X(AST_member_access) \
     X(AST_array_to_slice) \
+    X(AST_plus_plus) \
+    X(AST_minus_minus) \
 
 typedef enum {
 #define X(name) name,
@@ -184,6 +186,16 @@ typedef struct AST_node_s {
         struct {
             struct AST_node_s *body;
         } _not;
+
+        struct {
+            struct AST_node_s *body;
+            bool postfix;
+        } plus_plus;
+
+        struct {
+            struct AST_node_s *body;
+            bool postfix;
+        } minus_minus;
 
         struct {
             struct AST_node_s *body;

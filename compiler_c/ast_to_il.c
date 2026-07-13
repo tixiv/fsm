@@ -145,7 +145,8 @@ static void gen_cast(AST_node *n) {
         // No cast needed.
     }
     else if (to->kind == T_signed_integer && from->kind == T_signed_integer) {
-        push_opcode_sz(OP_sign_extend, nullptr, 0, from->storage_size);
+        if (to->storage_size > from->storage_size)
+            push_opcode_sz(OP_sign_extend, nullptr, 0, from->storage_size);
     }
     else if (is_integer_kind(to) && from->kind == T_signed_integer) {
         // Just put no cast for now, let's fix potential problems later
@@ -280,6 +281,19 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             else NOT_IMPLEMENTED("AST_array_access is not implemented for anything that is not an array or a slice.\n")
 
             break;
+        
+        case AST_plus_plus:
+            gen_address_visitor(n->plus_plus.body, gen);
+            push_opcode_sz(OP_integer_plus_plus, nullptr,
+                n->plus_plus.postfix + 1, n->type->storage_size);
+            break;
+
+        case AST_minus_minus:
+            gen_address_visitor(n->minus_minus.body, gen);
+            push_opcode_sz(OP_integer_minus_minus, nullptr,
+                n->minus_minus.postfix + 1, n->type->storage_size);
+            break;
+
 
         case AST_member_access:
             ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
@@ -294,6 +308,8 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
 
 
 static void il_gen_visitor(AST_node *n, IL_gen *gen) {
+    if (!n) return;
+
     switch (n->kind) {
         case AST_function: {
             Symbol *s_fun = n->fun.symbol;
@@ -355,6 +371,16 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         
         case AST_binary:
             gen_binary_operators(n, gen, false);
+            break;
+        
+        case AST_plus_plus:
+            gen_address_visitor(n->plus_plus.body, gen);
+            push_opcode_sz(OP_integer_plus_plus, nullptr, 0, n->type->storage_size);
+            break;
+
+        case AST_minus_minus:
+            gen_address_visitor(n->minus_minus.body, gen);
+            push_opcode_sz(OP_integer_minus_minus, nullptr, 0, n->type->storage_size);
             break;
 
         case AST_cast:

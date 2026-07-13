@@ -517,6 +517,28 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             n->type = &builtin_bool;
             n->addressable = false;
             break;
+        
+        case AST_plus_plus: {
+            Type * original_type = n->plus_plus.body->type;
+            auto_dereference(&n->plus_plus.body);
+            if (!is_integer_kind(n->plus_plus.body->type)) {
+                type_checker_error(n->line_number, "Operator '++' needs integer type argument. Have '%s'",
+                    get_type_name_r(buf_1, original_type));
+            }
+            n->type = n->plus_plus.body->type;
+            break;
+        }
+
+        case AST_minus_minus: {
+            Type * original_type = n->minus_minus.body->type;
+            auto_dereference(&n->minus_minus.body);
+            if (!is_integer_kind(n->minus_minus.body->type)) {
+                type_checker_error(n->line_number, "Operator '--' needs integer type argument. Have '%s'",
+                    get_type_name_r(buf_1, original_type));
+            }
+            n->type = n->minus_minus.body->type;
+            break;
+        }
 
         case AST_member_access: {
             ASSERT(n->member_access.body->type, "Unresolved type encountered in member access.\n");

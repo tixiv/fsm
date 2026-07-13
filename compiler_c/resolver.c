@@ -210,6 +210,8 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_array_access:
         case AST_dereference:
         case AST_reference:
+        case AST_plus_plus:
+        case AST_minus_minus:
         case AST_struct:
         case AST_member_def:
         case AST_member_access:

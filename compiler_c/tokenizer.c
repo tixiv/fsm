@@ -114,6 +114,8 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_rbracket: return("']'");
         case TOK_plus: return("'+'");
         case TOK_minus: return("'-'");
+        case TOK_plus_plus: return("'++'");
+        case TOK_minus_minus: return("'--'");
         case TOK_asterisk: return("'*'");
         case TOK_slash: return("'/'");
         case TOK_percent: return("'%'");
@@ -246,6 +248,14 @@ void tokenizer(SV *code) {
         else if (',' == c) {
             sv_pop(code);
             push_token(TOK_komma, nullptr, line_number);
+        }
+        else if (sv_starts_with(code, "++")) {
+            sv_pop(code);  sv_pop(code);
+            push_token(TOK_plus_plus, nullptr, line_number);
+        }
+        else if (sv_starts_with(code, "--")) {
+            sv_pop(code);  sv_pop(code);
+            push_token(TOK_minus_minus, nullptr, line_number);
         }
         else if ('+' == c) {
             sv_pop(code);

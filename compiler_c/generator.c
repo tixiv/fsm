@@ -447,6 +447,63 @@ void output_asm(const char *asm_file_name) {
                 }
                 else NOT_IMPLEMENTED("Generating asm for OP_store with storages size %lu is not implemented.\n", t->size);
                 break;
+
+            case OP_integer_plus_plus:
+                fprintf(file,"\t" "pop rbx\n");
+                if (t->u64_value == 2) { // post increment: push value first
+                    fprintf(file,"\t" "xor rax, rax\n");
+                    if      (t->size == 1) fprintf(file,"\t" "mov  al, [rbx]\n");
+                    else if (t->size == 2) fprintf(file,"\t" "mov  ax, [rbx]\n");
+                    else if (t->size == 4) fprintf(file,"\t" "mov eax, [rbx]\n");
+                    else if (t->size == 8) fprintf(file,"\t" "mov rax, [rbx]\n");
+                    fprintf(file,"\t" "push rax\n");
+                }
+
+                if      (t->size == 1) fprintf(file,"\t" "inc BYTE [rbx]\n");
+                else if (t->size == 2) fprintf(file,"\t" "inc WORD [rbx]\n");
+                else if (t->size == 4) fprintf(file,"\t" "inc DWORD [rbx]\n");
+                else if (t->size == 8) fprintf(file,"\t" "inc QWORD [rbx]\n");
+                else NOT_IMPLEMENTED("Generating asm for OP_integer_plus_plus with storages size %lu is not implemented.\n", t->size);
+
+                if (t->u64_value == 1) { // pre increment: push value after
+                                        fprintf(file,"\t" "xor rax, rax\n");
+                    if      (t->size == 1) fprintf(file,"\t" "mov  al, [rbx]\n");
+                    else if (t->size == 2) fprintf(file,"\t" "mov  ax, [rbx]\n");
+                    else if (t->size == 4) fprintf(file,"\t" "mov eax, [rbx]\n");
+                    else if (t->size == 8) fprintf(file,"\t" "mov rax, [rbx]\n");
+                    fprintf(file,"\t" "push rax\n");
+
+                }
+                break;
+
+            case OP_integer_minus_minus:
+                fprintf(file,"\t" "pop rbx\n");
+                if (t->u64_value == 2) { // post decrement: push value first
+                    fprintf(file,"\t" "xor rax, rax\n");
+                    if      (t->size == 1) fprintf(file,"\t" "mov  al, [rbx]\n");
+                    else if (t->size == 2) fprintf(file,"\t" "mov  ax, [rbx]\n");
+                    else if (t->size == 4) fprintf(file,"\t" "mov eax, [rbx]\n");
+                    else if (t->size == 8) fprintf(file,"\t" "mov rax, [rbx]\n");
+                    fprintf(file,"\t" "push rax\n");
+                }
+                
+                if      (t->size == 1) fprintf(file,"\t" "dec BYTE [rbx]\n");
+                else if (t->size == 2) fprintf(file,"\t" "dec WORD [rbx]\n");
+                else if (t->size == 4) fprintf(file,"\t" "dec DWORD [rbx]\n");
+                else if (t->size == 8) fprintf(file,"\t" "dec QWORD [rbx]\n");
+                else NOT_IMPLEMENTED("Generating asm for OP_integer_plus_plus with storages size %lu is not implemented.\n", t->size);
+
+                if (t->u64_value == 1) { // pre decrement: push value after
+                                        fprintf(file,"\t" "xor rax, rax\n");
+                    if      (t->size == 1) fprintf(file,"\t" "mov  al, [rbx]\n");
+                    else if (t->size == 2) fprintf(file,"\t" "mov  ax, [rbx]\n");
+                    else if (t->size == 4) fprintf(file,"\t" "mov eax, [rbx]\n");
+                    else if (t->size == 8) fprintf(file,"\t" "mov rax, [rbx]\n");
+                    fprintf(file,"\t" "push rax\n");
+
+                }
+                break;
+
             case OP_sign_extend:
                 fprintf(file,"\t" "pop  rax\n");
                 if      (t->size == 1) fprintf(file,"\t" "movsx  rax,  al\n");

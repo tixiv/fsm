@@ -241,6 +241,24 @@ static AST_node *parse_call_arguments() {
     return first;
 }
 
+static AST_node *parse_postfix_operators(AST_node *n) {
+    if (CT->kind == TOK_plus_plus) {
+        AST_node * plus_plus = ast_alloc(AST_plus_plus, CT->line_number);
+        plus_plus->plus_plus.body = n;
+        plus_plus->plus_plus.postfix = true;
+        MOVE_NEXT();
+        return plus_plus;
+    }
+    else if (CT->kind == TOK_minus_minus) {
+        AST_node * minus_minus = ast_alloc(AST_minus_minus, CT->line_number);
+        minus_minus->minus_minus.body = n;
+        minus_minus->minus_minus.postfix = true;
+        MOVE_NEXT();
+        return minus_minus;
+    }
+    return n;
+}
+
 static AST_node *parse_primary()
 {
     debug_log_parser("Entering %s\n", __func__);
@@ -271,6 +289,16 @@ static AST_node *parse_primary()
         n = ast_alloc(AST_not, CT->line_number);
         MOVE_NEXT();
         n->reference.body = parse_primary();
+    }
+    else if (CT->kind == TOK_plus_plus) {
+        n = ast_alloc(AST_plus_plus, CT->line_number);
+        MOVE_NEXT();
+        n->plus_plus.body = parse_primary();
+    }
+    else if (CT->kind == TOK_minus_minus) {
+        n = ast_alloc(AST_minus_minus, CT->line_number);
+        MOVE_NEXT();
+        n->minus_minus.body = parse_primary();
     }
     else if (CT->kind == TOK_identifier) {
         SV* name = &CT->value;
@@ -337,6 +365,8 @@ static AST_node *parse_primary()
         parser_error(CT->line_number, "Expected expression but got %s",
                 token_kind_name(CT->kind));
     }
+
+    n = parse_postfix_operators(n);
 
     debug_log_parser("Leaving %s\n", __func__);
     return n;

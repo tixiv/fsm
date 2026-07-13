@@ -31,6 +31,8 @@ typedef struct {
     X(TOK_rbracket) \
     X(TOK_plus) \
     X(TOK_minus) \
+    X(TOK_plus_plus) \
+    X(TOK_minus_minus) \
     X(TOK_asterisk) \
     X(TOK_slash) \
     X(TOK_percent) \

@@ -172,6 +172,12 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_reference:
             visit_non_null(n->reference.body, visit, arg);
             break;
+        case AST_plus_plus:
+            visit_non_null(n->plus_plus.body, visit, arg);
+            break;
+        case AST_minus_minus:
+            visit_non_null(n->minus_minus.body, visit, arg);
+            break;
         case AST_struct:
             ast_visit_chain(n->_struct.body, visit, arg);
             break;
@@ -238,6 +244,8 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
         case AST_dereference:
         case AST_reference:
         case AST_not:
+        case AST_plus_plus:
+        case AST_minus_minus:
         case AST_array_access:
         case AST_array_len:
         case AST_array_to_slice:
