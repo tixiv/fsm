@@ -123,6 +123,8 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_bind_ref: return("'=>'");
         case TOK_equal: return("'=='");
         case TOK_unequal: return("'!='");
+        case TOK_or_equal_to: return("'|=='");
+        case TOK_and_not_equal_to: return("'&!='");
         case TOK_greater: return("'>'");
         case TOK_lower: return("'<'");
         case TOK_greater_equal: return("'>='");
@@ -297,6 +299,14 @@ void tokenizer(SV *code) {
         else if (sv_starts_with(code, "==")) {
             sv_pop(code);  sv_pop(code);
             push_token(TOK_equal, nullptr, line_number);
+        }
+        else if (sv_starts_with(code, "|==")) {
+            sv_pop(code);  sv_pop(code); sv_pop(code);
+            push_token(TOK_or_equal_to, nullptr, line_number);
+        }
+        else if (sv_starts_with(code, "&!=")) {
+            sv_pop(code);  sv_pop(code); sv_pop(code);
+            push_token(TOK_and_not_equal_to, nullptr, line_number);
         }
         else if (sv_starts_with(code, "!=")) {
             sv_pop(code);  sv_pop(code);

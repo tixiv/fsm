@@ -28,7 +28,7 @@ void debug_log_parser(const char * fmt, ...) {
     va_end(args);
 }
 
-static void parser_error(int line_number, const char * fmt, ...) {
+void parser_error(int line_number, const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
@@ -380,7 +380,7 @@ const uint8_t operator_table[NUM_PRIOS][NUM_MAX_OPERATORS_IN_PRIO] =  {
     { TOK_boolean_or, 0, 0, 0},
     { TOK_boolean_and, 0, 0, 0},
     { TOK_greater, TOK_lower, TOK_greater_equal, TOK_lower_equal},
-    { TOK_equal, TOK_unequal, 0, 0},
+    { TOK_equal, TOK_unequal, TOK_or_equal_to, TOK_and_not_equal_to},
     { TOK_plus, TOK_minus, 0, 0},
     { TOK_asterisk, TOK_slash, TOK_percent, 0},
 };

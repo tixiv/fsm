@@ -40,6 +40,8 @@ typedef struct {
     X(TOK_bind_ref) \
     X(TOK_equal) \
     X(TOK_unequal) \
+    X(TOK_or_equal_to) \
+    X(TOK_and_not_equal_to) \
     X(TOK_greater) \
     X(TOK_lower) \
     X(TOK_greater_equal) \
