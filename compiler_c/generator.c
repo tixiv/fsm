@@ -494,7 +494,7 @@ void output_asm(const char *asm_file_name) {
                 else NOT_IMPLEMENTED("Generating asm for OP_integer_plus_plus with storages size %lu is not implemented.\n", t->size);
 
                 if (t->u64_value == 1) { // pre decrement: push value after
-                                        fprintf(file,"\t" "xor rax, rax\n");
+                    fprintf(file,"\t" "xor rax, rax\n");
                     if      (t->size == 1) fprintf(file,"\t" "mov  al, [rbx]\n");
                     else if (t->size == 2) fprintf(file,"\t" "mov  ax, [rbx]\n");
                     else if (t->size == 4) fprintf(file,"\t" "mov eax, [rbx]\n");
@@ -502,6 +502,15 @@ void output_asm(const char *asm_file_name) {
                     fprintf(file,"\t" "push rax\n");
 
                 }
+                break;
+
+            case OP_slice_plus_plus:
+                fprintf(file,"\t" "pop rbx\n");
+                fprintf(file,"\t" "cmp QWORD [rbx+8], 0\n");
+                fprintf(file,"\t" "jle @f\n");
+                fprintf(file,"\t" "add QWORD [rbx], %lu\n", t->size);
+                fprintf(file,"\t" "dec QWORD [rbx+8]\n");
+                fprintf(file,"@@:\n");
                 break;
 
             case OP_sign_extend:

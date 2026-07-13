@@ -42,6 +42,7 @@
     X(OP_store_and_dup) \
     X(OP_integer_plus_plus) \
     X(OP_integer_minus_minus) \
+    X(OP_slice_plus_plus) \
 
 enum Op_Kind {
 #define X(name) name,

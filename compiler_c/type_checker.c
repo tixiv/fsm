@@ -521,11 +521,18 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
         case AST_plus_plus: {
             Type * original_type = n->plus_plus.body->type;
             auto_dereference(&n->plus_plus.body);
-            if (!is_integer_kind(n->plus_plus.body->type)) {
-                type_checker_error(n->line_number, "Operator '++' needs integer type argument. Have '%s'",
+            if (is_slice_type(n->plus_plus.body->type)) {
+                if (n->result_used) type_checker_error(n->line_number, "Operator '++' on slice type argument has no value which can be used.\n");
+                n->type = &builtin_void;
+            }
+            else if (is_integer_kind(n->plus_plus.body->type)) {
+                n->type = n->plus_plus.body->type;
+            }
+            else{
+                type_checker_error(n->line_number, "Operator '++' needs integer or slice type argument. Have '%s'",
                     get_type_name_r(buf_1, original_type));
             }
-            n->type = n->plus_plus.body->type;
+            
             break;
         }
 

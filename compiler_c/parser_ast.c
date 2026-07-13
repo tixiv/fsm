@@ -463,6 +463,9 @@ static AST_node *parse_statement()
     else if (CT->kind == TOK_lbrace) {
         n = parse_scope_body();
     }
+    else if (CT->kind == TOK_semicolon) {
+        n = nullptr;
+    }
     else {
         return parse_expression();
     }

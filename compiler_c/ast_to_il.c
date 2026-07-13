@@ -179,6 +179,19 @@ static void gen_if(AST_node *n, IL_gen *gen, bool result_used) {
     push_opcode(OP_end_if, nullptr, if_num);
 }
 
+static void gen_plus_plus(AST_node *n, IL_gen *gen, bool result_used) {
+    gen_address_visitor(n->plus_plus.body, gen);
+    if (is_integer_kind(n->plus_plus.body->type)) {
+        push_opcode_sz(OP_integer_plus_plus, nullptr,
+            result_used ? (n->plus_plus.postfix + 1) : 0, n->type->storage_size);
+    }
+    else if (is_slice_type(n->plus_plus.body->type)) {
+        size_t size = get_slice_element_type(n->plus_plus.body->type)->storage_size;
+        push_opcode_sz(OP_slice_plus_plus, nullptr, 0, size);
+    }
+    else NOT_IMPLEMENTED("AST_plus_plus is not implemented for anything that is not an integer or a slice.\n")
+}
+
 static void gen_address_visitor(AST_node *n, IL_gen *gen) {
 
     // char buf[1024];
@@ -283,9 +296,7 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             break;
         
         case AST_plus_plus:
-            gen_address_visitor(n->plus_plus.body, gen);
-            push_opcode_sz(OP_integer_plus_plus, nullptr,
-                n->plus_plus.postfix + 1, n->type->storage_size);
+            gen_plus_plus(n, gen, true);
             break;
 
         case AST_minus_minus:
@@ -374,8 +385,7 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             break;
         
         case AST_plus_plus:
-            gen_address_visitor(n->plus_plus.body, gen);
-            push_opcode_sz(OP_integer_plus_plus, nullptr, 0, n->type->storage_size);
+            gen_plus_plus(n, gen, false);
             break;
 
         case AST_minus_minus:
