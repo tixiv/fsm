@@ -442,7 +442,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             try_convert_to_type_if_necessary(&n->_if.condition, &builtin_bool, "'if' condition");
             Type *_if_type = n->_if.if_clause->type;
             Type *_else_type = n->_if.else_clause ? n->_if.else_clause->type : &builtin_void;
-            if (_if_type != _else_type) {
+            if (n->result_used && _if_type != _else_type) {
                 type_checker_error(n->line_number,
                     "When the result of 'if' is used then it has to have an 'else', and both branches must have the same type. Have '%s' and '%s'.\n",
                     get_type_name_r(buf_1, _if_type), get_type_name_r(buf_2, _else_type));

@@ -482,11 +482,18 @@ static AST_node *parse_scope_body()
 
 static void insert_implicit_return(AST_node *scope) {
     ASSERT(scope->kind == AST_scope, "Tried to insert return in something that is not a scope\n");
-    AST_node *last = get_last_in_chain(scope->scope.body);
-    if (last->kind != AST_return) {
-        AST_node *ast_return = ast_alloc(AST_return, last->line_number);
+    if (!scope->scope.body) { // empty function
+        AST_node *ast_return = ast_alloc(AST_return, scope->line_number);
         ast_return->ret.implicit = true;
-        last->next = ast_return;
+        scope->scope.body = ast_return;
+    }
+    else {
+        AST_node *last = get_last_in_chain(scope->scope.body);
+        if (last->kind != AST_return) {
+            AST_node *ast_return = ast_alloc(AST_return, last->line_number);
+            ast_return->ret.implicit = true;
+            last->next = ast_return;
+        }
     }
 }
 
