@@ -1,0 +1,37 @@
+
+
+fn print_bits(v: u64[]) {
+    for (let i = 255; i >= 0; i--) {
+        putc(if (bittest(v.begin, i)) '#' else ' ')
+    }
+    putc ('\n')
+}
+
+fn main () {
+
+    let v: u64[2][4];
+
+    for (let x = 0; x < 4; x++) {
+        v[0][x] = 0;
+        v[1][x] = 0;
+    }
+
+    v[0][0] = 1
+
+    print_bits(v[0])
+
+    let rule = 110;
+
+    for (let j = 0; j < 255; j++) {
+        let inp => v[j % 2];
+        let outp => v[(j + 1) % 2];
+        setbit(outp, 0, 1)
+
+        for (let i = 0; i < 255; i++) {
+            let input = bitand(bitshift(inp, i), 7)
+            let bit = bittest(rule, input)
+            setbit(outp, i+1, bit)
+        }
+        print_bits(outp)
+    }
+}
