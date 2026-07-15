@@ -26,6 +26,8 @@ Type builtin_u8_reference = (Type){T_reference, .storage_size = 8, .reference.ta
 static TypeMember builtin_u8_slice_members[2] = {{.name = mkSV("begin"), .type = &builtin_u8_reference}, {.name = mkSV("len"), .type = &builtin_i64}};
 Type builtin_u8_slice = (Type){T_struct, .storage_size = 16, ._struct.num_members = 2, ._struct.members = builtin_u8_slice_members};
 
+Type builtin_any = (Type){T_any, .storage_size = 0};
+
 Type *type_alloc(TypeKind kind) {
     Type *t = malloc(sizeof(Type));
     memset(t, 0, sizeof(Type));
@@ -52,6 +54,7 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
     if (type == nullptr)       return "(null type)";
     if (type == &builtin_void) return "void";
     if (type == &builtin_bool) return "bool";
+    if (type == &builtin_any)  return "any";
     if (type == &builtin_u64)  return "u64";
     if (type == &builtin_i64)  return "i64";
     if (type == &builtin_u32)  return "u32";
@@ -93,6 +96,7 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
                 sb_printf(&sb, "anonymous struct", SV_prnt(type->name));
             }
             break;
+
         default:
             NOT_IMPLEMENTED("Dumping type kind %d is not implemented yet.\n", type->kind);
             break;

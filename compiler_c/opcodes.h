@@ -43,6 +43,13 @@
     X(OP_integer_plus_plus) \
     X(OP_integer_minus_minus) \
     X(OP_slice_plus_plus) \
+    X(OP_bittest) \
+    X(OP_bitshift) \
+    X(OP_bitand) \
+    X(OP_bitor) \
+    X(OP_bitxor) \
+    X(OP_bitnot) \
+    X(OP_setbit) \
 
 enum Op_Kind {
 #define X(name) name,

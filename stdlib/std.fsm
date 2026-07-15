@@ -49,3 +49,12 @@ fn parse_integer (s: u8[]) {
     if (neg) return 0 - i;
     return i;
 }
+
+fn print_hex(num: u64) {
+    let a: u8[16];
+    for (let i = 15; i >= 0; i--) {
+        let d = bitand(bitshift(num, 60 - i * 4), 0x0f);
+        a[i] = if (d < 10) d + '0' else d + 'A' - 10;
+    }
+    puts(a)
+}

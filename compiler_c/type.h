@@ -15,6 +15,7 @@ typedef enum {
     T_array,
     T_slice,
     T_struct,
+    T_any, // 'any' works like the 'void' in C's void* for now, just with a better name.
 } TypeKind;
 
 struct Type_s;
@@ -62,6 +63,7 @@ typedef struct Type_s {
 
 extern Type builtin_void;
 extern Type builtin_bool;
+extern Type builtin_any;
 
 extern Type builtin_u64;
 extern Type builtin_i64;
@@ -74,6 +76,7 @@ extern Type builtin_i8;
 
 extern Type builtin_u8_reference;
 extern Type builtin_u8_slice;
+
 
 Type *type_alloc(TypeKind kind);
 

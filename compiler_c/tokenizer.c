@@ -3,6 +3,7 @@
 #include "common.h"
 #include "dyn_array.h"
 #include "modules.h"
+#include "sv.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +23,7 @@ static void tokenizer_error(int line_number, const char * fmt, ...) {
 
 bool is_whitespace(char c) { return c == ' ' ||  c == '\t' || c == '\r'; }
 bool is_numeric(char c) { return c >= '0' && c <= '9'; }
+bool is_hex_digit(char c) { return is_numeric(c) || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'); }
 bool is_alpha(char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
 bool is_allowed_at_start_of_identifier(char c) { return is_alpha(c) || c == '_'; }
 bool is_allowed_in_identifier(char c) { return is_alpha(c) || is_numeric(c) || c == '_'; }
@@ -44,7 +46,13 @@ void read_word(SV *word, SV *input) {
 void read_number(SV *num, SV *input) {
     num->begin = input->begin;
     num->len = 0;
-    while(input->len && is_numeric(*input->begin)) {
+    bool hex = false;
+    if (sv_starts_with(num, "0x")) {
+        sv_pop(input); sv_pop(input);
+        num->len = 2;
+        hex = true;
+    }
+    while(input->len && hex ? is_hex_digit(*input->begin) : is_numeric(*input->begin)) {
         sv_pop(input);
         num->len++;
     }

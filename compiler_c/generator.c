@@ -63,7 +63,7 @@ void output_asm(const char *asm_file_name) {
     // from the Porth compiler https://gitlab.com/tsoding/porth which
     // was also the main inspiration for me to start this project.
 
-    const char *print_function =
+    const char *builtin_functions =
     "fn_print:\n"
     "mov rdi, [rsp+8]\n"
     "mov     r9, -3689348814741910323\n"
@@ -97,18 +97,24 @@ void output_asm(const char *asm_file_name) {
     "mov     rax, 1\n"                  
     "syscall\n"                         
     "add     rsp, 40\n"                 
-    "ret\n";
+    "ret\n"
 
-    const char *puts_function =
+    "fn_putc:\n"
+    "mov rax, 1          ; SYS_write\n"
+    "mov rdi, 1          ; stdout\n"
+    "lea rsi, [rsp+8]    ; pointer to the char\n"
+    "mov rdx, 1          ; length\n"
+    "syscall\n"
+    "ret\n"
+
     "fn_puts:\n"
     "mov rax, 1          ; SYS_write\n"
     "mov rdi, 1          ; stdout\n"
     "mov rsi, [rsp+8]    ; pointer\n"
     "mov rdx, [rsp+16]   ; length\n"
     "syscall\n"
-    "ret\n";
+    "ret\n"
 
-    const char *open_function =
     "SYS_OPEN    = 2\n"
     "SYS_CLOSE   = 3\n"
     "SYS_FSTAT   = 5\n"
@@ -190,14 +196,8 @@ void output_asm(const char *asm_file_name) {
 
 */
 
-
-
-
-
     fprintf(file, "%s", header);
-    fprintf(file, "%s", print_function);
-    fprintf(file, "%s", puts_function);
-    fprintf(file, "%s", open_function);
+    fprintf(file, "%s", builtin_functions);
     
     for (int i=0; i<num_opcodes; i++) {
         Opcode *t = &opcodes[i];
@@ -315,7 +315,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "push rcx\n");
                 break;
             case OP_push_literal:
-                fprintf(file,"\t" "mov rax,%lu\n", t->string_value.begin ? strtoul(t->string_value.begin, 0, 10) : t->u64_value);
+                fprintf(file,"\t" "mov rax,%lu\n", t->string_value.begin ? strtoul(t->string_value.begin, 0, 0) : t->u64_value);
                 fprintf(file,"\t" "push rax\n");
                 break;
             case OP_push_string_literal:
@@ -521,6 +521,85 @@ void output_asm(const char *asm_file_name) {
                 else NOT_IMPLEMENTED("Generating asm for OP_sign_extend with storages size %lu is not implemented.\n", t->size);
                 fprintf(file,"\t" "push  rax\n");
                 break;
+             
+            case OP_bittest:
+                fprintf(file, "\t" "pop rax\n"); // bit index
+                fprintf(file, "\t" "cqo\n");
+                fprintf(file, "\t" "mov rbx, 8\n");
+                fprintf(file, "\t" "div rbx\n"); // -> rax: byte offset, rdx: bit index
+                fprintf(file, "\t" "pop rbx\n"); // rbx: mem address
+                fprintf(file, "\t" "add rbx, rax\n"); // rbx: byte address
+                fprintf(file, "\t" "bt [rbx], rdx\n"); // test the bit
+                fprintf(file, "\t" "setc al\n");
+                fprintf(file, "\t" "movzx rax, al\n");
+                fprintf(file, "\t" "push rax\n");
+                break;
+
+            case OP_setbit:
+                fprintf(file, "\t" "pop rdi\n"); // rdi: value
+                fprintf(file, "\t" "pop rax\n"); // bit index
+                fprintf(file, "\t" "cqo\n");
+                fprintf(file, "\t" "mov rbx, 8\n");
+                fprintf(file, "\t" "div rbx\n"); // -> rax: byte offset, rdx: bit index
+                fprintf(file, "\t" "pop rsi\n"); // rsi: mem address
+                fprintf(file, "\t" "add rsi, rax\n"); // rsi: byte address
+                fprintf(file, "\t" "mov al, [rsi]\n"); // load the byte
+                fprintf(file, "\t" "mov rcx, rdx\n");
+                fprintf(file, "\t" "mov rdx, 1\n");
+                fprintf(file, "\t" "shl rdx, cl\n"); // make the mask
+
+                fprintf(file, "\t" "test rdi, rdi\n"); // set to 1?
+                fprintf(file, "\t" "jne @f\n");        // yes: jmp
+                fprintf(file, "\t" "xor dl, 0xff\n"); // invert the mask
+                fprintf(file, "\t" "and al, dl\n");   // clear the bit
+                fprintf(file, "\t" "mov dl, al\n");
+                fprintf(file, "@@:");
+                fprintf(file, "\t" "or al, dl\n");
+                fprintf(file, "\t" "mov [rsi], al\n"); // write back
+                break;
+
+            case OP_bitshift: // only implemented for positive shift amounts (right shift) for now
+                fprintf(file, "\t" "pop rax\n"); // shift amount
+                fprintf(file, "\t" "cqo\n");
+                fprintf(file, "\t" "mov rbx, 64\n");
+                fprintf(file, "\t" "div rbx\n"); // -> rax: QWORD offset, rdx: sub shift amount
+                fprintf(file, "\t" "shl rax, 3\n");
+                fprintf(file, "\t" "pop rsi\n"); // rsi: mem address
+                fprintf(file, "\t" "add rsi, rax\n"); // rsi: QWORD address
+                fprintf(file, "\t" "mov rax, [rsi]\n"); // load QWORD [0]
+                fprintf(file, "\t" "mov rcx, rdx\n");
+                fprintf(file, "\t" "shr rax, cl\n");
+                fprintf(file, "\t" "test rdx, rdx\n");
+                fprintf(file, "\t" "jz @f\n");
+                fprintf(file, "\t" "mov rbx, [rsi+8]\n"); // load QWORD [1]
+                fprintf(file, "\t" "mov rcx, 64\n");
+                fprintf(file, "\t" "sub rcx, rdx\n");
+                fprintf(file, "\t" "shl rbx, cl\n");
+                fprintf(file, "\t" "or rax, rbx\n");
+                fprintf(file, "@@:");
+                fprintf(file, "\t" "push rax\n");
+                break;
+
+            case OP_bitand:
+                fprintf(file, "\t" "pop rax\n");
+                fprintf(file, "\t" "and QWORD [rsp], rax\n");
+                break;
+            
+            case OP_bitor:
+                fprintf(file, "\t" "pop rax\n");
+                fprintf(file, "\t" "or QWORD [rsp], rax\n");
+                break;
+            
+            case OP_bitxor:
+                fprintf(file, "\t" "pop rax\n");
+                fprintf(file, "\t" "xor QWORD [rsp], rax\n");
+                break;
+            
+            case OP_bitnot:
+                fprintf(file, "\t" "mov rax,-1\n");
+                fprintf(file, "\t" "xor QWORD [rsp], rax\n");
+                break;
+            
             default:
                 fprintf(stderr, "%s:%d Generating %s opcode is not implemented yet.\n", __FILE__, __LINE__, opcode_name(t->kind));
                 exit(EXIT_FAILURE);

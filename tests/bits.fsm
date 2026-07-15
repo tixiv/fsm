@@ -1,0 +1,50 @@
+
+import * from "std";
+
+fn test_most_bit_operations () {
+    let v: u64[4];
+
+    v[0] = 0;
+    v[1] = 0xFFFFFFFFFFFFFFFF;
+    v[2] = 0;
+    v[3] = 0;
+
+    for (let i = 0; i < 192; i++) {
+        let a = bitshift(v, i);
+        a = bitor(a, 0x1000);
+        a = bitand(a, bitnot(0x1000000))
+        a = bitxor(a, 0x100000000000)
+        print_hex(a); putc('\n');
+    }
+}
+
+fn test_setbit() {
+    puts ("------- test_setbit --------\n")
+    let v: u64[3];
+    for (let i = 0; i < 192; i++) {
+        if (bitand(i, 0x0f) == 0) {
+            print_hex(v[0]); putc('\n');
+            print_hex(v[1]); putc('\n');
+            print_hex(v[2]); putc('\n');
+        }
+        setbit(v, i, 1);
+    }
+}
+
+fn test_bittest() {
+    puts ("------- test_bittest --------\n")
+    let v: u64[3];
+    v[0] = 0x5500000000000055;
+    v[1] = 0xFF000000000000FF;
+    v[2] = 0xAA000000000000AA;
+    
+    for (let i = 0; i < 192; i++) {
+        if (bittest(v, i)) print (i)
+    }
+}
+
+fn main () {
+    test_most_bit_operations();
+    test_setbit();
+    test_bittest();
+}

@@ -139,6 +139,13 @@ void try_convert_to_type_if_necessary(AST_node **n, Type *target_type, const cha
         }
     }
 
+    if (target_type == get_ref_type_for(&builtin_any)) {
+        if (!is_reference_kind(original_type)) {
+            insert_take_reference(n);
+        }
+        return; // any& can accept any reference type.
+    }
+
     if (is_reference_kind(target_type) && !is_reference_kind(original_type)) {
         insert_take_reference(n);
     }
@@ -164,14 +171,16 @@ void type_propagate_binary_operator(AST_node *n) {
     if (tk == TOK_bind_ref) {
         if (!is_reference_kind(n->binary.left->type)) {
             type_checker_error(n->line_number, "Operator %s requires a reference type on the left side. Have '%s' and '%s'.\n",
-                token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.left->type));
+                token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
         }
         if (!is_reference_kind(n->binary.right->type))
             insert_take_reference(&n->binary.right);
 
-        if (n->binary.left->type != n->binary.right->type) {
+        Type *any_ref = get_ref_type_for(&builtin_any);
+
+        if (n->binary.left->type != n->binary.right->type && n->binary.left->type != any_ref && n->binary.right->type != any_ref) {
             type_checker_error(n->line_number, "Operator %s requires the type on the right side to be referenceable by the left type. Have '%s' and '%s'.\n",
-                token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.left->type));
+                token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
         }
         
         n->type = n->binary.right->type;
@@ -181,7 +190,7 @@ void type_propagate_binary_operator(AST_node *n) {
         SB sb_right; sb_init (&sb_right, buf_2, 1024);
 
         sb_printf(&sb_left, "left argument of binary operator %s", token_kind_printable(tk));
-        sb_printf(&sb_right, "left argument of binary operator %s", token_kind_printable(tk));
+        sb_printf(&sb_right, "right argument of binary operator %s", token_kind_printable(tk));
 
         switch(tk) {
             case TOK_plus:

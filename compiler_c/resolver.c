@@ -75,11 +75,20 @@ void init_builtin_functions() {
     dyn_array_init(&builtin_functions, sizeof(Symbol*), 8);
 
     declare_builtin_fn(mkSV("print"), &builtin_void, 1, (Type*[]){&builtin_i64});
+    declare_builtin_fn(mkSV("putc"), &builtin_void, 1, (Type*[]){&builtin_u8});
     declare_builtin_fn(mkSV("puts"), &builtin_void, 1, (Type*[]){&builtin_u8_slice});
     declare_builtin_fn(mkSV("open"), &builtin_i64, 2, (Type*[]){&builtin_u8_reference, &builtin_i64 });// open(filename: u8 &, flags: i64) : i64
     declare_builtin_fn(mkSV("mmap"), &builtin_u8_reference, 2, (Type*[]){&builtin_i64, &builtin_i64});// mmap(lenght: i64, fd: i64) : u8 &
     declare_builtin_fn(mkSV("fsize"), &builtin_i64, 1, (Type*[]){&builtin_i64});// fsize(fd: i64) : i64
 
+    // TODO: These should act like operators actually, and not like builtin functions, because we can then better handle different types of arguments
+    declare_builtin_fn(mkSV("bittest"), &builtin_bool, 2, (Type*[]){get_ref_type_for(&builtin_any), &builtin_i64});
+    declare_builtin_fn(mkSV("setbit"), &builtin_void, 3, (Type*[]){get_ref_type_for(&builtin_any), &builtin_i64, &builtin_bool});
+    declare_builtin_fn(mkSV("bitshift"), &builtin_u64, 2, (Type*[]){get_ref_type_for(&builtin_any), &builtin_i64});
+    declare_builtin_fn(mkSV("bitand"), &builtin_u64, 2, (Type*[]){&builtin_u64, &builtin_u64});
+    declare_builtin_fn(mkSV("bitor"), &builtin_u64, 2, (Type*[]){&builtin_u64, &builtin_u64});
+    declare_builtin_fn(mkSV("bitxor"), &builtin_u64, 2, (Type*[]){&builtin_u64, &builtin_u64});
+    declare_builtin_fn(mkSV("bitnot"), &builtin_u64, 1, (Type*[]){&builtin_u64});
 }
 
 static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number) {
