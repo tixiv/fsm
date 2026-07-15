@@ -4,6 +4,7 @@
 #include "dyn_array.h"
 #include "sv.h"
 #include "type.h"
+#include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
 
@@ -26,11 +27,11 @@ typedef struct {
     Symbol *current_function;
 } Resolver;
 
-Symbol *alloc_symbol(SymbolKind kind, SV *name) {
+Symbol *alloc_symbol(SymbolKind kind, SV name) {
     Symbol *s = malloc(sizeof(Symbol));
     memset(s, 0, sizeof(Symbol));
     s->kind = kind;
-    s->name = *name;
+    s->name = name;
     return s;
 }
 
@@ -57,60 +58,29 @@ static void push_symbol(Dyn_array *arr, Symbol *s, int line_number) {
     dyn_array_push_p(arr, s);
 }       
 
-Type *builtin_print_argument_types[] = { &builtin_i64 };
+Dyn_array builtin_functions; // Dyn_array<Symbol*>
 
-Type builtin_print_type = (Type){T_function, .fun.num_arguments = 1, .fun.argument_types = builtin_print_argument_types, .fun.return_type = &builtin_void};
+void declare_builtin_fn(SV name, Type *return_type, size_t num_args, Type *arg_types[]) {
+    Symbol *s = alloc_symbol(SYM_global, name);
+    s->type = type_alloc(T_function);
+    s->type->fun.return_type = return_type;
+    s->type->fun.num_arguments = num_args;
+    s->type->fun.argument_types = malloc(sizeof(Type*) * num_args);
+    for (int i = 0; i < num_args; i++)
+        s->type->fun.argument_types[i] = arg_types[i];
+    dyn_array_push_p(&builtin_functions, s);
+}
 
-Symbol builtin_print = {
-    .kind = SYM_global,
-    .name.begin = "print",
-    .name.len = 5,
-    .type = &builtin_print_type,
-};
+void init_builtin_functions() {
+    dyn_array_init(&builtin_functions, sizeof(Symbol*), 8);
 
-Type *builtin_puts_argument_types[] = { &builtin_u8_slice };
+    declare_builtin_fn(mkSV("print"), &builtin_void, 1, (Type*[]){&builtin_i64});
+    declare_builtin_fn(mkSV("puts"), &builtin_void, 1, (Type*[]){&builtin_u8_slice});
+    declare_builtin_fn(mkSV("open"), &builtin_i64, 2, (Type*[]){&builtin_u8_reference, &builtin_i64 });// open(filename: u8 &, flags: i64) : i64
+    declare_builtin_fn(mkSV("mmap"), &builtin_u8_reference, 2, (Type*[]){&builtin_i64, &builtin_i64});// mmap(lenght: i64, fd: i64) : u8 &
+    declare_builtin_fn(mkSV("fsize"), &builtin_i64, 1, (Type*[]){&builtin_i64});// fsize(fd: i64) : i64
 
-Type builtin_puts_type = (Type){T_function, .fun.num_arguments = 1, .fun.argument_types = builtin_puts_argument_types, .fun.return_type = &builtin_void};
-
-Symbol builtin_puts = {
-    .kind = SYM_global,
-    .name.begin = "puts",
-    .name.len = 4,
-    .type = &builtin_puts_type,
-};
-
-Type *builtin_open_argument_types[] = { &builtin_u8_reference, &builtin_i64 }; // open(filename: u8 &, flags: i64) : i64
-
-Type builtin_open_type = (Type){T_function, .fun.num_arguments = 2, .fun.argument_types = builtin_open_argument_types, .fun.return_type = &builtin_i64};
-
-Symbol builtin_open = {
-    .kind = SYM_global,
-    .name.begin = "open",
-    .name.len = 4,
-    .type = &builtin_open_type,
-};
-
-Type *builtin_mmap_argument_types[] = { &builtin_i64, &builtin_i64 }; // mmap(lenght: i64, fd: i64) : u8 &
-
-Type builtin_mmap_type = (Type){T_function, .fun.num_arguments = 2, .fun.argument_types = builtin_mmap_argument_types, .fun.return_type = &builtin_u8_reference};
-
-Symbol builtin_mmap = {
-    .kind = SYM_global,
-    .name.begin = "mmap",
-    .name.len = 4,
-    .type = &builtin_mmap_type,
-};
-
-Type *builtin_fsize_argument_types[] = { &builtin_i64 }; // fsize(fd: i64) : i64
-
-Type builtin_fsize_type = (Type){T_function, .fun.num_arguments = 1, .fun.argument_types = builtin_fsize_argument_types, .fun.return_type = &builtin_i64};
-
-Symbol builtin_fsize = {
-    .kind = SYM_global,
-    .name.begin = "fsize",
-    .name.len = 5,
-    .type = &builtin_fsize_type,
-};
+}
 
 static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number) {
     // locals
@@ -122,21 +92,8 @@ static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number) 
     if (s) return s;
 
     // builtin
-    if (sv_equal(name, &builtin_print.name)) {
-        return &builtin_print;
-    }
-    if (sv_equal(name, &builtin_puts.name)) {
-        return &builtin_puts;
-    }
-    if (sv_equal(name, &builtin_open.name)) {
-        return &builtin_open;
-    }
-    if (sv_equal(name, &builtin_mmap.name)) {
-        return &builtin_mmap;
-    }
-    if (sv_equal(name, &builtin_fsize.name)) {
-        return &builtin_fsize;
-    }
+    s = get_symbol_by_name(&builtin_functions, name);
+    if (s) return s;
 
     resolver_error(line_number, "Undefined symbol %.*s", SV_prnt(*name));
     return nullptr;
@@ -157,7 +114,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
     switch (n->kind) {
 
         case AST_function: {
-            Symbol *s_fun = alloc_symbol(SYM_global, &n->fun.name);
+            Symbol *s_fun = alloc_symbol(SYM_global, n->fun.name);
             push_symbol(&global_symbols, s_fun, n->line_number);
             n->fun.symbol = s_fun;
             resolver_enter_function(res, s_fun);
@@ -168,7 +125,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
 
         case AST_arg_decl: {
             ASSERT(res->current_function, "Found function argument declaration for '%.*s' outside of function\n", SV_prnt(n->arg_decl.name));
-            Symbol *s_arg = alloc_symbol(SYM_arg, &n->arg_decl.name);
+            Symbol *s_arg = alloc_symbol(SYM_arg, n->arg_decl.name);
             push_symbol(&res->local_symbols, s_arg, n->line_number);
             n->arg_decl.symbol = s_arg;
             break;
@@ -176,7 +133,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
 
         case AST_var_decl: {
             ASSERT(res->current_function, "Found local variable declaration for '%.*s' outside of function\n", SV_prnt(n->var_decl.name));
-            Symbol *s_var = alloc_symbol(SYM_local, &n->var_decl.name);
+            Symbol *s_var = alloc_symbol(SYM_local, n->var_decl.name);
             push_symbol(&res->local_symbols, s_var, n->line_number);
             n->var_decl.symbol = s_var;
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
@@ -235,5 +192,6 @@ void resolver(AST_node *root) {
 }
 
 void init_resolver () {
-    dyn_array_init(&global_symbols, sizeof(Symbol *), 32);    
+    dyn_array_init(&global_symbols, sizeof(Symbol *), 32);
+    init_builtin_functions();
 }
