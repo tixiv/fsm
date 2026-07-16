@@ -18,21 +18,21 @@ fn main () {
 The comparison operators ('>', '<', '>=', '<=') can be arbitrarily chained to make the check you want:
 
 ```fsm
-fn check_in_range (a: i64) {
-    return 23 < a <= 42
+fn check_in_range (val: i64) : bool {
+    return 23 < val <= 42
 }
 ```
 
-The "or equal to" operator '|==' can extend the '==' operator, adding more true cases.
+The "or equal to" operator '|==' can extend the '==' operator, adding more cases.
 ```fsm
-fn do_things_for_some_numbers (val :i64) {
+fn do_things_for_specific_numbers (val :i64) {
     if (val == 2 |== 3 |== 4 |== 9) { do_things () }
 }
 ```
 
-The "and also not equal to" operator '&!=' can extend the '!=' operator, excluding more true cases.
+The "and also not equal to" operator '&!=' can extend the '!=' operator, excluding more cases.
 ```fsm
-fn do_things_except_for_some_numbers (val :i64) {
+fn do_things_except_for_specific_numbers (val :i64) {
     if (val != 2 &!= 3 &!= 4 &!= 9) { do_things () }
 }
 ```
@@ -161,7 +161,9 @@ gdb can be used for debugging the generated executeables. There are no debugging
     si
 ```
 
-# Rule 110
+# Examples
+
+## Rule 110
 
 Yes, it's Turing complete:
 
@@ -200,5 +202,80 @@ fn main () {
         }
         print_bits(outp)
     }
+}
+```
+
+## Fizz Buzz
+
+```fsm
+fn fizz(n) { if (n % 3 == 0) { puts("Fizz"); return 1 }; return 0 }
+fn buzz(n) { if (n % 5 == 0) { puts("Buzz"); return 1 }; return 0 }
+fn main () { for (let n = 0; n <= 100; n = n + 1) if (fizz(n) + buzz(n)) puts("\n") else print(n) }
+```
+
+## Recursive Fibonacci
+
+```fsm
+fn fib(n) {
+    if (n == 1 |== 2) return 1;
+
+    return fib(n-1) + fib(n-2);
+}
+
+fn main() {
+    for (let n = 1; n <= 20; n++) print(fib(n));
+}
+```
+
+## Tree Example
+
+As I want to be self hosting one day, I tried out implementing a simple AST in fsm:
+
+```fsm
+struct TreeNode {
+    type: i64;
+    value: i64;
+    left: TreeNode&;
+    right: TreeNode&;
+}
+
+fn init_number (n: TreeNode&, v) {
+    n.type = 0;
+    n.value = v;
+}
+
+fn init_add (n: TreeNode&, left: TreeNode&, right: TreeNode&) {
+    n.type = 1;
+    n.left => left;
+    n.right => right;
+}
+
+fn tree_visitor(n: TreeNode&) : i64 {
+    if (n.type == 1) {
+        let a = tree_visitor(n.left)
+        let b = tree_visitor(n.right)
+        puts("+\n=")
+        print (a + b)
+        return a + b
+    } else {
+        print (n.value)
+        return n.value
+    }
+    return 0
+}
+
+fn main () {
+    let a: TreeNode;
+    init_number(&a, 42);    
+    let b: TreeNode;
+    init_number(&b, 2300);
+    let c: TreeNode;
+    init_number(&c, 13370000);
+    let add_1: TreeNode;
+    init_add(&add_1, &a, &b);
+    let add_2: TreeNode;
+    init_add(&add_2, &add_1, &c);
+
+    tree_visitor(&add_2)
 }
 ```
