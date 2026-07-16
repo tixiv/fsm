@@ -1,4 +1,4 @@
-# The FSM prgramming language
+# The FSM programming language
 
 FSM can stand for either the "Flying Sphaghetticode Monster", or for "Finite Statemachine Maker", whichever you prefer. The Monster doesn't mind if you don't believe in it.
 
@@ -60,7 +60,7 @@ my_2nd_order_ref => &my_ref; // 'my_2nd_order_ref' now references 'my_ref'
 ```
 
 ## Slices
-The native string representation in fsm is the slice. A slice is a reference to beginning of the string, combined with the length of the string.
+The native string representation in fsm is the slice. A slice is a reference to the beginning of the string, combined with the length of the string.
 
 ```fsm
 struct {
@@ -123,8 +123,8 @@ fn main () {
 
 # NOT to do:
 - [NOT] Impement C style pointers. FSM uses references, which are essentially pointers implementation wise, but they don't have any arithmetic operations. "Pointer arithmetic" is done in FSM by rebinding a reference to another element of an array or a slice, because that is the only context in which pointer arithmetic makes sense.
-- [NOT] Implement C style bit operators (&, |, <<, >>, ^). FSM uses the 'bit...' set of builtins for performing these operations. That way it is clear when you are working with bits, and it reservs those nice operators for other things that are more important in a general programming language than messing with bits.
-- [NOT] Implement C style 'break' and 'continue'. FSM will use the to be implemented 'goto' for those. The reasoning is that 'break' and 'continue' get confusing as soon as you have stacked loops, and you also can't even escape multiple levels. By doing this with 'goto' in FSM you can just goto wherever you want to change loop control flow. Goto labels are going to be allowed inside the post-action of 'for', so continuing loops can be implemented.
+- [NOT] Implement C style bit operators (&, |, <<, >>, ^). FSM uses the 'bit...' set of builtins for performing these operations. That way it is clear when you are working with bits, and it reserves those nice operators for other things that might be more important in a general programming language than messing with bits.
+- [NOT] Implement C style 'break' and 'continue'. FSM will use the to be implemented 'goto' for those. The reasoning is that 'break' and 'continue' gets confusing as soon as you have stacked loops, and you also can't even escape multiple levels. By doing this with 'goto' in FSM you can just goto wherever you want to change loop control flow, and it's clear where you are going to. Goto labels are going to be allowed inside the post-action of 'for' loops, so 'continue' can be implemented that way.
 
 
 # Building the compiler
@@ -136,7 +136,7 @@ fn main () {
 - fasm (the flat assembler, Ubuntu has it as a package)
 
 ## building
-The compiler is currently implemented in C. To build it just run "make" in the projects root folder.
+The compiler is currently implemented in C. To build it just run "make" in the project's root folder.
 
 ## tests
 To build and run the included fsm test programs, type "make test".
@@ -147,7 +147,7 @@ Go to the project root directory and type:
 ./fsm my_program.fsm && fasm out.asm
 ```
 
-The compiler will compile the fsm source to the assembly source 'out.asm'. Then fasm will assemble it, and you get 'out', a native Linux 64 bit elf executeable.
+The compiler will compile the fsm source to an assembly source 'out.asm'. Then fasm will assemble it, and you get 'out', a native Linux 64 bit elf executeable.
 
 # Debugging the executeables
 
