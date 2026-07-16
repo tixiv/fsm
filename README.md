@@ -1,7 +1,6 @@
 # The FSM prgramming language
 
-FSM can stand for either the "Flying Sphaghetticode Monster", or for "Finite Statemachine Maker", whichever you prefer.
-The Monster doesn't mind if you don't believe in it.
+FSM can stand for either the "Flying Sphaghetticode Monster", or for "Finite Statemachine Maker", whichever you prefer. The Monster doesn't mind if you don't believe in it.
 
 This is a language that I am making up right now as a hobby project because I never wrote a real compiler in my life before, and I thought I'd better do it late than never.
 
@@ -16,16 +15,26 @@ fn main () {
 
 ## Operator chaining, or variadic operators
 
-The comparison operators ('>', '<', '>=', '<=') can be arbitrarily chained to make the check you want
+The comparison operators ('>', '<', '>=', '<=') can be arbitrarily chained to make the check you want:
+
+```fsm
+fn check_in_range (a: i64) {
+    return 23 < a <= 42
+}
+```
 
 The "or equal to" operator '|==' can extend the '==' operator, adding more true cases.
 ```fsm
-if (some_number == 2 |== 3 |== 4 |== 9) { do_things () }
+fn do_things_for_some_numbers (val :i64) {
+    if (val == 2 |== 3 |== 4 |== 9) { do_things () }
+}
 ```
 
 The "and also not equal to" operator '&!=' can extend the '!=' operator, excluding more true cases.
 ```fsm
-if (some_number != 2 &!= 3 &!= 4 &!= 9) { do_things () }
+fn do_things_except_for_some_numbers (val :i64) {
+    if (val != 2 &!= 3 &!= 4 &!= 9) { do_things () }
+}
 ```
 
 ## References with auto dereferencing and special reference binding operator
@@ -101,19 +110,19 @@ fn main () {
 - [X] Return 128 bit structs from functions
 - [X] Char constants
 - [X] Implement bit functions
-- [] Write more documentation
-- [] Implement null type for refs
-- [] Implement enums
-- [] Runtime bounds checks
-- [] Global variables
-- [] Implement function refs
-- [] Memory management
-- [] Make the compiler self hosting at some point
+- [ ] Write more documentation
+- [ ] Implement null type for refs
+- [ ] Implement enums
+- [ ] Runtime bounds checks
+- [ ] Global variables
+- [ ] Implement function refs
+- [ ] Memory management
+- [ ] Make the compiler self hosting at some point
 
 
 
 # NOT to do:
-- [NOT] Impement C style pointers. FSM uses references, which are essentially pointers implementation wise, but they don't have any arithmetic operations. "Pointer arithmetic" is done in FSM by rebinding a reference to another element of an array or a slice, because that is the only context in which pointer arithmetic makes sense. if you ai'nt got no array you don't need to do pointer arithmetic on it.
+- [NOT] Impement C style pointers. FSM uses references, which are essentially pointers implementation wise, but they don't have any arithmetic operations. "Pointer arithmetic" is done in FSM by rebinding a reference to another element of an array or a slice, because that is the only context in which pointer arithmetic makes sense.
 - [NOT] Implement C style bit operators (&, |, <<, >>, ^). FSM uses the 'bit...' set of builtins for performing these operations. That way it is clear when you are working with bits, and it reservs those nice operators for other things that are more important in a general programming language than messing with bits.
 - [NOT] Implement C style 'break' and 'continue'. FSM will use the to be implemented 'goto' for those. The reasoning is that 'break' and 'continue' get confusing as soon as you have stacked loops, and you also can't even escape multiple levels. By doing this with 'goto' in FSM you can just goto wherever you want to change loop control flow. Goto labels are going to be allowed inside the post-action of 'for', so continuing loops can be implemented.
 
