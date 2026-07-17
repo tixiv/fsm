@@ -21,6 +21,7 @@ typedef struct {
     X(TOK_keyword_while) \
     X(TOK_keyword_for) \
     X(TOK_keyword_struct) \
+    X(TOK_keyword_enum) \
     X(TOK_keyword_import) \
     X(TOK_keyword_fsm_debug) \
     X(TOK_lparen) \
@@ -52,6 +53,7 @@ typedef struct {
     X(TOK_colon) \
     X(TOK_semicolon) \
     X(TOK_dot) \
+    X(TOK_colon_colon) \
     X(TOK_ampersand) \
     X(TOK_exclam) \
     X(TOK_identifier) \

@@ -58,7 +58,7 @@ const char *make_movx(const char*reg, size_t size, bool _sigend) {
             break;
         case 2: sprintf(buf, "mov%cx %s, WORD ", sz, reg); break;
         case 1: sprintf(buf, "mov%cx %s, BYTE ", sz, reg); break;
-        default: NOT_IMPLEMENTED("make_movx is not implemented for size %lu", size);
+        default: NOT_IMPLEMENTED("make_movx is not implemented for size %lu\n", size);
     }
     return buf;
 }

@@ -1,0 +1,19 @@
+
+enum Animal {
+    Goat = 5,
+    Cow,
+    Dog,
+    Max
+}
+
+fn print_animal(a: Animal) {
+    if (a == Animal::Goat) puts("Goat")
+    if (Animal::Cow == a) puts("Cow");
+    if (a == Animal::Dog) puts("Dog");
+}
+
+fn main () {
+    for (let i: i64 = Animal::Goat; i < Animal::Max; i++) {
+        print_animal(i) puts (" ") print (i)
+    }
+}

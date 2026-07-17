@@ -112,6 +112,7 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_keyword_while: return("'while'");
         case TOK_keyword_for: return("'for'");
         case TOK_keyword_struct: return("'struct'");
+        case TOK_keyword_enum: return("'enum'");
         case TOK_keyword_import: return("'import'");
         case TOK_keyword_fsm_debug: return("'fsm_debug'");
         case TOK_lparen: return("'('");
@@ -143,6 +144,7 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_colon: return("':'");
         case TOK_semicolon: return("';'");
         case TOK_dot: return("'.'");
+        case TOK_colon_colon: return "'::'";
         case TOK_ampersand: return("'&'");
         case TOK_exclam: return("'!'");
         case TOK_identifier: return("identifier");
@@ -188,6 +190,9 @@ void handle_word(SV *word, int line_number) {
     }
     else if (sv_compare_cstr(word, "struct")) {
         push_token(TOK_keyword_struct, nullptr, line_number);
+    }
+    else if (sv_compare_cstr(word, "enum")) {
+        push_token(TOK_keyword_enum, nullptr, line_number);
     }
     else if (sv_compare_cstr(word, "import")) {
         push_token(TOK_keyword_import, nullptr, line_number);
@@ -242,6 +247,10 @@ void tokenizer(SV *code) {
         else if (']' == c) {
             sv_pop(code);
             push_token(TOK_rbracket, nullptr, line_number);
+        }
+        else if (sv_starts_with(code, "::")) {
+            sv_pop(code);  sv_pop(code);
+            push_token(TOK_colon_colon, nullptr, line_number);
         }
         else if (':' == c) {
             sv_pop(code);

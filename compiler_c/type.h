@@ -1,9 +1,10 @@
 
 #pragma once
 
+#include "sv.h"
+#include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include "sv.h"
 
 typedef enum {
     T_void,
@@ -15,6 +16,7 @@ typedef enum {
     T_array,
     T_slice,
     T_struct,
+    T_enum,
     T_any, // 'any' works like the 'void' in C's void* for now, just with a better name.
 } TypeKind;
 
@@ -24,6 +26,11 @@ typedef struct {
     SV name;
     struct Type_s *type;
 } TypeMember;
+
+typedef struct {
+    SV name;
+    int64_t value;
+} EnumMember;
 
 typedef struct Type_s {
     TypeKind kind;
@@ -58,6 +65,11 @@ typedef struct Type_s {
             int num_members;
             TypeMember *members;
         } _struct;
+
+        struct {
+            int num_members;
+            EnumMember *members;
+        } _enum;
     };
 } Type;
 
@@ -89,6 +101,7 @@ bool is_signed_integer(Type *t);
 bool is_boolean_kind(Type *t);
 bool is_array_kind(Type *t);
 bool is_struct_kind(Type *t);
+bool is_enum_kind(Type *t);
 bool is_reference_kind(Type *t);
 
 bool is_slice_type(Type *t);
@@ -100,6 +113,8 @@ bool type_can_have_members(Type *t);
 bool types_are_equivalent(Type *t1, Type *t2);
 Type *dereferenced_type(Type *t);
 Type *get_member_type_and_offset(Type *_struct, SV *member_name, size_t *out_offset);
+
+bool get_enum_member_value (Type *t, SV *member_name, int64_t *enum_value);
 
 size_t get_storage_size(Type *t);
 void calculate_storage_size(Type *t);

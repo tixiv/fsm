@@ -83,7 +83,7 @@
             "patterns": [
                 {
                     "name": "keyword.control.fsm",
-                    "match": "\\b(fn|struct|if|else|while|for|return|let|import)\\b"
+                    "match": "\\b(fn|struct|enum|if|else|while|for|return|let|import)\\b"
                 }
             ]
         },
@@ -110,7 +110,7 @@
             "patterns": [
                 {
                     "name": "keyword.operator.fsm",
-                    "match": "=>|==|!=|<=|>=|&&|\\|\\||&!=|\\|==|[+\\-*/%=<>!&|]"
+                    "match": "=>|==|!=|<=|>=|&&|\\|\\||&!=|\\|==|::|[+\\-*/%=<>!]"
                 }
             ]
         }

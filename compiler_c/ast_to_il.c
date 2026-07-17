@@ -260,6 +260,7 @@ static void gen_address_visitor(AST_node *n, IL_gen *gen) {
 
 
 static void gen_value_visitor(AST_node *n, IL_gen *gen) {
+    char buf[1024];
     if (!n) return;
     switch (n->kind) {
         case AST_call:
@@ -358,7 +359,14 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
             push_opcode(OP_member_access, nullptr, n->member_access.offset);
             break;
-         
+
+        case AST_namespace_access:
+            if (is_enum_kind(n->type)) {
+                push_opcode(OP_push_literal, nullptr, n->namespace_access.enum_value);
+            }
+            else NOT_IMPLEMENTED("Generating IL for namespace acces for type %s is not implemented yet", get_type_name_r(buf, n->type))
+            break;
+            
         default:
             NOT_IMPLEMENTED("gen_value_visitor for %s is not implemented yet.\n", ast_kind_name(n->kind));
             break;
@@ -442,6 +450,8 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         case AST_type_ref:
         case AST_type_array:
         case AST_type_slice:
+        case AST_enum:
+        case AST_enum_member:
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             break;
         default:

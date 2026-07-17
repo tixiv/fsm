@@ -96,7 +96,14 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
                 sb_printf(&sb, "anonymous struct", SV_prnt(type->name));
             }
             break;
-
+        case T_enum:
+            if (type->name.begin) {
+                sb_printf(&sb, "enum %.*s", SV_prnt(type->name));
+            }
+            else {
+                sb_printf(&sb, "anonymous enum", SV_prnt(type->name));
+            }
+            break;
         default:
             NOT_IMPLEMENTED("Dumping type kind %d is not implemented yet.\n", type->kind);
             break;
@@ -123,6 +130,10 @@ bool is_array_kind(Type *t) {
 
 bool is_struct_kind(Type *t) {
     return t->kind == T_struct;
+}
+
+bool is_enum_kind(Type *t) {
+    return t->kind == T_enum;
 }
 
 bool is_reference_kind(Type *t) {
@@ -211,6 +222,18 @@ Type *get_member_type_and_offset(Type *_struct, SV *member_name, size_t *out_off
     }
 
     return nullptr;
+}
+
+bool get_enum_member_value (Type *t, SV *member_name, int64_t *enum_value) {
+    for (int i = 0; i < t->_enum.num_members; i++) {
+        EnumMember *member = &t->_enum.members[i];
+
+        if (sv_equal(&member->name, member_name)) {
+            if (enum_value) *enum_value = member->value;
+            return true;
+        }
+    }
+    return false;
 }
 
 void calculate_storage_size(Type *_struct) {

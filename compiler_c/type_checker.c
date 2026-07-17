@@ -156,6 +156,9 @@ void try_convert_to_type_if_necessary(AST_node **n, Type *target_type, const cha
 
     if ((*n)->type == target_type) return;
 
+    if (is_integer_kind(target_type) && is_enum_kind((*n)->type)) return;
+    if (is_enum_kind(target_type) && is_integer_kind((*n)->type)) return;
+
     const char *warning;
     if (is_castable_to(target_type, (*n)->type, &warning)) {
         ast_insert_node(n, make_cast(target_type, (*n)->type));
@@ -628,12 +631,28 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             }
 
             break;
-            
+        }
+
+        case AST_namespace_access: {
+            Type *t = n->namespace_access.body->type;
+            if (t->kind == T_enum) {
+                if (!get_enum_member_value (t, &n->namespace_access.name, &n->namespace_access.enum_value))
+                {
+                    type_checker_error(n->line_number, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->namespace_access.name),
+                        get_type_name_r(buf_1, t));
+                }
+                n->type = t;
+                n->addressable = false;
+            }
+            else NOT_IMPLEMENTED("Namespace access is not implemented yet for typ %s.\n", get_type_name_r(buf_1, t));
+            break;
         }
 
         case AST_typename:
         case AST_member_def:
         case AST_struct:
+        case AST_enum:
+        case AST_enum_member:
         case AST_type_ref:
         case AST_type_array:
         case AST_type_slice:

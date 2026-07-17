@@ -4,6 +4,7 @@
 #include "dyn_array.h"
 #include "sv.h"
 #include "type.h"
+#include "symbol.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
@@ -20,35 +21,12 @@ static void resolver_error(int line_number, const char * fmt, ...) {
     va_end(args);
 }
 
-Dyn_array global_symbols;
-
 typedef struct {
     Dyn_array local_symbols;
     Symbol *current_function;
     size_t locals_stack[100];
     size_t locals_stack_pointer;
 } Resolver;
-
-Symbol *alloc_symbol(SymbolKind kind, SV name) {
-    Symbol *s = malloc(sizeof(Symbol));
-    memset(s, 0, sizeof(Symbol));
-    s->kind = kind;
-    s->name = name;
-    return s;
-}
-
-Symbol *get_symbol(Dyn_array *arr, size_t index) {
-    ASSERT(index < arr->count, "Tried to access symbol that does not exist at index %lu\n", index);
-    return ((Symbol**)arr->data)[index];
-}
-
-static Symbol *get_symbol_by_name(Dyn_array *arr, SV *name) {
-    for (int i = 0; i < arr->count; i++) {
-        Symbol *s = get_symbol(arr, i);
-        if (sv_equal(&s->name, name)) return s;
-    }
-    return nullptr;
-}
 
 static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, bool do_undefined_error);
 
@@ -60,7 +38,7 @@ static void push_symbol(Resolver *res, Dyn_array *arr, Symbol *s, int line_numbe
     }
 
     dyn_array_push_p(arr, s);
-}     
+}
 
 Dyn_array builtin_functions; // Dyn_array<Symbol*>
 
@@ -208,6 +186,9 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_struct:
         case AST_member_def:
         case AST_member_access:
+        case AST_namespace_access:
+        case AST_enum:
+        case AST_enum_member:
         case AST_typename:
         case AST_type_ref:
         case AST_type_array:

@@ -4,11 +4,13 @@
 #include "sv.h"
 #include "tokenizer.h"
 #include "type.h"
+#include <stdint.h>
 
 #define SYM_LIST \
     X(SYM_global) \
     X(SYM_local) \
     X(SYM_arg) \
+    X(SYM_type) \
 
 
 typedef enum {
@@ -54,11 +56,14 @@ typedef struct {
     X(AST_reference) \
     X(AST_struct) \
     X(AST_member_def) \
+    X(AST_enum) \
+    X(AST_enum_member) \
     X(AST_typename) \
     X(AST_type_ref) \
     X(AST_type_array) \
     X(AST_type_slice) \
     X(AST_member_access) \
+    X(AST_namespace_access) \
     X(AST_array_to_slice) \
     X(AST_plus_plus) \
     X(AST_minus_minus) \
@@ -214,6 +219,22 @@ typedef struct AST_node_s {
             SV name;
             size_t offset;                
         } member_access;
+
+        struct {
+            struct AST_node_s *body;
+            SV name;
+            int64_t enum_value;
+        } namespace_access;
+
+        struct {
+            struct AST_node_s *body;
+            SV name;
+        } _enum;
+
+        struct {
+            SV name;
+            int64_t value;
+        } _enum_member;
 
         struct {
             size_t len;

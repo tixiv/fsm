@@ -318,7 +318,7 @@ static AST_node *parse_primary()
             n = ast_alloc(AST_symbol, CT->line_number);
             n->symbol.name = *name;
 
-            while (CT->kind == TOK_lbracket || CT->kind == TOK_dot) {
+            while (CT->kind == TOK_lbracket || CT->kind == TOK_dot || CT->kind == TOK_colon_colon) {
                 if (CT->kind == TOK_lbracket) {
                     AST_node *ast_arr = ast_alloc(AST_array_access, CT->line_number);
                     MOVE_NEXT();
@@ -341,6 +341,15 @@ static AST_node *parse_primary()
                     deref->deref.body = ast_member_access;
                     n = deref;
                     MOVE_NEXT();
+                }
+                if (CT->kind == TOK_colon_colon) {
+                    AST_node *ast_namespace_access = ast_alloc(AST_namespace_access, CT->line_number);
+                    MOVE_NEXT();
+                    expect_token(TOK_identifier);
+                    ast_namespace_access->namespace_access.body = n;
+                    ast_namespace_access->namespace_access.name = CT->value;
+                    MOVE_NEXT();
+                    n = ast_namespace_access;
                 }
             }
         }
@@ -644,6 +653,62 @@ static AST_node *parse_struct() {
     return ast_struct;
 }
 
+static AST_node *parse_enum() {
+    debug_log_parser("Entering %s\n", __func__);
+
+    expect_token(TOK_keyword_enum);
+    AST_node *ast_enum = ast_alloc(AST_enum, CT->line_number);
+    MOVE_NEXT();
+
+    expect_token(TOK_identifier);
+    ast_enum->_enum.name = CT->value;
+    MOVE_NEXT();
+
+    take_expected(TOK_lbrace);
+
+    // Members
+    {
+        AST_node *latest = nullptr;
+        int64_t latest_value = 0;
+
+        while (1) {
+            if (CT->kind == TOK_rbrace) {
+                MOVE_NEXT();
+                break;
+            }
+            else if(CT->kind == TOK_identifier) {
+                AST_node *member = ast_alloc(AST_enum_member, CT->line_number);
+                member->_enum_member.name = CT->value;
+                MOVE_NEXT();
+                if (CT->kind == TOK_equal_assign) {
+                    MOVE_NEXT();
+                    expect_token(TOK_number);
+                    latest_value = strtol(CT->value.begin, nullptr, 0);
+                    MOVE_NEXT();
+                }
+                member->_enum_member.value = latest_value++;
+
+                if (latest) {
+                    latest->next = member;
+                } else {
+                    ast_enum->_enum.body = member;
+                }
+                latest = member;
+
+                if (CT->kind == TOK_semicolon || CT->kind == TOK_komma) {
+                    MOVE_NEXT();
+                }
+            }
+            else {
+                parser_error(CT->line_number, "Expected '}' or struct member definition but got %s",
+                    token_kind_name(CT->kind));
+            }
+        }
+    }
+
+    debug_log_parser("Leaving %s\n", __func__);
+    return ast_enum;
+}
 
 AST_node *parse_program_ast() {
     debug_log_parser("Entering %s\n", __func__);
@@ -674,6 +739,14 @@ AST_node *parse_program_ast() {
         }
         else if (CT->kind == TOK_keyword_struct) {
             AST_node *n = parse_struct();
+            if (last) 
+                last->next = n;
+            else
+                root->program.body = n;
+            last = n;
+        }
+        else if (CT->kind == TOK_keyword_enum) {
+            AST_node *n = parse_enum();
             if (last) 
                 last->next = n;
             else
