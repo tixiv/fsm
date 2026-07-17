@@ -1,0 +1,51 @@
+
+import * from "std";
+
+fn take_number (str: u8[]&) : u8[]
+{
+    while (!is_numeric(str.begin) && str.len) str++;
+    
+    let number = str;
+    number.len = 0
+
+    while (is_numeric(str.begin) && str.len) {
+        str++
+        number.len = number.len + 1
+    } 
+
+    return number
+}
+
+fn meas_window (a: i64[], i) {
+    return a[i+0] + a[i+1] + a[i+2]
+}
+
+fn main () {
+    let content = read_file ("aoc_21/aoc21_day1.input")
+
+    let input: i64[2000];
+    
+    let num_inputs = 0;
+
+    while (content.len) {
+        input[num_inputs++] = parse_integer(take_number(content));
+    }
+
+    let last = 5000;
+    let deeper_count = 0;
+
+    for (let i = 0; i < num_inputs; i++) {
+        if (input[i] > last) deeper_count++
+        last = input[i]
+    }
+
+    puts("deeper_count: ")print (deeper_count)
+
+    let smooth_deeper_count = 0;
+
+    for (i = 0; i < num_inputs - 3; i++) {
+        if (meas_window(input, i+1) > meas_window(input, i)) smooth_deeper_count++
+    }
+
+    puts("smooth_deeper_count: ")print (smooth_deeper_count)
+}

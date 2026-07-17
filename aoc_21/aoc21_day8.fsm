@@ -1,0 +1,154 @@
+
+import * from "std";
+
+struct Display {
+    notes: u8[10];
+    readout: u8[4];
+    decoded: i64;
+}
+
+fn read_sequence (s: u8[]&) {
+    skip_whitespace(s);
+
+    let seq: u8[];
+    seq = s; seq.len = 0;
+    while ('a' <= s.begin <= 'g') {
+        seq.len++; s++;
+    }
+
+    skip_whitespace(s);
+
+    return seq;
+}
+
+fn to_bitset (s: u8[]) {
+    let a: u8 = 0;
+
+    while (s.len) {
+        setbit(a, s.begin - 'a', 1)
+        s++
+    }
+    return a
+}
+
+fn count_bits_set (b: u8) {
+    let count = 0;
+    for (let i = 0; i < 8; i++) if (bittest(b, i)) count++
+    return count
+}
+
+fn get_nth_left (left, n) {
+    for (let i = 0; i < 8; i++) {
+        if (bittest(left, i)) {
+            if (n-- == 0) return i;
+        }
+    }
+    return 0;
+}
+
+fn s_box_it (seq: u8[], val: u8) : u8 {
+    let outp: u8 = 0;
+    for (let i = 0; i < 7; i++)
+        if (bittest(val, i))
+            setbit(outp, seq[i], 1)
+    return outp
+}
+
+fn decode_digit(d: u8) {
+    if (d == 0x3F) return 0
+    if (d == 0x06) return 1
+    if (d == 0x5B) return 2
+    if (d == 0x4F) return 3
+    if (d == 0x66) return 4
+    if (d == 0x6D) return 5
+    if (d == 0x7D) return 6
+    if (d == 0x07) return 7
+    if (d == 0x7F) return 8
+    if (d == 0x6F) return 9
+
+    return -1
+}
+
+fn check_disp_valid_and_decode(disp: Display&, seq: u8[]) {
+    for (let i = 0; i < 10; i++) {
+        if (decode_digit(s_box_it(seq, disp.notes[i])) < 0)
+            return;
+    }
+    
+    // valid
+
+    let v = 0
+    for (let j = 0; j < 4; j++) {
+        v = v * 10
+        v = v + decode_digit(s_box_it(seq, disp.readout[j]))
+    }
+
+    print (v)
+    disp.decoded = v;
+}
+
+fn calc_seq (num_left, left, seq: u8[], disp: Display&) : void {
+    for (let i = 0; i < num_left; i++) {
+        let n = get_nth_left(left, i);
+        let l = left;
+        setbit(l, n, 0);
+        seq[7 - num_left] = n;
+        if (num_left > 1) {
+            calc_seq (num_left - 1, l, seq, disp)
+            if (disp.decoded >= 0) return;
+        }
+    }
+
+    if (num_left == 1) {
+        check_disp_valid_and_decode(disp, seq);
+    }
+}
+
+fn main () {
+    let contents = read_file ("aoc_21/aoc21_day8.input");
+
+    let displays: Display[200];
+
+    let x = 0;
+    while (contents.len) {
+        skip_whitespace(contents);
+        let i = 0;
+        while (contents.len && contents.begin != '|') {
+            displays[x].notes[i++] = to_bitset(read_sequence(contents));
+        }
+        contents++;
+
+        i = 0;
+        while (contents.len && contents.begin != '\n') {
+            displays[x].readout[i++] = to_bitset(read_sequence(contents));
+        }
+
+        displays[x].decoded = -1;
+
+        contents++;
+        x++;
+    }
+
+    let num_displays = x;
+
+    let num_trivialy_decodeable_readouts = 0;
+
+    for (let d = 0; d < num_displays; d++) {
+        let disp => displays[d];
+        for (let r = 0; r < 4; r++) {
+            if (count_bits_set(disp.readout[r]) == 2 |== 4 |== 3 |== 7) num_trivialy_decodeable_readouts++;
+        }
+    }
+
+    puts ("Trivialy decodeable: ") print (num_trivialy_decodeable_readouts);
+
+    let arr: u8[8];
+
+    let sum = 0;
+    for (let dn = 0; dn < num_displays; dn++) {
+        calc_seq(7, 255, arr, displays[dn]);
+        sum = sum + displays[dn].decoded
+    }
+
+    puts ("Sum of decoded displays: ") print (sum)
+}

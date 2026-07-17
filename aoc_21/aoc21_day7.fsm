@@ -1,0 +1,62 @@
+
+import * from "std";
+
+fn take_number (str: u8[]&) : u8[]
+{
+    while (!is_numeric(str.begin) && str.len) str++;
+    
+    let number = str;
+    number.len = 0
+
+    while (is_numeric(str.begin) && str.len) {
+        str++
+        number.len = number.len + 1
+    } 
+
+    return number
+}
+
+// 1+2+3+4   = 10; (4+1)*4/2 = 10
+// 1+2+3+4+5 = 15; (5+1)*5/2 = 15
+fn fuel_calc (steps) {
+    return (steps + 1) * steps / 2;
+}
+
+fn main () {
+    let contents = read_file ("aoc_21/aoc21_day7.input");
+    
+    let pos: i32[1000];
+
+    let min = 10000000;
+    let max = 0;
+    for (let x = 0; contents.len; x = x + 1) {
+        let n = parse_integer(take_number(contents));
+        pos[x] = n;
+        if (n > max) max = n else 0
+        if (n < min) min = n else 0
+    }
+
+    let min_fuel = 100000000000;
+
+    let min_fuel_pos = 0;
+
+    for (let i = min; i <= max; i = i + 1) {
+        let fuel = 0;
+        for (let s = 0; s < x; s = s + 1) {
+            let diff = pos[s] - i;
+
+            if (diff >= 0) {
+                fuel = fuel + fuel_calc(diff);
+            }
+            else {
+                fuel = fuel + fuel_calc(0 - diff);
+            }
+        }
+        if (fuel < min_fuel) {
+            min_fuel = fuel;
+            min_fuel_pos = i;
+        }
+    }
+    puts("pos: ")print(min_fuel_pos)
+    puts("fuel: ")print(min_fuel)
+}

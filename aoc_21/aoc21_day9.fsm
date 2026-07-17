@@ -1,0 +1,114 @@
+
+import * from "std";
+
+struct HeightMap {
+    arr: u8[100][100];
+    num_y;
+    num_x;
+}
+
+fn get_height(map: HeightMap&, y, x) {
+     if (0 <= y < map.num_y && 0 <= x < map.num_x) 
+        return map.arr[y][x] + 0;
+    return 9;
+}
+
+fn find_basin_size(map: HeightMap&, y, x) {
+    let marked: u8[100][100];
+
+    for (let i = 0; i < 100; i++) {
+        for (let j = 0; j < 100; j++) {
+            marked[i][j] = 0
+        }
+    }
+    marked[y][x] = 1;
+
+    let last_size = 0;
+
+    while(1) {
+        let size_now = 0;
+        for (i = 0; i < 100; i++) {
+            for (j = 0; j < 100; j++) {
+                if (marked[i][j]) {
+                    if (get_height(map, i-1, j) < 9) marked[i-1][j] = 1;
+                    if (get_height(map, i+1, j) < 9) marked[i+1][j] = 1;
+                    if (get_height(map, i, j-1) < 9) marked[i][j-1] = 1;
+                    if (get_height(map, i, j+1) < 9) marked[i][j+1] = 1;
+
+                    size_now++
+                }
+            }
+        }
+        if (size_now == last_size) return size_now;
+        last_size = size_now;
+    }
+    return 0
+}
+
+
+fn main () {
+    let content = read_file ("aoc_21/aoc21_day9.input")
+
+    let map: HeightMap;
+
+    for (let y = 0; content.len; {y++; content++}) {
+        
+        for (let x = 0; content.len && content.begin != '\n'; {x++ ; content++}) {
+            map.arr[y][x] = content.begin - '0'
+            putc(content.begin)
+        }
+        puts("\n");
+    }
+
+    map.num_y = y;
+    map.num_x = x;
+    // print (map.num_y)
+    // print (map.num_x)
+
+    let risk_level = 0
+
+    let basins: i64[1000];
+    let basin_count = 0;
+
+    for (y = 0; y < map.num_y; y++) {
+        for (x = 0; x < map.num_x; x++) {
+            let v = get_height(map, y, x);
+
+            if (   get_height(map, y, x+1) > v < get_height(map, y, x-1)
+                && get_height(map, y+1, x) > v < get_height(map, y-1, x))
+            {
+                risk_level = risk_level + v + 1
+
+                // puts("Y:") print (y)
+                // puts("X:") print (x)
+                // puts("val:") print (v)
+                
+                let basin_size = find_basin_size(map, y, x)
+                basins[basin_count++] = basin_size
+
+                // puts ("basin: ") print(basin_size);
+            }
+        }
+    }
+
+    let basin_mul = 1;
+
+    for (let j = 0; j < 3; j++) {
+        let max = 0;
+        let max_idx = 0;
+
+        for (let i = 0; i < basin_count; i++) {
+            if (basins[i] > max) {
+                max = basins[i];
+                max_idx = i;
+            }
+        }
+
+        puts ("basin: ") print (max)
+        basin_mul = basin_mul * max;
+        basins[max_idx] = 0;
+    }
+
+    puts ("risk_level: ") print(risk_level)
+    puts ("basin danger product: ") print(basin_mul)
+}

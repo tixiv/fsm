@@ -4,6 +4,7 @@ FSM = fsm
 SRC_DIR = compiler_c
 BUILD_DIR = build
 TEST_DIR = tests
+AOC21_DIR = aoc_21
 
 CFLAGS += -Wall -O0 -g
 
@@ -27,7 +28,8 @@ $(FSM): $(O_FILES)
 	$(CC) $(CFLAGS) -o $@ $(O_FILES)
 
 
-TESTS = $(wildcard $(TEST_DIR)/*.fsm)
+TESTS  = $(wildcard $(TEST_DIR)/*.fsm)
+TESTS += $(wildcard $(AOC21_DIR)/*.fsm)
 
 test: $(FSM)
 	@for t in $(TESTS); do \

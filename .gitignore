@@ -6,4 +6,5 @@ out
 out.asm
 build/
 tests/*.out
+aoc_21/*.out
 compile_commands.json

@@ -1,0 +1,51 @@
+
+import * from "std";
+
+fn take_number (str: u8[]&) : u8[]
+{
+    while (!is_numeric(str.begin) && str.len) str++;
+    
+    let number = str;
+    number.len = 0
+
+    while (is_numeric(str.begin) && str.len) {
+        str++
+        number.len = number.len + 1
+    } 
+
+    return number
+}
+
+fn count_fishes(fishes_with_timer: i64[]) {
+    let num_fishes = 0;
+    for (let t = 0; t < 9; t = t + 1) {
+        num_fishes = num_fishes + fishes_with_timer[t];
+    }
+    return num_fishes
+}
+
+fn main () {
+    let contents = read_file ("aoc_21/aoc21_day6.input");
+
+    let fishes_with_timer: i64[9];
+
+    for (let i = 0; i < 9; i = i + 1) fishes_with_timer[i] = 0
+
+    for (let x = 0; contents.len; x = x + 1) {
+        let n = parse_integer(take_number(contents));
+        fishes_with_timer[n] = fishes_with_timer[n] + 1;
+    }
+
+    for (let day = 0; day < 256; day = day + 1) {
+        if (day == 80) print(count_fishes(fishes_with_timer));
+        
+        let day_0_fishes = fishes_with_timer[0];
+        for (let t = 0; t < 8; t = t + 1) {
+            fishes_with_timer[t] = fishes_with_timer[t+1];
+        }
+        fishes_with_timer[8] = day_0_fishes;
+        fishes_with_timer[6] = fishes_with_timer[6] + day_0_fishes;
+    }
+
+    print(count_fishes(fishes_with_timer))    
+}

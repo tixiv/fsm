@@ -1,0 +1,109 @@
+
+import * from "std";
+
+fn take_line (str: u8[]&) : u8[] {
+    let line = str;
+    line.len = 0
+    while (str.len && str.begin != '\n') {
+        str++
+        line.len++
+    }
+    str++
+    return line
+}
+
+fn get_error_score(c) {
+    if (c == ')') return 3;
+    if (c == ']') return 57;
+    if (c == '}') return 1197;
+    if (c == '>') return 25137;
+
+    return 0;
+}
+
+fn get_completion_score(c) {
+    if (c == ')') return 1;
+    if (c == ']') return 2;
+    if (c == '}') return 3;
+    if (c == '>') return 4;
+
+    return 0;
+}
+
+fn get_closing_for(c) {
+    if (c == '(') return ')' + 0;
+    if (c == '[') return ']' + 0;
+    if (c == '{') return '}' + 0;
+    if (c == '<') return '>' + 0;
+
+    puts ("Error: no opening bracket: ") putc(c) puts("\n")
+    return 0
+}
+
+struct ParserState {
+    s: u8[];
+    compl: u8[20];
+    compl_idx;
+    line_number;
+    error_score;
+    completion_score;
+}
+
+fn check_operators(p: ParserState&) : void {
+    
+    while (p.s.begin == '(' |== '[' |== '{' |== '<') {
+        let expected_closing = get_closing_for(p.s.begin);
+        p.s++
+
+        check_operators(p)
+        if (p.error_score) return;
+
+        if (!p.s.len) {
+            // puts ("incomplete line: ") print (p.line_number)
+            p.compl[p.compl_idx++] = expected_closing;
+            p.completion_score = p.completion_score * 5 + get_completion_score(expected_closing)
+            return;
+        }
+
+        if (p.s.begin != expected_closing) {
+            puts("Expected '") putc(expected_closing) puts("' but found '") putc(p.s.begin) puts("' instead in line ") print (p.line_number)
+            p.error_score = get_error_score(p.s.begin);
+        } else {
+            p.s++;
+        }
+    }
+}
+
+fn main () {
+    let content = read_file ("aoc_21/aoc21_day10.input")
+
+    let p: ParserState;
+
+    p.line_number = 1;
+
+    let error_score = 0;
+
+    let num_completions = 0;
+    let completion_scores: i64[100];
+
+    while (content.len) {
+        p.s = take_line(content);
+        p.error_score = 0;
+        p.completion_score = 0;
+        p.compl_idx = 0;
+        check_operators(p)
+        error_score = error_score + p.error_score
+        
+        if (p.completion_score) {
+            completion_scores[num_completions++] = p.completion_score
+            puts(p.compl) puts(" - ") print(p.completion_score)
+        }
+        p.line_number++
+    }
+
+    puts("Error score: ") print(error_score)
+
+    quicksort64(completion_scores, 0, num_completions-1)
+
+    puts("Completion score: ") print(completion_scores[num_completions / 2])
+}
