@@ -25,6 +25,8 @@ Dyn_array global_symbols;
 typedef struct {
     Dyn_array local_symbols;
     Symbol *current_function;
+    size_t locals_stack[100];
+    size_t locals_stack_pointer;
 } Resolver;
 
 Symbol *alloc_symbol(SymbolKind kind, SV name) {
@@ -115,12 +117,23 @@ static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, 
 static void resolver_enter_function(Resolver *res, Symbol *s_fun) {
     res->current_function = s_fun;
     res->local_symbols.count = 0;
+    res->locals_stack_pointer = 0;
 }
 
 static void resolver_leave_function(Resolver *res) {
     ASSERT(res->current_function, "Resolver leave function called without active function\n");
     res->current_function = nullptr;
     res->local_symbols.count = 0;
+}
+
+static void resolver_enter_scope(Resolver *res, int line_number) {
+    if (res->locals_stack_pointer >= 99) resolver_error(line_number, "Scope stack overflow. More than 100 levels nested. What are you doing?.\n");
+    res->locals_stack[res->locals_stack_pointer++] = res->local_symbols.count;
+}
+
+static void resolver_leave_scope(Resolver *res) {
+    ASSERT(res->locals_stack_pointer >= 1, "Resolver locals stack underflow.\n")
+    res->local_symbols.count = res->locals_stack[--res->locals_stack_pointer];
 }
 
 static void resolver_visitor(AST_node *n, Resolver *res) {
@@ -167,11 +180,21 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
             break;
 
         case AST_scope:
+            resolver_enter_scope(res, n->line_number);
+            ast_visit_children(n, (AstVisitor)resolver_visitor, res);
+            resolver_leave_scope(res);
+            break;
+
+        case AST_for:
+            resolver_enter_scope(res, n->line_number);
+            ast_visit_children(n, (AstVisitor)resolver_visitor, res);
+            resolver_leave_scope(res);
+            break;
+
         case AST_arg_list:
         case AST_program:
         case AST_if:
         case AST_while:
-        case AST_for:
         case AST_number:
         case AST_binary:
         case AST_unary:

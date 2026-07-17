@@ -27,8 +27,8 @@ fn find_basin_size(map: HeightMap&, y, x) {
 
     while(1) {
         let size_now = 0;
-        for (i = 0; i < 100; i++) {
-            for (j = 0; j < 100; j++) {
+        for (let i = 0; i < 100; i++) {
+            for (let j = 0; j < 100; j++) {
                 if (marked[i][j]) {
                     if (get_height(map, i-1, j) < 9) marked[i-1][j] = 1;
                     if (get_height(map, i+1, j) < 9) marked[i+1][j] = 1;
@@ -51,17 +51,14 @@ fn main () {
 
     let map: HeightMap;
 
-    for (let y = 0; content.len; {y++; content++}) {
-        
-        for (let x = 0; content.len && content.begin != '\n'; {x++ ; content++}) {
+    map.num_y = for (let y = 0; content.len; {y++; content++}; y) {
+        map.num_x = for (let x = 0; content.len && content.begin != '\n'; {x++ ; content++}; x) {
             map.arr[y][x] = content.begin - '0'
             putc(content.begin)
         }
         puts("\n");
     }
 
-    map.num_y = y;
-    map.num_x = x;
     // print (map.num_y)
     // print (map.num_x)
 
@@ -70,8 +67,8 @@ fn main () {
     let basins: i64[1000];
     let basin_count = 0;
 
-    for (y = 0; y < map.num_y; y++) {
-        for (x = 0; x < map.num_x; x++) {
+    for (let y = 0; y < map.num_y; y++) {
+        for (let x = 0; x < map.num_x; x++) {
             let v = get_height(map, y, x);
 
             if (   get_height(map, y, x+1) > v < get_height(map, y, x-1)

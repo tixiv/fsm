@@ -57,8 +57,8 @@ fn main () {
     for (let i = 0; i < x && winning_board == 0; i = i + 1) {
         puts ("------------- called: ") puts(called_numbers[i]) puts("\n")
         for (bb = 0; bb < num_bb; bb = bb + 1) {
-            for (row = 0; row < 5; row = row + 1) {
-                for (col = 0; col < 5; col = col + 1) {
+            for (let row = 0; row < 5; row = row + 1) {
+                for (let col = 0; col < 5; col = col + 1) {
                     if (sv_equal(bingo_boards[bb][row][col], called_numbers[i])) {
                         marked[bb][row][col] = 1
                         // puts ("Match at: ") print(bb) print (row) print (col)
@@ -66,10 +66,10 @@ fn main () {
                 }
             }
 
-            for (row = 0; row < 5; row = row + 1) {
+            for (let row = 0; row < 5; row = row + 1) {
                 let rowscore = 0;
                 let colscore = 0;
-                for (col = 0; col < 5; col = col + 1) {
+                for (let col = 0; col < 5; col = col + 1) {
                     rowscore = rowscore + marked[bb][row][col];
                     colscore = colscore + marked[bb][col][row];
                 }
@@ -90,8 +90,8 @@ fn main () {
 
     let sum = 0;
 
-    for (row = 0; row < 5; row = row + 1) {
-        for (col = 0; col < 5; col = col + 1) {
+    for (let row = 0; row < 5; row = row + 1) {
+        for (let col = 0; col < 5; col = col + 1) {
             if (!marked[bb][row][col]) {
                 sum = sum + parse_integer(bingo_boards[bb][row][col])
             }

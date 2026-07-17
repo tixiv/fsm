@@ -37,7 +37,7 @@ fn test_struct_in_array_in_struct() {
     for (let i = 0; i < o.data.len; i = i + 1)
         o.data[i].value = i * 10;
 
-    for (i = 0; i < o.data.len; i = i + 1)
+    for (let i = 0; i < o.data.len; i = i + 1)
         print(o.data[i].value);
 }
 

@@ -29,7 +29,7 @@ fn main () {
 
     let min = 10000000;
     let max = 0;
-    for (let x = 0; contents.len; x = x + 1) {
+    let num_pos = for (let x = 0; contents.len; x = x + 1; x) {
         let n = parse_integer(take_number(contents));
         pos[x] = n;
         if (n > max) max = n else 0
@@ -42,7 +42,7 @@ fn main () {
 
     for (let i = min; i <= max; i = i + 1) {
         let fuel = 0;
-        for (let s = 0; s < x; s = s + 1) {
+        for (let s = 0; s < num_pos; s = s + 1) {
             let diff = pos[s] - i;
 
             if (diff >= 0) {

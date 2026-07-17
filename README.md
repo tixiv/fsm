@@ -111,7 +111,7 @@ fn main () {
 - [X] Char constants
 - [X] Implement bit functions
 - [X] Implement unary minus operator
-- [ ] Implement scopes inside functions
+- [X] Implement scopes inside functions
 - [ ] Implement enums
 - [ ] Implement initializers for arrays and structs
 - [ ] Write more documentation

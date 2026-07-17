@@ -69,7 +69,7 @@ fn main () {
     let aim = 0;
 
     for (i = 0; i < num_instructions; i++) {
-        ins => instructions[i];
+        let ins => instructions[i];
         if (sv_equal(ins.word, "forward")) {
             pos = pos + ins.num;
             depth = depth + aim * ins.num;
