@@ -37,6 +37,24 @@ fn do_things_except_for_specific_numbers (val :i64) {
 }
 ```
 
+## For loops can have a result
+
+Just add another ';' after the post action if you want this. It is usefull for usecases like this:
+
+```fsm
+fn main () {
+    let contents = read_file("input");
+    
+    let pos: i32[1000];
+
+    let num_pos = for (let x = 0; contents.len && x < 1000; x++; x) {
+        pos[x] = parse_integer(take_number(contents));
+    }
+
+    puts ("Positions read: ") print (num_pos)
+}
+```
+
 ## References with auto dereferencing and special reference binding operator
 ```fsm
 let my_value = 42;
