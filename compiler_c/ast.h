@@ -159,6 +159,7 @@ typedef struct AST_node_s {
             struct AST_node_s *condition;
             struct AST_node_s *post_action;
             struct AST_node_s *body;
+            struct AST_node_s *result;
         } _for;
 
         struct {

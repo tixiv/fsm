@@ -218,6 +218,21 @@ static void gen_plus_plus(AST_node *n, IL_gen *gen, bool result_used) {
     else NOT_IMPLEMENTED("AST_plus_plus is not implemented for anything that is not an integer or a slice.\n")
 }
 
+static void gen_for(AST_node *n, IL_gen *gen, bool result_used) {
+    int while_num = num_whiles++;
+    il_gen_visitor(n->_for.initializer, gen);
+    push_opcode(OP_while_loop, 0, while_num);
+    if (n->_for.condition) {
+        gen_value_visitor(n->_for.condition, gen);
+        push_opcode(OP_while_check, 0, while_num);
+    }
+    il_gen_visitor(n->_for.body, gen);
+    il_gen_visitor(n->_for.post_action, gen);
+    push_opcode(OP_while_end, 0, while_num);
+    if (result_used) gen_value_visitor(n->_for.result, gen);
+    else il_gen_visitor(n->_for.result, gen);;
+}
+
 static void gen_address_visitor(AST_node *n, IL_gen *gen) {
 
     // char buf[1024];
@@ -273,7 +288,11 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
         case AST_if:
             gen_if(n, gen, true);
             break;
-        
+
+        case AST_for:
+            gen_for(n, gen, true);
+            break;
+
         case AST_cast:
             ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
             gen_cast(n);
@@ -379,19 +398,9 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             break;
         }
 
-        case AST_for: {
-            int while_num = num_whiles++;
-            il_gen_visitor(n->_for.initializer, gen);
-            push_opcode(OP_while_loop, 0, while_num);
-            if (n->_for.condition) {
-                gen_value_visitor(n->_for.condition, gen);
-                push_opcode(OP_while_check, 0, while_num);
-            }
-            il_gen_visitor(n->_for.body, gen);
-            il_gen_visitor(n->_for.post_action, gen);
-            push_opcode(OP_while_end, 0, while_num);
+        case AST_for:
+            gen_for(n, gen, false);
             break;
-        }
 
         case AST_arg_decl:
             // Nothing to do here for an arg decl, as it can't have an initializer

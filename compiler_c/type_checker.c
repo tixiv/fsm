@@ -67,7 +67,6 @@ void annotate_used_visitor(AST_node *n, uint64_t used) {
             break;
 
         case AST_for:
-            if (used) type_checker_error(n->line_number, "The 'for' statement has no value and therefore can't be used in an expression.\n");
             annotate_used_visitor(n->_for.initializer, false);
             annotate_used_visitor(n->_for.condition, true);
             annotate_used_visitor(n->_for.post_action, false);
@@ -178,8 +177,11 @@ void type_propagate_binary_operator(AST_node *n) {
             type_checker_error(n->line_number, "Operator %s requires a reference type on the left side. Have '%s' and '%s'.\n",
                 token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
         }
-        if (!is_reference_kind(n->binary.right->type))
+        if (!is_reference_kind(n->binary.right->type)) {
+            if (!n->binary.right->addressable) type_checker_error(n->line_number, "Operator %s requires either another reference or something addressable on the right side. Have '%s' and '%s'.\n",
+                token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
             insert_take_reference(&n->binary.right);
+        }
 
         Type *any_ref = get_ref_type_for(&builtin_any);
 
@@ -362,6 +364,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                         type_checker_error(n->line_number, "Can't bind a reference to 'void' type target.\n");
                     }
                     if (!is_reference_kind(n->var_decl.initializer->type)) {
+                        if (!n->var_decl.initializer->addressable) type_checker_error(n->line_number, "Can't bind a reference to a non addressable target.\n");
                         t = get_ref_type_for(n->var_decl.initializer->type);
                         insert_take_reference(&n->var_decl.initializer);
                     }
@@ -459,9 +462,12 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_for:
+            n->type = &builtin_void;
             if (n->_for.condition)
                 try_convert_to_type_if_necessary(&n->_for.condition, &builtin_bool, "'for' loop condition");
-            n->type = &builtin_void;
+            if (n->_for.result)
+                n->type = n->_for.result->type;
+
             n->addressable = false;
             break;
         
@@ -535,6 +541,9 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_reference:
+            if (!n->reference.body->addressable) type_checker_error(n->line_number, "Can't take reference to something that is not addressable.\n",
+                get_type_name_r(buf_1, n->reference.body->type));
+            
             n->type = get_ref_type_for(n->reference.body->type);
             n->addressable = false;
             break;

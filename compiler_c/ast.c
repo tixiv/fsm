@@ -145,6 +145,7 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             visit_non_null(n->_for.condition, visit, arg);
             visit_non_null(n->_for.post_action, visit, arg);
             visit_non_null(n->_for.body, visit, arg);
+            visit_non_null(n->_for.result, visit, arg);
             break;
         case AST_binary:
             visit_non_null(n->binary.left, visit, arg);
