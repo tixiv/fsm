@@ -141,12 +141,17 @@ void try_convert_to_type_if_necessary(AST_node **n, Type *target_type, const cha
 
     if (target_type == get_ref_type_for(&builtin_any)) {
         if (!is_reference_kind(original_type)) {
+            if ((*n)->addressable == false) type_checker_error((*n)->line_number, "Can't convert %s of type '%s' to '%s' because it is not addressable.\n",
+                    desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
+            
             insert_take_reference(n);
         }
         return; // any& can accept any reference type.
     }
 
     if (is_reference_kind(target_type) && !is_reference_kind(original_type)) {
+        if ((*n)->addressable == false) type_checker_error((*n)->line_number, "Can't convert %s of type '%s' to '%s' because it is not addressable.\n",
+                desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
         insert_take_reference(n);
     }
 
@@ -528,9 +533,16 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             n->addressable = false;
             break;
 
-        case AST_not:
-            try_convert_to_type_if_necessary(&n->_not.body, &builtin_bool, "Argument of not operator");
-            n->type = &builtin_bool;
+        case AST_unary:
+            if (n->unary.token_kind == TOK_exclam) {
+                try_convert_to_type_if_necessary(&n->unary.body, &builtin_bool, "Argument of unary '!'");
+                n->type = &builtin_bool;
+            }
+            else if (n->unary.token_kind == TOK_minus) {
+                try_convert_to_type_if_necessary(&n->unary.body, &builtin_i64, "Argument of unary '-'");
+                n->type = &builtin_i64;
+            }
+            else NOT_IMPLEMENTED("Type checking unary operator %s is not implemented yet.\n", token_kind_printable(n->unary.token_kind));
             n->addressable = false;
             break;
         

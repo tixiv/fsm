@@ -2,6 +2,7 @@
 #include "sv.h"
 #include "dyn_array.h"
 #include <stdint.h>
+#include <stdbool.h>
 
 #define OPCODE_LIST \
     X(OP_begin_fn) \
@@ -14,6 +15,7 @@
     X(OP_equal) \
     X(OP_unequal) \
     X(OP_not) \
+    X(OP_neg) \
     X(OP_compare_GT) \
     X(OP_compare_LT) \
     X(OP_compare_GE) \
@@ -67,6 +69,7 @@ typedef struct {
         uint32_t u32_value[2];
     };
     uint64_t size;
+    bool _signed;
 } Opcode;
 
 extern Dyn_array opcodes_dyn;
@@ -78,3 +81,4 @@ void dump_opcodes();
 
 size_t push_opcode(int kind, SV *value, uint64_t u64_value);
 size_t push_opcode_sz(int kind, SV *value, uint64_t u64_value, uint64_t size);
+size_t push_opcode_sz_sgn(int kind, SV *value, uint64_t u64_value, uint64_t size, bool _signed);

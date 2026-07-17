@@ -150,8 +150,8 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             visit_non_null(n->binary.left, visit, arg);
             visit_non_null(n->binary.right, visit, arg);
             break;
-        case AST_not:
-            visit_non_null(n->_not.body, visit, arg);
+        case AST_unary:
+            visit_non_null(n->unary.body, visit, arg);
             break;
         case AST_call:
             ast_visit_chain(n->call.args, visit, arg);
@@ -243,7 +243,6 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
         case AST_type_slice:
         case AST_dereference:
         case AST_reference:
-        case AST_not:
         case AST_plus_plus:
         case AST_minus_minus:
         case AST_array_access:
@@ -310,10 +309,15 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             printf("%.*s%s %s (%s)\n", (int)spaces, spc, kind_name, token_kind_name(n->binary.token_kind), get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
+        case AST_unary:
+            printf("%.*s%s %s (%s)\n", (int)spaces, spc, kind_name, token_kind_name(n->unary.token_kind), get_type_name_r(buf, n->type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
         case AST_symbol:
             printf("%.*s%s '%.*s' ", (int)spaces, spc, kind_name, SV_prnt(n->symbol.name));
             print_symbol(n->symbol.symbol);
             printf(" (%s)\n", get_type_name_r(buf, n->type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_call:
             printf("%.*s%s '%.*s' ", (int)spaces, spc, kind_name, SV_prnt(n->call.name));

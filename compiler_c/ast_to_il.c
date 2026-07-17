@@ -21,6 +21,10 @@ static void il_gen_error(int line_number, const char * fmt, ...) {
     va_end(args);
 }
 
+size_t push_opcode_t(int kind, SV *value, uint64_t u64_value, Type *t) {
+    return push_opcode_sz_sgn(kind, value, u64_value, t->storage_size, is_signed_integer(t));
+}
+
 static int num_ifs;
 static int num_whiles;
 static int num_strings;
@@ -42,7 +46,7 @@ static void il_gen_push_symbol(Symbol *s) {
     if (s->kind == SYM_arg) {
         push_opcode_sz(OP_push_arg, nullptr, s->offset, s->type->storage_size);
     } else if (s->kind == SYM_local) {
-        push_opcode_sz(OP_push_local_var, nullptr,  s->offset, s->type->storage_size);
+        push_opcode_t(OP_push_local_var, nullptr,  s->offset, s->type);
     } else {
         NOT_IMPLEMENTED("Pushing symbol kind %s is not implemented yet.\n", symbol_kind_name(s->kind));
     }
@@ -232,7 +236,8 @@ static void gen_address_visitor(AST_node *n, IL_gen *gen) {
             break;
 
         default:
-            NOT_IMPLEMENTED("il_gen_address_visitor for %s is not implemented yet.\n", ast_kind_name(n->kind));
+            il_gen_error(n->line_number, "Trying to take the address of something for which it is not possible. Have %s.\n",
+                    ast_kind_name(n->kind));
             break;
     }
 }
@@ -274,11 +279,13 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             gen_cast(n);
             break;
         
-        case AST_not:
+        case AST_unary:
             ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
-            push_opcode(OP_not, nullptr, 0);
+            if (n->unary.token_kind == TOK_exclam) push_opcode(OP_not, nullptr, 0);
+            else if (n->unary.token_kind == TOK_minus) push_opcode(OP_neg, nullptr, 0);
+            else NOT_IMPLEMENTED("Generating IL for unary operator %s is not implemented yet.\n", token_kind_printable(n->unary.token_kind));
             break;
-        
+
         case AST_array_to_slice:
             push_opcode(OP_push_literal, nullptr, n->_array_to_slice.body->type->_array.n_elements);
             gen_address_visitor(n->_array_to_slice.body, gen);

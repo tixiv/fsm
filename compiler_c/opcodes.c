@@ -54,3 +54,15 @@ size_t push_opcode_sz(int kind, SV *value, uint64_t u64_value, uint64_t size) {
 
     return num_opcodes - 1;
 }
+
+size_t push_opcode_sz_sgn(int kind, SV *value, uint64_t u64_value, uint64_t size, bool _signed) {
+    Opcode * op = dyn_array_push(&opcodes_dyn);
+
+    op->kind = kind;
+    op->u64_value = u64_value;
+    if (value) op->string_value = *value;
+    op->size = size;
+    op->_signed = _signed;
+
+    return num_opcodes - 1;
+}

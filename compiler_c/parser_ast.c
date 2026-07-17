@@ -285,10 +285,11 @@ static AST_node *parse_primary()
         MOVE_NEXT();
         n->reference.body = parse_primary();
     }
-    else if (CT->kind == TOK_exclam) {
-        n = ast_alloc(AST_not, CT->line_number);
+    else if (CT->kind == TOK_exclam || CT->kind == TOK_minus) {
+        n = ast_alloc(AST_unary, CT->line_number);
+        n->unary.token_kind = CT->kind;
         MOVE_NEXT();
-        n->reference.body = parse_primary();
+        n->unary.body = parse_primary();
     }
     else if (CT->kind == TOK_plus_plus) {
         n = ast_alloc(AST_plus_plus, CT->line_number);

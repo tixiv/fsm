@@ -113,6 +113,10 @@ bool is_integer_kind(Type *t) {
     return t && (t->kind == T_unsigned_integer || t->kind == T_signed_integer);
 }
 
+bool is_signed_integer(Type *t) {
+    return t && (t->kind == T_signed_integer);
+}
+
 bool is_array_kind(Type *t) {
     return t->kind == T_array;
 }

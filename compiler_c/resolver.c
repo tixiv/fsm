@@ -174,7 +174,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_for:
         case AST_number:
         case AST_binary:
-        case AST_not:
+        case AST_unary:
         case AST_string:
         case AST_char_constant:
         case AST_array_access:

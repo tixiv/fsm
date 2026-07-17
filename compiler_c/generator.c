@@ -46,6 +46,23 @@ int32_t get_char_constant(SV str) {
     return c;
 }
 
+const char *make_movx(const char*reg, size_t size, bool _sigend) {
+    static char buf[20];
+    char sz = _sigend ? 's' : 'z';
+
+    switch (size) {
+        case 8: sprintf(buf, "mov %s,", reg); break;
+        case 4:
+            if (_sigend) sprintf(buf, "movsxd %s, DWORD ", reg);
+            else         sprintf(buf, "mov e%s, ", reg+1); // moving to eRx zero extends into rRx automatically
+            break;
+        case 2: sprintf(buf, "mov%cx %s, WORD ", sz, reg); break;
+        case 1: sprintf(buf, "mov%cx %s, BYTE ", sz, reg); break;
+        default: NOT_IMPLEMENTED("make_movx is not implemented for size %lu", size);
+    }
+    return buf;
+}
+
 void output_asm(const char *asm_file_name) {
     FILE *file = fopen(asm_file_name, "w");
 
@@ -66,6 +83,15 @@ void output_asm(const char *asm_file_name) {
     const char *builtin_functions =
     "fn_print:\n"
     "mov rdi, [rsp+8]\n"
+    "test rdi, rdi\n"
+    "jns @f\n"
+    "push rdi\n"
+    "push '-'\n"
+    "call fn_putc\n"
+    "pop rdi\n"
+    "pop rdi\n"
+    "neg rdi\n"
+    "@@:\n"
     "mov     r9, -3689348814741910323\n"
     "sub     rsp, 40\n"                 
     "mov     BYTE [rsp+31], 10\n"       
@@ -260,6 +286,9 @@ void output_asm(const char *asm_file_name) {
             case OP_not:
                 fprintf(file,"\t" "xor QWORD [rsp], 1\n");
                 break;
+            case OP_neg:
+                fprintf(file,"\t" "neg QWORD [rsp]\n");
+                break;
             case OP_equal:
                 fprintf(file,"\t" "mov rcx, 0\n");
                 fprintf(file,"\t" "mov rdx, 1\n");
@@ -342,7 +371,7 @@ void output_asm(const char *asm_file_name) {
                 break;
             case OP_push_arg:
                 if (t->size <= 8) {
-                    fprintf(file,"\t" "mov rax, [rbp+%lu]\n", 16 + t->u64_value);
+                    fprintf(file,"\t" "%s [rbp+%lu]\n", make_movx("rax", t->size, t->_signed), 16 + t->u64_value);
                     fprintf(file,"\t" "push rax\n");
                 }
                 else if (t->size <= 16) {
@@ -355,7 +384,7 @@ void output_asm(const char *asm_file_name) {
                 break;
             case OP_push_local_var:
                 if (t->size <= 8) {
-                    fprintf(file,"\t" "mov rax, [rbp-%lu]\n", t->u64_value);
+                    fprintf(file,"\t" "%s [rbp-%lu]\n", make_movx("rax", t->size, t->_signed) , t->u64_value);
                     fprintf(file,"\t" "push rax\n");
                 }
                 else if (t->size <= 16) {
@@ -627,11 +656,11 @@ void output_asm(const char *asm_file_name) {
                     sv_pop(&str);
                 }
 
-                if (str.len) fprintf(file, ", ");
+                fprintf(file, ", ");
             }
 
             // terminating null byte for C compatability
-            fprintf(file, ", 0");
+            fprintf(file, "0");
 
             fprintf(file, "\n");
         }

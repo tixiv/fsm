@@ -85,6 +85,7 @@ void append_fn_arg_type(Type *fn_type, Type *arg_type);
 const char *get_type_name_r(char print_buf[1024], Type *type);
 
 bool is_integer_kind(Type *t);
+bool is_signed_integer(Type *t);
 bool is_boolean_kind(Type *t);
 bool is_array_kind(Type *t);
 bool is_struct_kind(Type *t);
