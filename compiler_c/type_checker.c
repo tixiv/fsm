@@ -283,6 +283,7 @@ void type_check_call_args(AST_node *n_call) {
 
 typedef struct {
     Symbol *current_function_symbol;
+    Type *current_cuntion_type_decl;
     Dyn_array arg_symbols;
 } PropagationVisitorData;
 
@@ -293,12 +294,15 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
     switch (n->kind) {
         case AST_function:
             prop->current_function_symbol = n->fun.symbol;
+            prop->current_cuntion_type_decl = nullptr;
             n->fun.symbol->type = type_alloc(T_function);
-            
+
             if (n->fun.ret_typedecl) {
                 type_propagation_visitor(n->fun.ret_typedecl, prop);
                 n->fun.symbol->type->fun.return_type = n->fun.ret_typedecl->type;
+                prop->current_cuntion_type_decl = n->fun.ret_typedecl->type;
             }
+            
             if (n->fun.args) type_propagation_visitor(n->fun.args, prop);
             if (n->fun.body) type_propagation_visitor(n->fun.body, prop);
             prop->current_function_symbol = nullptr;
@@ -419,10 +423,9 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
         case AST_return:
             ASSERT(prop->current_function_symbol, "Encountered 'return' without active function symbol\n")
-            AST_node *ret_expression = n->ret.return_val;
             Type *ret_type;
-            if (ret_expression) 
-                ret_type = ret_expression->type;
+            if (n->ret.body) 
+                ret_type = n->ret.body->type;
             else
                 ret_type = &builtin_void;
 
@@ -431,8 +434,11 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             if (*fun_ret_type == nullptr) {
                 *fun_ret_type = ret_type;
             } else {
-                if (!types_are_equivalent(*fun_ret_type, ret_type)) {
-                    type_checker_error(n->line_number, "Returning different types from the same function. Have '%s' and '%s'.",
+                if (prop->current_cuntion_type_decl && prop->current_cuntion_type_decl != &builtin_void) {
+                    if (ret_type == &builtin_void) type_checker_error(n->line_number, "'return' without a value in function returning non void.\n");
+                    try_convert_to_type_if_necessary(&n->ret.body, prop->current_cuntion_type_decl, "Return argument");
+                } else if (!types_are_equivalent(*fun_ret_type, ret_type)) {
+                    type_checker_error(n->line_number, "Returning different types from the same function. Have '%s' and '%s'. Please declare a return type!\n",
                         get_type_name_r(buf_1, *fun_ret_type), get_type_name_r(buf_2, ret_type));
                 }
             }

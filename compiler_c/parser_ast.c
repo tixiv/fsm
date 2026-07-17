@@ -433,7 +433,7 @@ static AST_node *parse_statement()
 
         if (CT->kind != TOK_semicolon)
         {
-            n->ret.return_val = parse_expression();
+            n->ret.body = parse_expression();
         }
     }
     else if (CT->kind == TOK_keyword_let) {

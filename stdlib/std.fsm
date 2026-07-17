@@ -48,7 +48,7 @@ fn parse_integer (s: u8[]) {
     for ( ; s.len && is_numeric(s.begin); s++) {
         i = i * 10 + s.begin - '0';
     }
-    if (neg) return 0 - i;
+    if (neg) return -i;
     return i;
 }
 

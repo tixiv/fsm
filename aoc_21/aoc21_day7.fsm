@@ -49,7 +49,7 @@ fn main () {
                 fuel = fuel + fuel_calc(diff);
             }
             else {
-                fuel = fuel + fuel_calc(0 - diff);
+                fuel = fuel + fuel_calc(-diff);
             }
         }
         if (fuel < min_fuel) {

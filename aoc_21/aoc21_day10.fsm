@@ -30,11 +30,11 @@ fn get_completion_score(c) {
     return 0;
 }
 
-fn get_closing_for(c) {
-    if (c == '(') return ')' + 0;
-    if (c == '[') return ']' + 0;
-    if (c == '{') return '}' + 0;
-    if (c == '<') return '>' + 0;
+fn get_closing_for(c) :i32 {
+    if (c == '(') return ')';
+    if (c == '[') return ']';
+    if (c == '{') return '}';
+    if (c == '<') return '>';
 
     puts ("Error: no opening bracket: ") putc(c) puts("\n")
     return 0

@@ -361,7 +361,7 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
 
         case AST_return:
             ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
-            uint64_t return_size = n->ret.return_val ? n->ret.return_val->type->storage_size : 0;
+            uint64_t return_size = n->ret.body ? n->ret.body->type->storage_size : 0;
             push_opcode_sz(OP_return, nullptr, 0, return_size);
             break;
         

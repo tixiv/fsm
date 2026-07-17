@@ -112,7 +112,7 @@ typedef struct AST_node_s {
         } call;
 
         struct {
-            struct AST_node_s *return_val;
+            struct AST_node_s *body;
             bool implicit;
         } ret;
 

@@ -122,7 +122,7 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             ast_visit_chain(n->fun.body, visit, arg);            
             break;
         case AST_return:
-            visit_non_null(n->ret.return_val, visit, arg);
+            visit_non_null(n->ret.body, visit, arg);
             break;
         case AST_var_decl:
             visit_non_null(n->var_decl._typedecl, visit, arg);

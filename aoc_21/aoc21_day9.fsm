@@ -7,9 +7,9 @@ struct HeightMap {
     num_x;
 }
 
-fn get_height(map: HeightMap&, y, x) {
+fn get_height(map: HeightMap&, y, x) : u8 {
      if (0 <= y < map.num_y && 0 <= x < map.num_x) 
-        return map.arr[y][x] + 0;
+        return map.arr[y][x];
     return 9;
 }
 
