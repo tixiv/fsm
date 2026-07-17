@@ -110,9 +110,12 @@ fn main () {
 - [X] Return 128 bit structs from functions
 - [X] Char constants
 - [X] Implement bit functions
+- [ ] Implement unary minus operator
+- [ ] Implement scopes inside functions
+- [ ] Implement enums
+- [ ] Implement initializers for arrays and structs
 - [ ] Write more documentation
 - [ ] Implement null type for refs
-- [ ] Implement enums
 - [ ] Runtime bounds checks
 - [ ] Global variables
 - [ ] Implement function refs

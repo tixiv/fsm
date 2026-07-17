@@ -429,7 +429,7 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             break;
         default:
-            NOT_IMPLEMENTED("il_gen_visitor for %s is not implemented yet.\n", ast_kind_name(n->kind));
+            NOT_IMPLEMENTED("%s:%d il_gen_visitor for %s is not implemented yet.\n", current_filename, n->line_number, ast_kind_name(n->kind));
             break;
     }
 }

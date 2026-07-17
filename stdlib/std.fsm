@@ -28,6 +28,8 @@ fn is_alpha(c: i32) { return 'A' <= c <= 'Z' || 'a' <= c <= 'z' }
 fn is_allowed_at_start_of_identifier(c: i32) { return is_alpha(c) || c == '_' }
 fn is_allowed_in_identifier(c: i32) { return is_alpha(c) || is_numeric(c) || c == '_' }
 
+fn skip_whitespace (s: u8[]&) { while (s.len && is_whitespace(s.begin)) s++ }
+
 fn sv_equal (s1: u8[], s2: u8[]) {
     if (s1.len != s2.len) return 0;
     for (let i = 0; i < s1.len; i = i + 1)
@@ -57,4 +59,33 @@ fn print_hex(num: u64) {
         a[i] = if (d < 10) d + '0' else d + 'A' - 10;
     }
     puts(a)
+}
+
+fn quicksort64_partition(arr: i64[], lo, hi) {
+    let pivot = arr[lo]
+    let i = lo - 1
+    let j = hi + 1
+
+    for (;;) {
+        i++
+        while (arr[i] < pivot) i++
+
+        j--
+        while (arr[j] > pivot) j--
+
+        if (i >= j) return j
+
+        let tmp = arr[i]
+        arr[i] = arr[j]
+        arr[j] = tmp
+    }
+    return 0;
+}
+
+fn quicksort64(arr: i64[], lo, hi) : void {
+    if (lo >= 0 && hi >= 0 && lo < hi) {
+        let p = quicksort64_partition(arr, lo, hi)
+        quicksort64(arr, lo, p)
+        quicksort64(arr, p + 1, hi)
+    }
 }

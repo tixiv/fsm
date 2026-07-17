@@ -336,6 +336,9 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             else if (n->var_decl.initializer) {
                 if (n->var_decl.initializer_operator == TOK_equal_assign) {
                     t = n->var_decl.initializer->type;
+                    if (t == &builtin_void) {
+                        type_checker_error(n->line_number, "Can't initialize variable with 'void' type.\n");
+                    }
                     int ord = get_ref_order(t);
                     if (ord >= 2) {
                         type_checker_error(n->line_number, "Can't dereference references of order >1 in value initialization. Have '%'",
@@ -346,6 +349,9 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                         t = dereferenced_type(t);
                     }
                 } else if (n->var_decl.initializer_operator == TOK_bind_ref) {
+                    if (n->var_decl.initializer->type == &builtin_void) {
+                        type_checker_error(n->line_number, "Can't bind a reference to 'void' type target.\n");
+                    }
                     if (!is_reference_kind(n->var_decl.initializer->type)) {
                         t = get_ref_type_for(n->var_decl.initializer->type);
                         insert_take_reference(&n->var_decl.initializer);
@@ -442,7 +448,8 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_for:
-            try_convert_to_type_if_necessary(&n->_for.condition, &builtin_bool, "'for' loop condition");
+            if (n->_for.condition)
+                try_convert_to_type_if_necessary(&n->_for.condition, &builtin_bool, "'for' loop condition");
             n->type = &builtin_void;
             n->addressable = false;
             break;

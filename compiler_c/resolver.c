@@ -48,15 +48,17 @@ static Symbol *get_symbol_by_name(Dyn_array *arr, SV *name) {
     return nullptr;
 }
 
-static void push_symbol(Dyn_array *arr, Symbol *s, int line_number) {
-    Symbol *conflicting = get_symbol_by_name(arr, &s->name);
+static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, bool do_undefined_error);
+
+static void push_symbol(Resolver *res, Dyn_array *arr, Symbol *s, int line_number) {
+    Symbol *conflicting = resolver_lookup_symbol(res,  &s->name, line_number, false);
     if (conflicting) {
         resolver_error(line_number, "Symbol '%.*s' redefined\n", SV_prnt(s->name));
         return;
     }
 
     dyn_array_push_p(arr, s);
-}       
+}     
 
 Dyn_array builtin_functions; // Dyn_array<Symbol*>
 
@@ -91,7 +93,7 @@ void init_builtin_functions() {
     declare_builtin_fn(mkSV("bitnot"), &builtin_u64, 1, (Type*[]){&builtin_u64});
 }
 
-static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number) {
+static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, bool do_undefined_error) {
     // locals
     Symbol *s = get_symbol_by_name(&res->local_symbols, name);
     if (s) return s;
@@ -104,7 +106,9 @@ static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number) 
     s = get_symbol_by_name(&builtin_functions, name);
     if (s) return s;
 
-    resolver_error(line_number, "Undefined symbol %.*s", SV_prnt(*name));
+    if(do_undefined_error)
+        resolver_error(line_number, "Undefined symbol %.*s", SV_prnt(*name));
+    
     return nullptr;
 }
 
@@ -124,7 +128,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
 
         case AST_function: {
             Symbol *s_fun = alloc_symbol(SYM_global, n->fun.name);
-            push_symbol(&global_symbols, s_fun, n->line_number);
+            push_symbol(res, &global_symbols, s_fun, n->line_number);
             n->fun.symbol = s_fun;
             resolver_enter_function(res, s_fun);
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
@@ -135,7 +139,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_arg_decl: {
             ASSERT(res->current_function, "Found function argument declaration for '%.*s' outside of function\n", SV_prnt(n->arg_decl.name));
             Symbol *s_arg = alloc_symbol(SYM_arg, n->arg_decl.name);
-            push_symbol(&res->local_symbols, s_arg, n->line_number);
+            push_symbol(res, &res->local_symbols, s_arg, n->line_number);
             n->arg_decl.symbol = s_arg;
             break;
         }
@@ -143,18 +147,18 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_var_decl: {
             ASSERT(res->current_function, "Found local variable declaration for '%.*s' outside of function\n", SV_prnt(n->var_decl.name));
             Symbol *s_var = alloc_symbol(SYM_local, n->var_decl.name);
-            push_symbol(&res->local_symbols, s_var, n->line_number);
+            push_symbol(res, &res->local_symbols, s_var, n->line_number);
             n->var_decl.symbol = s_var;
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             break;
         }
 
         case AST_symbol:
-            n->symbol.symbol = resolver_lookup_symbol(res, &n->symbol.name, n->line_number);
+            n->symbol.symbol = resolver_lookup_symbol(res, &n->symbol.name, n->line_number, true);
             break;
 
         case AST_call:
-            n->call.symbol = resolver_lookup_symbol(res, &n->call.name, n->line_number);
+            n->call.symbol = resolver_lookup_symbol(res, &n->call.name, n->line_number, true);
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             break;
 
