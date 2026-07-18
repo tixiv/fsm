@@ -5,6 +5,7 @@
 #include "common.h"
 #include "type.h"
 #include <malloc.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -98,6 +99,15 @@ void ast_visit_chain(AST_node *n, void (*visit)(AST_node *, void *arg), void *ar
         visit(n, arg);
         n = n->next;
     }
+}
+
+size_t ast_count_chain(AST_node *n) {
+    size_t num = 0;
+    while (n) {
+        num++;
+        n = n->next;
+    }
+    return num;
 }
 
 void visit_non_null(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg) {

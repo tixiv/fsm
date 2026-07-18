@@ -89,3 +89,51 @@ fn quicksort64(arr: i64[], lo, hi) : void {
         quicksort64(arr, p + 1, hi)
     }
 }
+
+struct StringBuilder {
+    buffer: u8[];
+    str: u8[];
+}
+
+fn sb_init(sb: StringBuilder&, buffer: u8[]) {
+    sb.buffer = buffer
+    sb.str.begin => buffer.begin
+    sb.str.len = 0
+}
+
+fn sb_puts(sb: StringBuilder&, s: u8[]) {
+    while (sb.buffer.len && s.len) {
+        sb.buffer.begin = s.begin
+        sb.buffer++ s++
+        sb.str.len++
+    }
+}
+
+fn sb_putc(sb: StringBuilder&, c: u8) {
+    if (sb.buffer.len) {
+        sb.buffer.begin = c
+        sb.buffer++
+        sb.str.len++
+    }
+}
+
+fn sb_puti(sb: StringBuilder&, num) {
+    if (num < 0) {
+        if (num == 0x8000000000000000) {
+            // This one is not representable as positive integer
+            sb_puts(sb, "-9223372036854775808")
+            return;
+        }
+        num = -num
+        sb_putc(sb, '-')
+    }
+    let zero_blank = 1
+    for (let a = 1000000000000000000; a != 0; a = a / 10) {
+        let digit = num / a
+        num = num - a * digit
+        if (!(digit == 0 && zero_blank && a > 1)) {
+            zero_blank = 0
+            sb_putc(sb, digit + '0')
+        }
+    }
+}

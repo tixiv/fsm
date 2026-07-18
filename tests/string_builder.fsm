@@ -1,0 +1,25 @@
+
+import * from "std";
+
+fn main () {
+    let a = 23;
+
+    let sb: StringBuilder;
+    let arr: u8[1024];
+    for (let i = -5; i < 101; i++) {
+        sb_init(sb, arr);
+        sb_puts(sb, "a is ");
+        sb_puti(sb, i);
+        sb_puts(sb, " now.\n");
+        puts(sb.str);
+    }
+
+    sb_init(sb, arr);
+    sb_puti(sb, -0x8000000000000000);
+    sb_puts(sb, "\n")
+    sb_puti(sb, -0x7fffffffffffffff);
+    sb_puts(sb, "\n")
+    sb_puti(sb,  0x7fffffffffffffff);
+    sb_puts(sb, "\n")
+    puts(sb.str)
+}

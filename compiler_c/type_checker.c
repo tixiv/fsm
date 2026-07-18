@@ -314,18 +314,20 @@ void type_check_variadic_operator (AST_node *n){
 
 void type_check_call_args(AST_node *n_call) {
     Type *symbol_type = n_call->call.symbol->type;
-    int num_args = symbol_type->fun.num_arguments;
+    int num_args_expected = symbol_type->fun.num_arguments;
+    int num_args = ast_count_chain(n_call->call.args);
+
+    if (num_args < num_args_expected) type_checker_error(n_call->line_number, "Not enough arguments to function call.\n");
+    if (num_args > num_args_expected) type_checker_error(n_call->line_number, "Too many arguments to function call.\n");
 
     AST_node **arg = &n_call->call.args;
     for (int i = 0; i < num_args; i++) {
         Type *expected_type = symbol_type->fun.argument_types[i];
-        if (*arg == nullptr) type_checker_error(n_call->line_number, "Not enough arguments to function call.\n");
+        
         try_convert_to_type_if_necessary(arg, expected_type, "Function argument");
 
         arg = &(*arg)->next;
     }
-
-    if (*arg) type_checker_error(n_call->line_number, "Too many arguments to function call.\n");
 }
 
 typedef struct {

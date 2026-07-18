@@ -226,9 +226,11 @@ void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
 TypeResolverState trs;
 
 void run_type_resolver(AST_node *root) {
-    dyn_array_init(&dyn_structs, sizeof(void*), 32);
-    dyn_array_init(&dyn_enums, sizeof(void*), 32);
-
     type_lookup_visitor(root, nullptr);
     type_resolver_visitor(root, &trs);
+}
+
+void type_resolver_init() {
+    dyn_array_init(&dyn_structs, sizeof(void*), 32);
+    dyn_array_init(&dyn_enums, sizeof(void*), 32);
 }

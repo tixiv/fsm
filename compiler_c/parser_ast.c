@@ -307,15 +307,16 @@ static AST_node *parse_primary()
     }
     else if (CT->kind == TOK_identifier) {
         SV* name = &CT->value;
+        int line_number = CT->line_number;
         MOVE_NEXT();
 
         if (CT->kind == TOK_lparen) {
             n = ast_alloc(AST_call, CT->line_number);
             n->call.name = *name;
-            n->call.args = parse_call_arguments(name);
+            n->call.args = parse_call_arguments();
         }
         else {
-            n = ast_alloc(AST_symbol, CT->line_number);
+            n = ast_alloc(AST_symbol, line_number);
             n->symbol.name = *name;
 
             while (CT->kind == TOK_lbracket || CT->kind == TOK_dot || CT->kind == TOK_colon_colon) {

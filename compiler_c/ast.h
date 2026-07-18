@@ -281,5 +281,5 @@ typedef void (*AstVisitor)(AST_node *, void *);
 
 void ast_visit_chain(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg);
 void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg);
-
+size_t ast_count_chain(AST_node *n);
 void ast_dump_tree (AST_node *root);
