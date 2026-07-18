@@ -133,3 +133,7 @@ size_t get_stack_offset_for(Type *t);
 
 struct AST_node_s;
 struct AST_node_s *make_cast(Type *to, Type *from);
+
+int64_t get_max_enum_value (Type *t);
+int64_t get_min_enum_value (Type *t);
+EnumMember *get_enum_member_by_value(Type *t, int64_t value);

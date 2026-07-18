@@ -66,3 +66,13 @@ size_t push_opcode_sz_sgn(int kind, SV *value, uint64_t u64_value, uint64_t size
 
     return num_opcodes - 1;
 }
+
+size_t push_opcode_tp(int kind, SV *value, struct Type_s *type) {
+    Opcode * op = dyn_array_push(&opcodes_dyn);
+
+    op->kind = kind;
+    op->type = type;
+    if (value) op->string_value = *value;
+
+    return num_opcodes - 1;
+}

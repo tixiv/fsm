@@ -447,11 +447,21 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             break;
 
 
-        case AST_member_access:
-            ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
-            push_opcode(OP_member_access, nullptr, n->member_access.offset);
+        case AST_member_access: {
+            Type *t = n->member_access.body->type;
+            if (is_reference_kind(t) && is_struct_kind(dereferenced_type(t))) {
+                ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+                push_opcode(OP_member_access, nullptr, n->member_access.offset);
+            }
+            else if (is_enum_kind(t)) {
+                ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+                push_opcode_tp(OP_get_enum_member_name, nullptr, t);
+            }
+            else NOT_IMPLEMENTED("Member acces for type %s is not implemented yet.\n",
+                get_type_name_r(buf, t));
+            
             break;
-
+        }
         case AST_namespace_access:
             if (is_enum_kind(n->type)) {
                 push_opcode(OP_push_literal, nullptr, n->namespace_access.enum_value);

@@ -719,8 +719,11 @@ static AST_node *parse_enum() {
                 MOVE_NEXT();
                 if (CT->kind == TOK_equal_assign) {
                     MOVE_NEXT();
+                    bool neg = CT->kind == TOK_minus;
+                    if (neg) MOVE_NEXT();
                     expect_token(TOK_number);
-                    latest_value = strtol(CT->value.begin, nullptr, 0);
+                    latest_value = strtoul(CT->value.begin, nullptr, 0);
+                    if (neg) latest_value = -latest_value;
                     MOVE_NEXT();
                 }
                 member->_enum_member.value = latest_value++;

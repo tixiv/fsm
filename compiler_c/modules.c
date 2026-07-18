@@ -55,7 +55,7 @@ void read_file(SV *contents, const char *path)
 
 
 bool debug_tokens = false;
-bool debug_ast = true;
+bool debug_ast = false;
 
 void compile_module(const char *filename) {
     current_module = dyn_array_push(&modules);

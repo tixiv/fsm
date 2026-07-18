@@ -130,7 +130,8 @@ fn main () {
 - [X] Implement bit functions
 - [X] Implement unary minus operator
 - [X] Implement scopes inside functions
-- [ ] Implement enums
+- [X] Implement enums
+- [ ] Formatted string printing
 - [ ] Implement initializers for arrays and structs
 - [ ] Write more documentation
 - [ ] Implement null type for refs

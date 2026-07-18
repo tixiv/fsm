@@ -362,3 +362,26 @@ size_t get_stack_offset_for(Type *t) {
 
     return ((size + 7) / 8) * 8;
 }
+
+int64_t get_max_enum_value (Type *t) {
+    int64_t max = -0x8000000000000000;
+    for (size_t i = 0; i < t->_enum.num_members; i++) {
+        if (t->_enum.members[i].value > max) max = t->_enum.members[i].value;
+    }
+    return max;
+}
+
+int64_t get_min_enum_value (Type *t) {
+    int64_t min = 0x7fffffffffffffff;
+    for (size_t i = 0; i < t->_enum.num_members; i++) {
+        if (t->_enum.members[i].value < min) min = t->_enum.members[i].value;
+    }
+    return min;
+}
+
+EnumMember *get_enum_member_by_value(Type *t, int64_t value) {
+    for (size_t i = 0; i < t->_enum.num_members; i++) {
+        if (t->_enum.members[i].value == value) return &t->_enum.members[i];
+    }
+    return nullptr;
+}

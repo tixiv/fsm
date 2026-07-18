@@ -1,19 +1,23 @@
 
 enum Animal {
-    Goat = 5,
+    Goat = -1,
     Cow,
     Dog,
+    Cat,
     Max
 }
 
-fn print_animal(a: Animal) {
-    if (a == Animal::Goat) puts("Goat")
-    if (Animal::Cow == a) puts("Cow");
-    if (a == Animal::Dog) puts("Dog");
+fn sound(a: Animal) {
+    if (a == Animal::Goat) return "Mäh";
+    if (Animal::Cow == a) return "Mooo";
+    if (a == Animal::Dog) return "Wuff";
+    if (a == Animal::Cat) return "Miau";
+    return "";
 }
 
 fn main () {
     for (let i: i64 = Animal::Goat; i < Animal::Max; i++) {
-        print_animal(i) puts (" ") print (i)
+        let a: Animal = i;
+        puts("The ") puts(a.name) puts(" goes ") puts(sound(i)) puts ("\n")
     }
 }

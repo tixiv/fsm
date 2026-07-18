@@ -53,6 +53,7 @@
     X(OP_bitnot) \
     X(OP_setbit) \
     X(OP_pop) \
+    X(OP_get_enum_member_name) \
 
 enum Op_Kind {
 #define X(name) name,
@@ -66,6 +67,7 @@ typedef struct {
     int kind;
     SV string_value;
     union {
+        struct Type_s *type;
         uint64_t u64_value;
         uint32_t u32_value[2];
     };
@@ -83,3 +85,4 @@ void dump_opcodes();
 size_t push_opcode(int kind, SV *value, uint64_t u64_value);
 size_t push_opcode_sz(int kind, SV *value, uint64_t u64_value, uint64_t size);
 size_t push_opcode_sz_sgn(int kind, SV *value, uint64_t u64_value, uint64_t size, bool _signed);
+size_t push_opcode_tp(int kind, SV *value, struct Type_s *type);
