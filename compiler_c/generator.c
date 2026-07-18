@@ -296,6 +296,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "pop rbx\n");
                 fprintf(file,"\t" "cmp rax, rbx\n");
                 fprintf(file,"\t" "cmove rcx, rdx\n");
+                if (t->u64_value) fprintf(file,"\t" "push rbx\n"); // chaining value: left operand
                 fprintf(file,"\t" "push rcx\n");
                 break;
             case OP_unequal:
@@ -305,6 +306,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "pop rbx\n");
                 fprintf(file,"\t" "cmp rax, rbx\n");
                 fprintf(file,"\t" "cmove rcx, rdx\n");
+                if (t->u64_value) fprintf(file,"\t" "push rbx\n"); // chaining value: left operand
                 fprintf(file,"\t" "push rcx\n");
                 break;
             case OP_compare_GT:
@@ -314,6 +316,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "pop rax\n");
                 fprintf(file,"\t" "cmp rax, rbx\n");
                 fprintf(file,"\t" "cmovg rcx, rdx\n");
+                if (t->u64_value) fprintf(file,"\t" "push rbx\n"); // chaining value: right operand
                 fprintf(file,"\t" "push rcx\n");
                 break;
             case OP_compare_LT:
@@ -323,6 +326,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "pop rax\n");
                 fprintf(file,"\t" "cmp rax, rbx\n");
                 fprintf(file,"\t" "cmovl rcx, rdx\n");
+                if (t->u64_value) fprintf(file,"\t" "push rbx\n"); // chaining value: right operand
                 fprintf(file,"\t" "push rcx\n");
                 break;
             case OP_compare_GE:
@@ -332,6 +336,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "pop rax\n");
                 fprintf(file,"\t" "cmp rax, rbx\n");
                 fprintf(file,"\t" "cmovge rcx, rdx\n");
+                if (t->u64_value) fprintf(file,"\t" "push rbx\n"); // chaining value: right operand
                 fprintf(file,"\t" "push rcx\n");
                 break;
             case OP_compare_LE:
@@ -341,6 +346,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"\t" "pop rax\n");
                 fprintf(file,"\t" "cmp rax, rbx\n");
                 fprintf(file,"\t" "cmovle rcx, rdx\n");
+                if (t->u64_value) fprintf(file,"\t" "push rbx\n"); // chaining value: right operand
                 fprintf(file,"\t" "push rcx\n");
                 break;
             case OP_push_literal:
@@ -627,6 +633,10 @@ void output_asm(const char *asm_file_name) {
             case OP_bitnot:
                 fprintf(file, "\t" "mov rax,-1\n");
                 fprintf(file, "\t" "xor QWORD [rsp], rax\n");
+                break;
+
+            case OP_pop:
+                fprintf(file, "\t" "pop rax\n");
                 break;
             
             default:

@@ -52,6 +52,7 @@
     X(OP_bitxor) \
     X(OP_bitnot) \
     X(OP_setbit) \
+    X(OP_pop) \
 
 enum Op_Kind {
 #define X(name) name,

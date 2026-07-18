@@ -6,6 +6,7 @@
 #include "sv.h"
 #include "tokenizer.h"
 #include "type.h"
+#include "parser_ast.h"
 #include <stdarg.h>
 #include <stdint.h>
 
@@ -18,6 +19,17 @@ static void il_gen_error(int line_number, const char * fmt, ...) {
     fprintf(stderr, "\n");
 
     exit(EXIT_FAILURE);
+    va_end(args);
+}
+
+static void il_gen_warning(int line_number, const char * fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    fprintf(stderr, "[FSM IL Gen] Line %d Warning: ", line_number);
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
+
     va_end(args);
 }
 
@@ -127,6 +139,82 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen, bool result_used) {
                 NOT_IMPLEMENTED("Generating IL for binary operator %s is not implemented yet.\n", token_kind_name(n->binary.token_kind));
         }
     }
+}
+
+static void gen_variadic_operator_members_and(AST_node *n, IL_gen *gen, size_t i) {
+    gen_value_visitor(n->variadic_operator.members[i].right, gen);
+
+    switch (n->variadic_operator.members[i].token_kind) {
+        case TOK_greater:       push_opcode(OP_compare_GT, nullptr, 1); break;
+        case TOK_lower:         push_opcode(OP_compare_LT, nullptr, 1); break;
+        case TOK_greater_equal: push_opcode(OP_compare_GE, nullptr, 1); break;
+        case TOK_lower_equal:   push_opcode(OP_compare_LE, nullptr, 1); break;
+        case TOK_and_not_equal_to:
+        case TOK_unequal:       push_opcode(OP_unequal, nullptr, 1); break;
+
+        default: ASSERT(false, "Illegal comparison operator.\n");
+    }
+    
+    // short circuit logic:
+    int if_num = num_ifs++;
+    push_opcode(OP_if, nullptr, 0x100000000 | if_num);
+    if (i+1 < n->variadic_operator.num_members) {
+        gen_variadic_operator_members_and(n, gen, i+1);
+    }
+    else {
+        push_opcode(OP_pop, nullptr, 0);
+        push_opcode(OP_push_literal, &mkSV("1"), 0);
+    }
+
+    push_opcode(OP_else, nullptr, if_num);
+    push_opcode(OP_pop, nullptr, 0);
+    push_opcode(OP_push_literal, &mkSV("0"), 0);
+    push_opcode(OP_end_if, nullptr, if_num);
+}
+
+static void gen_variadic_operator_members_or(AST_node *n, IL_gen *gen, size_t i) {
+    gen_value_visitor(n->variadic_operator.members[i].right, gen);
+
+    switch (n->variadic_operator.members[i].token_kind) {
+        case TOK_equal:
+        case TOK_or_equal_to:
+            push_opcode(OP_equal, nullptr, 1);
+            break;
+        default: ASSERT(false, "Illegal comparison operator.\n");
+    }
+    
+    // short circuit logic:
+    int if_num = num_ifs++;
+    push_opcode(OP_if, nullptr, 0x100000000 | if_num);
+    push_opcode(OP_pop, nullptr, 0);
+    push_opcode(OP_push_literal, &mkSV("1"), 0);
+    push_opcode(OP_else, nullptr, if_num);
+    if (i+1 < n->variadic_operator.num_members) {
+        gen_variadic_operator_members_or(n, gen, i+1);
+    }
+    else
+    {
+        push_opcode(OP_pop, nullptr, 0);
+        push_opcode(OP_push_literal, &mkSV("0"), 0);
+    }
+
+    push_opcode(OP_end_if, nullptr, if_num);
+}
+
+static void gen_variadic_operators(AST_node *n, IL_gen *gen, bool result_used) {
+    TokenKind first_token = n->variadic_operator.members[0].token_kind;
+
+    if (is_comparison_operator(first_token) || first_token == TOK_unequal) {
+        gen_value_visitor(n->variadic_operator.left, gen);
+        gen_variadic_operator_members_and(n, gen, 0);
+    }
+    else if (first_token == TOK_equal) {
+        gen_value_visitor(n->variadic_operator.left, gen);
+        gen_variadic_operator_members_or(n, gen, 0);
+    }
+    else NOT_IMPLEMENTED("Generating IL for variadic operator %s is not implemented yet.\n", token_kind_name(first_token));
+
+    if (!result_used) push_opcode(OP_pop, nullptr, 0);
 }
 
 static void gen_cast(AST_node *n) {
@@ -286,6 +374,10 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             gen_binary_operators(n, gen, true);
             break;
 
+        case AST_variadic_operator:
+            gen_variadic_operators(n, gen, true);
+            break;
+
         case AST_if:
             gen_if(n, gen, true);
             break;
@@ -438,6 +530,15 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
             gen_address_visitor(n->minus_minus.body, gen);
             push_opcode_sz(OP_integer_minus_minus, nullptr, 0, n->type->storage_size);
             break;
+
+        case AST_dereference:
+        case AST_member_access:
+        case AST_reference:
+        case AST_symbol:
+            il_gen_warning(n->line_number, "unused code.");
+            ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
+            break;
+
 
         case AST_cast:
         case AST_number:

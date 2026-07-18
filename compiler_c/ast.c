@@ -205,6 +205,12 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_type_slice:
             visit_non_null(n->_type_slice.body, visit, arg);
             break;
+        case AST_variadic_operator:
+            visit_non_null(n->variadic_operator.left, visit, arg);
+            for (int i = 0; i < n->variadic_operator.num_members; i++) {
+                visit_non_null(n->variadic_operator.members[i].right, visit, arg);
+            }
+            break;
 
         case AST_enum_member:
         case AST_symbol:
@@ -331,6 +337,10 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             break;
         case AST_unary:
             printf("%.*s%s %s (%s)\n", (int)spaces, spc, kind_name, token_kind_name(n->unary.token_kind), get_type_name_r(buf, n->type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_variadic_operator:
+            printf("%.*s%s %s (%s)\n", (int)spaces, spc, kind_name, token_kind_name(n->variadic_operator.members[0].token_kind), get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_symbol:

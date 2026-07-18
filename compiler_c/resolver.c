@@ -175,6 +175,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_while:
         case AST_number:
         case AST_binary:
+        case AST_variadic_operator:
         case AST_unary:
         case AST_string:
         case AST_char_constant:

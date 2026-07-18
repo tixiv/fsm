@@ -10,6 +10,7 @@
 #include "resolver.h"
 #include <stdarg.h>
 #include <stdint.h>
+#include <string.h>
 
 static void type_checker_error(int line_number, const char * fmt, ...) {
     va_list args;
@@ -267,7 +268,48 @@ void type_propagate_binary_operator(AST_node *n) {
                 break;
         }
     }
+}
 
+void type_check_variadic_operator (AST_node *n){
+    switch (n->variadic_operator.members[0].token_kind) {
+        case TOK_greater:
+        case TOK_lower:
+        case TOK_greater_equal:
+        case TOK_lower_equal:
+            for (int i = 0; i < n->variadic_operator.num_members; i++) {
+                try_convert_to_type_if_necessary(&n->variadic_operator.left, &builtin_i64, "Argument of variadic operator");
+                try_convert_to_type_if_necessary(&n->variadic_operator.members[i].right, &builtin_i64, "Argument of variadic operator");                
+            }
+            n->type = &builtin_bool;
+            n->addressable = false;
+            break;
+        
+        case TOK_equal:
+        case TOK_unequal:
+            auto_dereference(&n->variadic_operator.left);
+            
+            Type *left_type = n->variadic_operator.left->type;
+            bool all_same_type = true;
+            bool all_integer = is_integer_kind(left_type);
+
+            for (int i = 0; i < n->variadic_operator.num_members; i++) {
+                auto_dereference(&n->variadic_operator.members[i].right);
+                if (left_type != n->variadic_operator.members[i].right->type) all_same_type = false;
+                if (!is_integer_kind(n->variadic_operator.members[i].right->type)) all_integer = false;
+            }
+
+            if (!all_same_type && !all_integer) {
+                type_checker_error(n->line_number, "Chained operator %s can't accept arguments with different types.",
+                    token_kind_printable(n->variadic_operator.members[0].token_kind));
+            }
+            n->type = &builtin_bool;
+            n->addressable = false;
+            break;
+
+        default: NOT_IMPLEMENTED("Type checking variadic operator %s is not implemented yet.",
+            token_kind_printable(n->variadic_operator.members[0].token_kind))
+            break;
+    }
 }
 
 void type_check_call_args(AST_node *n_call) {
@@ -526,17 +568,9 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
         case AST_dereference:
             if (!is_reference_kind(n->deref.body->type)) {
-                if (n->deref.body->kind == AST_array_len) {
-                    // Parser inserted dereference for member access. We need
-                    // it for structs, but it needs to be removed if the member access
-                    // is 'fake' because it's an array len
-                    ast_remove_node(n);
-                }
-                else {
                     type_checker_error(n->line_number,
                         "Dereferencing something that is not a reference. Have '%s'.\n",
                         get_type_name_r(buf_1, n->deref.body->type));
-                }
             } else {
                 n->type = dereferenced_type(n->deref.body->type);
                 n->addressable = true;
@@ -614,6 +648,17 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                 n->type = get_ref_type_for(t);
                 n->member_access.offset = offset;
                 n->addressable = true;
+
+                // We need to insert a dereference node now at this point in the tree.
+                // copy the current node to a new one:
+                AST_node *ast_member_access = ast_alloc(AST_member_access, n->line_number);
+                memcpy(ast_member_access, n, sizeof(AST_node));
+                ast_member_access->next = nullptr; // clear next pointer in case it was used
+
+                // Now we overwrite the current node, making it the dereference node with the member acces in it's body
+                n->kind = AST_dereference;
+                n->deref.body = ast_member_access;
+                n->type = dereferenced_type(ast_member_access->type);
             }
             else if (is_array_kind(container)) {
                 if(sv_compare_cstr(&n->member_access.name, "len")) {
@@ -626,7 +671,18 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                     type_checker_error(n->line_number, "Tried to access non existent member '%.*s' on array type. Arrays only have the member 'len' available.\n",
                             SV_prnt(n->member_access.name));
                 }
-            } else {
+            }
+            else if (is_enum_kind(container)) {
+                if(sv_compare_cstr(&n->member_access.name, "name")) {
+                    n->addressable = false;
+                    n->type = &builtin_u8_slice;
+                }
+                else {
+                    type_checker_error(n->line_number, "Tried to access non existent member '%.*s' on enum type. Enums only have the member 'name' available.\n",
+                            SV_prnt(n->member_access.name));
+                }
+            }
+            else {
                 NOT_IMPLEMENTED("accessing members in '%s' is not implemented yet.\n", get_type_name_r(buf_1, container));
             }
 
@@ -647,6 +703,10 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             else NOT_IMPLEMENTED("Namespace access is not implemented yet for typ %s.\n", get_type_name_r(buf_1, t));
             break;
         }
+
+        case AST_variadic_operator:
+            type_check_variadic_operator(n);
+            break;
 
         case AST_typename:
         case AST_member_def:

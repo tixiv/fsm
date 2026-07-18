@@ -7,7 +7,6 @@
 #include "opcodes.h"
 #include "generator.h"
 #include "ast_to_il.h"
-#include "operator_chaining.h"
 #include "resolver.h"
 #include "type_checker.h"
 #include "type_resolver.h"

@@ -43,6 +43,7 @@ typedef struct {
     X(AST_char_constant) \
     X(AST_symbol) \
     X(AST_binary) \
+    X(AST_variadic_operator) \
     X(AST_unary) \
     X(AST_call) \
     X(AST_return) \
@@ -76,6 +77,11 @@ typedef enum {
 
 const char *ast_kind_name(AST_kind kind);
 
+typedef struct {
+    TokenKind token_kind;
+    struct AST_node_s *right;
+} VariadicOperatorMember;
+
 typedef struct AST_node_s {
     struct AST_node_s *next;
     AST_kind kind;
@@ -89,6 +95,12 @@ typedef struct AST_node_s {
             struct AST_node_s *right;
             TokenKind token_kind;
         } binary;
+
+        struct {
+            struct AST_node_s *left;
+            int num_members;
+            VariadicOperatorMember *members;
+        } variadic_operator;
 
         struct {
             struct AST_node_s *args;

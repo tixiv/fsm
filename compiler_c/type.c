@@ -158,7 +158,7 @@ Type *dereferenced_type(Type *t) {
 }
 
 bool type_can_have_members(Type *t) {
-    return t->kind == T_struct || t->kind == T_array || t->kind == T_slice;
+    return t->kind == T_struct || t->kind == T_array || t->kind == T_slice || t->kind == T_enum;
 }
 
 size_t get_storage_size(Type *t) {

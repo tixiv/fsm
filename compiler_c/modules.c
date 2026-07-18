@@ -9,7 +9,6 @@
 #include "opcodes.h"
 #include "generator.h"
 #include "ast_to_il.h"
-#include "operator_chaining.h"
 #include "resolver.h"
 #include "type_checker.h"
 #include "type_resolver.h"
@@ -56,7 +55,7 @@ void read_file(SV *contents, const char *path)
 
 
 bool debug_tokens = false;
-bool debug_ast = false;
+bool debug_ast = true;
 
 void compile_module(const char *filename) {
     current_module = dyn_array_push(&modules);
@@ -70,8 +69,6 @@ void compile_module(const char *filename) {
         dump_tokens();
 
     AST_node *ast = parse_program_ast();
-
-    chain_operators(ast);
 
     run_type_resolver(ast);
 

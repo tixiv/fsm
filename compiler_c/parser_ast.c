@@ -333,13 +333,11 @@ static AST_node *parse_primary()
                 } 
                 if (CT->kind == TOK_dot) {
                     AST_node *ast_member_access = ast_alloc(AST_member_access, CT->line_number);
-                    AST_node *deref = ast_alloc(AST_dereference, CT->line_number);
                     MOVE_NEXT();
                     expect_token(TOK_identifier);
                     ast_member_access->member_access.body = n;
                     ast_member_access->member_access.name = CT->value;
-                    deref->deref.body = ast_member_access;
-                    n = deref;
+                    n = ast_member_access;
                     MOVE_NEXT();
                 }
                 if (CT->kind == TOK_colon_colon) {
@@ -406,21 +404,60 @@ static bool is_in_prio(int op, int prio) {
     return false;
 }
 
+bool is_comparison_operator(int op) {
+    return op == TOK_greater || op == TOK_lower || op == TOK_greater_equal || op == TOK_lower_equal;
+}
+
+static bool is_chainable(int left, int right) {
+    return (is_comparison_operator(left) && is_comparison_operator(right))
+    || ((left == TOK_equal || left == TOK_or_equal_to) && right == TOK_or_equal_to)
+    || ((left == TOK_unequal || left == TOK_and_not_equal_to) && right == TOK_and_not_equal_to);
+}
+
 static AST_node *parse_binary_operators(int prio) {
     if (prio == NUM_PRIOS) return parse_primary();
     
     AST_node *left = parse_binary_operators(prio + 1);
 
+    AST_node *last = nullptr;
     while (is_in_prio(CT->kind, prio)) {
-        AST_node *n = ast_alloc(AST_binary, CT->line_number);
-        n->binary.left = left;
-        n->binary.token_kind = CT->kind;
-        
-        MOVE_NEXT();
+        if (!last) {
+            if (CT->kind == TOK_or_equal_to) parser_error(CT->line_number, "Operator '|==' requires initial '=='.");
+            if (CT->kind == TOK_and_not_equal_to) parser_error(CT->line_number, "Operator '&!=' requires initial '!='.");
+        }
 
-        n->binary.right = parse_binary_operators(prio + 1);
+        if (last && is_chainable(last->binary.token_kind, CT->kind)) {
+            Dyn_array members;
+            #define MEMBERS ((VariadicOperatorMember*)members.data)
+            dyn_array_init(&members, sizeof(VariadicOperatorMember), 16);
+            VariadicOperatorMember *member = dyn_array_push(&members);
+            member->token_kind = last->binary.token_kind;
+            member->right = last->binary.right;
+            last->kind = AST_variadic_operator;
+            
+            while (is_chainable(MEMBERS[members.count-1].token_kind, CT->kind)) {
+                member = dyn_array_push(&members);
+                member->token_kind = CT->kind;
+                MOVE_NEXT();
+                member->right = parse_binary_operators(prio + 1);
+            }
 
-        left = n;
+            last->variadic_operator.members = members.data;
+            last->variadic_operator.num_members = members.count;
+            left = last;
+            last = nullptr;
+        }
+        else
+        {
+            AST_node *n = ast_alloc(AST_binary, CT->line_number);
+            n->binary.left = left;
+            n->binary.token_kind = CT->kind;
+            MOVE_NEXT();
+            n->binary.right = parse_binary_operators(prio + 1);
+
+            left = n;
+            last = n;
+        }
     }
 
     return left;
