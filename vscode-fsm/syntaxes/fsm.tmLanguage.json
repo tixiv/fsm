@@ -1,7 +1,6 @@
 {
     "scopeName": "source.fsm",
     "name": "FSM",
-
     "patterns": [
         {
             "include": "#comments"
@@ -25,9 +24,7 @@
             "include": "#operators"
         }
     ],
-
     "repository": {
-
         "comments": {
             "patterns": [
                 {
@@ -41,35 +38,51 @@
                 }
             ]
         },
-
         "strings": {
             "patterns": [
+                {
+                    "name": "string.interpolated.fsm",
+                    "begin": "\\$\"",
+                    "end": "\"",
+                    "patterns": [
+                        {
+                            "include": "#string-escape"
+                        },
+                        {
+                            "include": "#interpolation"
+                        }
+                    ]
+                },
                 {
                     "name": "string.quoted.double.fsm",
                     "begin": "\"",
                     "end": "\"",
                     "patterns": [
                         {
-                            "name": "constant.character.escape.fsm",
-                            "match": "\\\\."
+                            "include": "#string-escape"
                         }
                     ]
                 },
                 {
                     "name": "string.quoted.single.fsm",
-                    "begin": "\\'",
-                    "end": "\\'",
+                    "begin": "'",
+                    "end": "'",
                     "patterns": [
                         {
-                            "name": "constant.character.escape.fsm",
-                            "match": "\\\\."
+                            "include": "#string-escape"
                         }
                     ]
                 }
-
             ]
         },
-
+        "string-escape": {
+            "patterns": [
+                {
+                    "name": "constant.character.escape.fsm",
+                    "match": "\\\\."
+                }
+            ]
+        },
         "numbers": {
             "patterns": [
                 {
@@ -78,16 +91,14 @@
                 }
             ]
         },
-
         "keywords": {
             "patterns": [
                 {
                     "name": "keyword.control.fsm",
-                    "match": "\\b(fn|struct|enum|if|else|while|for|return|let|import)\\b"
+                    "match": "\\b(fn|struct|enum|if|else|while|for|return|let|import|from|true|false)\\b"
                 }
             ]
         },
-
         "types": {
             "patterns": [
                 {
@@ -96,7 +107,6 @@
                 }
             ]
         },
-
         "functions": {
             "patterns": [
                 {
@@ -105,12 +115,22 @@
                 }
             ]
         },
-
         "operators": {
             "patterns": [
                 {
                     "name": "keyword.operator.fsm",
                     "match": "=>|==|!=|<=|>=|&&|\\|\\||&!=|\\|==|::|[+\\-*/%=<>!]"
+                }
+            ]
+        },
+        "interpolation": {
+            "name": "meta.embedded.fsm",
+            "begin": "\\{",
+            "end": "\\}",
+            "contentName": "source.fsm",
+            "patterns": [
+                {
+                    "include": "$self"
                 }
             ]
         }
