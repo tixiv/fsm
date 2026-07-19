@@ -24,6 +24,7 @@ fn read_file (filename: u8[]) : u8[]
 
 fn is_whitespace(c: i32) { return c == ' ' ||  c == '\t' || c == '\r' }
 fn is_numeric(c: i32) { return '0' <= c <= '9' }
+fn is_hex_digit(c: i32) { return is_numeric(c) || 'a' < c < 'f' || 'A' < c < 'F' }
 fn is_alpha(c: i32) { return 'A' <= c <= 'Z' || 'a' <= c <= 'z' }
 fn is_allowed_at_start_of_identifier(c: i32) { return is_alpha(c) || c == '_' }
 fn is_allowed_in_identifier(c: i32) { return is_alpha(c) || is_numeric(c) || c == '_' }
@@ -37,19 +38,47 @@ fn sv_equal (s1: u8[], s2: u8[]) {
     return 1;
 }
 
-fn parse_integer (s: u8[]) {
-    let i = 0;
+fn sv_starts_with (s: u8[], start: u8[]) {
+    if (s.len < start.len) return 0
+    s.len = start.len
+    return sv_equal(s, start)
+}
 
-    while (s.len && is_whitespace(s.begin)) s++;
+fn is_digit_in_base(digit: i32, base) {
+    if (base == 16) return is_hex_digit(digit);
+    return '0' <= digit < '0' + base
+}
 
+// expects valid digit
+fn digit_value(digit :i32) {
+    return  if (digit <= '9') digit - '0'
+            else if (digit <= 'F') digit - 'A' + 10 
+            else digit - 'a' + 10;
+}
+
+fn parse_integer_in_base(s: u8[], base) {
     let neg = s.begin == '-';
     if (neg) s++;
 
-    for ( ; s.len && is_numeric(s.begin); s++) {
-        i = i * 10 + s.begin - '0';
+    let num = for (let i = 0; s.len && is_digit_in_base(s.begin, base); s++; i) {
+        i = i * base + digit_value(s.begin);
     }
-    if (neg) return -i;
-    return i;
+    if (neg) return -num;
+    return num;
+}
+
+fn parse_integer (s: u8[]) {
+    skip_whitespace(s)
+    let neg = s.begin == '-';
+    if (neg) s++;
+
+    let base = 10
+    if (sv_starts_with(s, "0x")) { base = 16; s++; s++ }
+    if (sv_starts_with(s, "0b")) { base = 2; s++; s++ }
+
+    let num = parse_integer_in_base(s, base)
+    if (neg) return -num;
+    return num
 }
 
 fn print_hex(num: u64) {
