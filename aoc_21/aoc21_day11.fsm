@@ -1,0 +1,100 @@
+
+import * from "std";
+
+struct EnergyMap {
+    energy: u8[100][100];
+    flashed: bool[100][100];
+    num_y;
+    num_x;
+}
+
+fn dump_map (map: EnergyMap&) {
+    for (let y = 0; y < map.num_y; y++) {
+        for (let x = 0; x < map.num_x; x++) {
+            putc('0' + map.energy[y][x])
+        }
+        putc('\n')
+    }
+    putc('\n')
+}
+
+fn charge (map: EnergyMap&, y, x) {
+    if (0 <= y < map.num_y && 0 <= x < map.num_x) {
+        map.energy[y][x] = map.energy[y][x] + 1
+    }
+}
+
+fn main () {
+    let content = read_file ("aoc_21/aoc21_day11.input")
+
+    let map: EnergyMap;
+
+    map.num_y = for (let y = 0; content.len; {y++; content++}; y) {
+        map.num_x = for (let x = 0; content.len && content.begin != '\n'; {x++ ; content++}; x) {
+            map.energy[y][x] = content.begin - '0'
+            putc(content.begin)
+        }
+        puts("\n");
+    }
+    $"\nMap size is {map.num_y} rows, {map.num_x} cols\n\n"
+
+    let num_flashes = 0
+
+    let all_flashed = false;
+
+    for (let step = 1; step <= 1000 && !all_flashed; step++) {
+        
+        // Reset flashed
+        for (let y = 0; y < map.num_y; y++)
+            for (let x = 0; x < map.num_x; x++)
+                map.flashed[y][x] = false;
+        
+        // Every octopus gains 1 charge
+        for (let y = 0; y < map.num_y; y++)
+            for (let x = 0; x < map.num_x; x++)
+                charge(map, y, x)
+
+        let flashed = true;
+        while (flashed)
+        {
+            flashed = false;
+
+            for (let y = 0; y < map.num_y; y++) {
+                for (let x = 0; x < map.num_x; x++) {
+                    if (map.energy[y][x] > 9 && !map.flashed[y][x]) {
+                        flashed = true;
+                        map.flashed[y][x] = true;
+                        num_flashes++;
+                        charge(map, y + 1, x - 1)
+                        charge(map, y + 1, x)
+                        charge(map, y + 1, x + 1)
+                        charge(map, y, x - 1)
+                        charge(map, y, x + 1)
+                        charge(map, y - 1, x - 1)
+                        charge(map, y - 1, x)
+                        charge(map, y - 1, x + 1)
+                    }
+                }
+            }
+        }
+
+        // check all flashed
+        all_flashed = true;
+        for (let y = 0; y < map.num_y; y++)
+            for (let x = 0; x < map.num_x; x++)
+                if (!map.flashed[y][x]) all_flashed = false;
+
+        // Set all that flashed to 0
+        for (let y = 0; y < map.num_y; y++)
+            for (let x = 0; x < map.num_x; x++)
+                if (map.flashed[y][x]) map.energy[y][x] = 0;
+        
+        if (step < 10 || step % 10 == 0 || all_flashed) {
+            $"After Step {step}:\n"
+            dump_map(map)
+            if (all_flashed) $"All flashed at step: {step}\n"
+        }
+    }
+
+    $"Total Flashes: {num_flashes}\n"
+}
