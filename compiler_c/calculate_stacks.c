@@ -1,5 +1,6 @@
 
 #include "calculate_stacks.h"
+#include "ast.h"
 #include "dyn_array.h"
 #include "resolver.h"
 #include "common.h"

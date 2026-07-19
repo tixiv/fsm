@@ -34,6 +34,12 @@ void skip_whitespace(SV *sv) {
     }
 }
 
+typedef struct {
+    SV code;
+    int line_number;
+    bool inside_builder_string;
+} Tokenizer;
+
 void read_word(SV *word, SV *input) {
     word->begin = input->begin;
     word->len = 0;
@@ -63,8 +69,13 @@ void read_string(SV *str, SV *input, int *line_number) {
     str->begin = input->begin;
     str->len = 0;
     while(input->len && '"' != *input->begin) {
-        if ('\n' == sv_pop(input)) (*line_number)++;
-        str->len++;
+        if (sv_starts_with(input, "\\\"")) {
+            str->len += 2; sv_pop(input); sv_pop(input);
+        }
+        else {
+            if ('\n' == sv_pop(input)) (*line_number)++;
+            str->len++;
+        }
     }
     if (input->len) {
         sv_pop(input); // closing '"'
@@ -152,6 +163,8 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_number: return("number");
         case TOK_char_constant: return ("char constant");
         case TOK_eof: return("EOF");
+        case TOK_builder_string_begin: return "'$\"'";
+        case TOK_builder_string_end:   return "'\"'";
     }
     return token_kind_name(kind);
 }
@@ -205,88 +218,136 @@ void handle_word(SV *word, int line_number) {
     }
 }
 
-void tokenizer(SV *code) {
-    dyn_array_init(&current_module->tokens_dyn, sizeof(Token), 16);
-    int line_number = 1;
-    
+void tokenize_fsm (Tokenizer *tok);
+
+void read_builder_string(Tokenizer *tokenizer) {
+    sv_pop(&tokenizer->code); sv_pop(&tokenizer->code); // skip $"
+
+    push_token(TOK_builder_string_begin, nullptr, tokenizer->line_number);
+
+    SV str;
+    str.begin = tokenizer->code.begin;
+    str.len = 0;
+    while(tokenizer->code.len && '"' != *tokenizer->code.begin) {
+        if (sv_starts_with(&tokenizer->code, "\\\"")) {
+            str.len += 2; sv_pop(&tokenizer->code); sv_pop(&tokenizer->code);
+        }
+        else {
+            char c = sv_pop(&tokenizer->code);
+
+            if (c == '\n') {
+                tokenizer->line_number++;
+                str.len++;
+            }
+            else if (c == '{') {
+                push_token(TOK_string, &str, tokenizer->line_number);
+                tokenizer->inside_builder_string = true;
+                tokenize_fsm(tokenizer);
+                tokenizer->inside_builder_string = false;
+                str.begin = tokenizer->code.begin;
+                str.len = 0;
+            }
+            else
+            {
+                str.len++;
+            }
+        }
+    }
+
+    if (str.len) push_token(TOK_string, &str, tokenizer->line_number);
+
+    if (tokenizer->code.len) {
+        sv_pop(&tokenizer->code); // closing '"'
+    } else {
+        tokenizer_error(tokenizer->line_number,  "Error: unmatched '\"'. Quitting.");
+    }
+
+    push_token(TOK_builder_string_end, nullptr, tokenizer->line_number);
+}
+
+void tokenize_fsm (Tokenizer *tok) {
+    SV *code = &tok->code;
     while (code->len) {
         char c = *code->begin;
         
         if (is_numeric(c)) {
             SV num;
             read_number(&num, code);
-            push_token(TOK_number, &num, line_number);
+            push_token(TOK_number, &num, tok->line_number);
         }
         else if (is_whitespace(c)) {
             sv_pop(code);
         }
         else if ('\n' == c) {
             sv_pop(code);
-            line_number++;
+            tok->line_number++;
         }
         else if ('(' == c) {
             sv_pop(code);
-            push_token(TOK_lparen, nullptr, line_number);
+            push_token(TOK_lparen, nullptr, tok->line_number);
         }
         else if (')' == c) {
             sv_pop(code);
-            push_token(TOK_rparen, nullptr, line_number);
+            push_token(TOK_rparen, nullptr, tok->line_number);
         }
         else if ('{' == c) {
             sv_pop(code);
-            push_token(TOK_lbrace, nullptr, line_number);
+            push_token(TOK_lbrace, nullptr, tok->line_number);
         }
         else if ('}' == c) {
             sv_pop(code);
-            push_token(TOK_rbrace, nullptr, line_number);
+            if (tok->inside_builder_string) {
+                return;
+            }
+            push_token(TOK_rbrace, nullptr, tok->line_number);
         }
         else if ('[' == c) {
             sv_pop(code);
-            push_token(TOK_lbracket, nullptr, line_number);
+            push_token(TOK_lbracket, nullptr, tok->line_number);
         }
         else if (']' == c) {
             sv_pop(code);
-            push_token(TOK_rbracket, nullptr, line_number);
+            push_token(TOK_rbracket, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "::")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_colon_colon, nullptr, line_number);
+            push_token(TOK_colon_colon, nullptr, tok->line_number);
         }
         else if (':' == c) {
             sv_pop(code);
-            push_token(TOK_colon, nullptr, line_number);
+            push_token(TOK_colon, nullptr, tok->line_number);
         }
         else if (';' == c) {
             sv_pop(code);
-            push_token(TOK_semicolon, nullptr, line_number);
+            push_token(TOK_semicolon, nullptr, tok->line_number);
         }
         else if ('.' == c) {
             sv_pop(code);
-            push_token(TOK_dot, nullptr, line_number);
+            push_token(TOK_dot, nullptr, tok->line_number);
         }
         else if (',' == c) {
             sv_pop(code);
-            push_token(TOK_komma, nullptr, line_number);
+            push_token(TOK_komma, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "++")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_plus_plus, nullptr, line_number);
+            push_token(TOK_plus_plus, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "--")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_minus_minus, nullptr, line_number);
+            push_token(TOK_minus_minus, nullptr, tok->line_number);
         }
         else if ('+' == c) {
             sv_pop(code);
-            push_token(TOK_plus, nullptr, line_number);
+            push_token(TOK_plus, nullptr, tok->line_number);
         }
         else if ('-' == c) {
             sv_pop(code);
-            push_token(TOK_minus, nullptr, line_number);
+            push_token(TOK_minus, nullptr, tok->line_number);
         }
         else if ('*' == c) {
             sv_pop(code);
-            push_token(TOK_asterisk, nullptr, line_number);
+            push_token(TOK_asterisk, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "//")) {
             while(code->len && *code->begin != '\n')
@@ -294,98 +355,109 @@ void tokenizer(SV *code) {
         }
         else if (sv_starts_with(code, "/*")) {
             while(code->len && !sv_starts_with(code, "*/")) {
-                if ('\n' == sv_pop(code)) line_number++;
+                if ('\n' == sv_pop(code)) tok->line_number++;
             }
             sv_pop(code); sv_pop(code);
         }
         else if (sv_starts_with(code, "*/")) {
-            tokenizer_error(line_number, "Encountered '*/' outside of comment.\n");
+            tokenizer_error(tok->line_number, "Encountered '*/' outside of comment.\n");
         }
         else if ('/' == c) {
             sv_pop(code);
-            push_token(TOK_slash, nullptr, line_number);
+            push_token(TOK_slash, nullptr, tok->line_number);
         }
         else if ('%' == c) {
             sv_pop(code);
-            push_token(TOK_percent, nullptr, line_number);
+            push_token(TOK_percent, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "=>")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_bind_ref, nullptr, line_number);
+            push_token(TOK_bind_ref, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "==")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_equal, nullptr, line_number);
+            push_token(TOK_equal, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "|==")) {
             sv_pop(code);  sv_pop(code); sv_pop(code);
-            push_token(TOK_or_equal_to, nullptr, line_number);
+            push_token(TOK_or_equal_to, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "&!=")) {
             sv_pop(code);  sv_pop(code); sv_pop(code);
-            push_token(TOK_and_not_equal_to, nullptr, line_number);
+            push_token(TOK_and_not_equal_to, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "!=")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_unequal, nullptr, line_number);
+            push_token(TOK_unequal, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, ">=")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_greater_equal, nullptr, line_number);
+            push_token(TOK_greater_equal, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "<=")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_lower_equal, nullptr, line_number);
+            push_token(TOK_lower_equal, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "&&")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_boolean_and, nullptr, line_number);
+            push_token(TOK_boolean_and, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "||")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_boolean_or, nullptr, line_number);
+            push_token(TOK_boolean_or, nullptr, tok->line_number);
         }
         else if (c == '>') {
             sv_pop(code);
-            push_token(TOK_greater, nullptr, line_number);
+            push_token(TOK_greater, nullptr, tok->line_number);
         }
         else if (c == '<') {
             sv_pop(code);
-            push_token(TOK_lower, nullptr, line_number);
+            push_token(TOK_lower, nullptr, tok->line_number);
         }
         else if (c == '=') {
             sv_pop(code);
-            push_token(TOK_equal_assign, nullptr, line_number);
+            push_token(TOK_equal_assign, nullptr, tok->line_number);
         }
         else if (c == '&') {
             sv_pop(code);
-            push_token(TOK_ampersand, nullptr, line_number);
+            push_token(TOK_ampersand, nullptr, tok->line_number);
         }
         else if (c == '!') {
             sv_pop(code);
-            push_token(TOK_exclam, nullptr, line_number);
+            push_token(TOK_exclam, nullptr, tok->line_number);
+        }
+        else if (sv_starts_with(code, "$\"")) {
+            read_builder_string(tok);
         }
         else if ('"' == c) {
             SV str;
-            read_string(&str, code, &line_number);
-            push_token(TOK_string, &str, line_number);
+            read_string(&str, code, &tok->line_number);
+            push_token(TOK_string, &str, tok->line_number);
         }
         else if ('\'' == c) {
             SV str;
-            read_char_constant(&str, code, &line_number);
-            push_token(TOK_char_constant, &str, line_number);
+            read_char_constant(&str, code, &tok->line_number);
+            push_token(TOK_char_constant, &str, tok->line_number);
         }
         else if (is_allowed_at_start_of_identifier(c)) {
             SV word;
             read_word(&word, code);
-            handle_word(&word, line_number);
+            handle_word(&word, tok->line_number);
         }
         else {
-            tokenizer_error(line_number,  "encountered unhandled character '%c' = 0x%02X. Quitting.\n", c, c);
+            tokenizer_error(tok->line_number,  "encountered unhandled character '%c' = 0x%02X. Quitting.\n", c, c);
             exit(EXIT_FAILURE);
         }
     }
-    push_token(TOK_eof, nullptr, line_number);
+    push_token(TOK_eof, nullptr, tok->line_number);
+}
+
+void tokenizer(SV *code) {
+    dyn_array_init(&current_module->tokens_dyn, sizeof(Token), 16);
+    Tokenizer tok;
+    tok.code = *code;
+    tok.line_number = 1;
+    tokenize_fsm(&tok);
 }
 
 void dump_tokens() {

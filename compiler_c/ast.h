@@ -68,6 +68,7 @@ typedef struct {
     X(AST_array_to_slice) \
     X(AST_plus_plus) \
     X(AST_minus_minus) \
+    X(AST_builder_string) \
 
 typedef enum {
 #define X(name) name,
@@ -268,6 +269,12 @@ typedef struct AST_node_s {
         struct {
             struct AST_node_s *body;
         } _type_slice;
+
+        struct {
+            struct AST_node_s *var_decl_sb;
+            struct AST_node_s *var_decl_arr;
+            struct AST_node_s *body;
+        } builder_string;
     };
 } AST_node;
 
@@ -276,6 +283,7 @@ AST_node *ast_alloc(AST_kind kind, int line_number);
 AST_node *get_last_in_chain(AST_node *n);
 void ast_insert_node(AST_node **at, AST_node *new_node);
 void ast_remove_node(AST_node *n);
+void ast_link_to_chain(AST_node **chain_p, AST_node *n);
 
 typedef void (*AstVisitor)(AST_node *, void *);
 

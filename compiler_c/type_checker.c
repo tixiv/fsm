@@ -710,6 +710,10 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             type_check_variadic_operator(n);
             break;
 
+        case AST_builder_string:
+            n->type = &builtin_u8_slice;
+            break;
+
         case AST_typename:
         case AST_member_def:
         case AST_struct:

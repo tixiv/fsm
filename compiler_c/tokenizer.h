@@ -61,6 +61,8 @@ typedef struct {
     X(TOK_number) \
     X(TOK_char_constant) \
     X(TOK_eof) \
+    X(TOK_builder_string_begin) \
+    X(TOK_builder_string_end) \
 
 typedef enum {
 #define X(name) name,

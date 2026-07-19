@@ -216,6 +216,35 @@ static AST_node *parse_for() {
     return n;
 }
 
+static AST_node *parse_builder_string() {
+    AST_node *builder = ast_alloc(AST_builder_string, CT->line_number);
+
+    builder->builder_string.var_decl_sb = ast_alloc(AST_var_decl, CT->line_number);
+    builder->builder_string.var_decl_sb->var_decl._typedecl = ast_alloc(AST_typename, CT->line_number);
+    builder->builder_string.var_decl_sb->var_decl._typedecl->_typename.name = mkSV("StringBuilder");
+
+    builder->builder_string.var_decl_arr = ast_alloc(AST_var_decl, CT->line_number);
+    builder->builder_string.var_decl_arr->var_decl._typedecl = ast_alloc(AST_type_array, CT->line_number);
+    builder->builder_string.var_decl_arr->var_decl._typedecl->_type_array.n_elements = 1024;
+    builder->builder_string.var_decl_arr->var_decl._typedecl->_type_array.body = ast_alloc(AST_typename, CT->line_number);
+    builder->builder_string.var_decl_arr->var_decl._typedecl->_type_array.body->_typename.name = mkSV("u8");
+
+    MOVE_NEXT();
+
+    while (CT->kind != TOK_builder_string_end) {
+        if (CT->kind == TOK_string) {
+            AST_node *ast_str = ast_alloc(AST_string, CT->line_number);
+            ast_str->str.value = CT->value;
+            ast_link_to_chain(&builder->builder_string.body, ast_str);
+            MOVE_NEXT();
+        } else {
+            ast_link_to_chain(&builder->builder_string.body, parse_expression());
+        }
+    }
+    MOVE_NEXT();
+    return builder;
+}
+
 static AST_node *parse_call_arguments() {
     debug_log_parser("Entering %s\n", __func__);
 
@@ -278,6 +307,9 @@ static AST_node *parse_primary()
         n = ast_alloc(AST_string, CT->line_number);
         n->str.value = CT->value;
         MOVE_NEXT();
+    }
+    else if (CT->kind == TOK_builder_string_begin) {
+        n = parse_builder_string();
     }
     else if (CT->kind == TOK_char_constant) {
         n = ast_alloc(AST_char_constant, CT->line_number);

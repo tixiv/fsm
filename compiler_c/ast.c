@@ -43,6 +43,24 @@ AST_node *get_last_in_chain(AST_node *n) {
     return n;
 }
 
+size_t ast_count_chain(AST_node *n) {
+    size_t num = 0;
+    while (n) {
+        num++;
+        n = n->next;
+    }
+    return num;
+}
+
+void ast_link_to_chain(AST_node **chain_p, AST_node *n) {
+    if (!*chain_p) {
+        *chain_p = n;
+    }
+    else {
+        get_last_in_chain(*chain_p)->next = n;
+    }
+}
+
 void ast_insert_node(AST_node **at, AST_node *new_node) {
     AST_node *child = *at;
     switch (new_node->kind) {
@@ -99,15 +117,6 @@ void ast_visit_chain(AST_node *n, void (*visit)(AST_node *, void *arg), void *ar
         visit(n, arg);
         n = n->next;
     }
-}
-
-size_t ast_count_chain(AST_node *n) {
-    size_t num = 0;
-    while (n) {
-        num++;
-        n = n->next;
-    }
-    return num;
 }
 
 void visit_non_null(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg) {
@@ -221,6 +230,11 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
                 visit_non_null(n->variadic_operator.members[i].right, visit, arg);
             }
             break;
+        case AST_builder_string:
+            visit_non_null(n->builder_string.var_decl_sb, visit, arg);
+            visit_non_null(n->builder_string.var_decl_arr, visit, arg);
+            ast_visit_chain(n->builder_string.body, visit, arg);
+            break;
 
         case AST_enum_member:
         case AST_symbol:
@@ -262,6 +276,7 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             printf("%.*s%s \n", (int)spaces, spc, kind_name);
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
+        case AST_builder_string:
         case AST_type_ref:
         case AST_type_array:
         case AST_type_slice:

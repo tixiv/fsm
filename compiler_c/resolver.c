@@ -31,10 +31,12 @@ typedef struct {
 static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, bool do_undefined_error);
 
 static void push_symbol(Resolver *res, Dyn_array *arr, Symbol *s, int line_number) {
-    Symbol *conflicting = resolver_lookup_symbol(res,  &s->name, line_number, false);
-    if (conflicting) {
-        resolver_error(line_number, "Symbol '%.*s' redefined\n", SV_prnt(s->name));
-        return;
+    if (s->name.len) {
+        Symbol *conflicting = resolver_lookup_symbol(res,  &s->name, line_number, false);
+        if (conflicting) {
+            resolver_error(line_number, "Symbol '%.*s' redefined\n", SV_prnt(s->name));
+            return;
+        }
     }
 
     dyn_array_push_p(arr, s);
@@ -194,6 +196,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_type_ref:
         case AST_type_array:
         case AST_type_slice:
+        case AST_builder_string:
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             break;
 
