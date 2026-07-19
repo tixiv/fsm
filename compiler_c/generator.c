@@ -237,7 +237,14 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file,"fn_" SV_FMT ":\n", SV_prnt(op->string_value));
                 fprintf(file,"\t" "push rbp\n");
                 fprintf(file,"\t" "mov rbp, rsp\n");
-                if (op->u64_value) fprintf(file,"\t" "sub rsp, %lu\n", op->u64_value);
+                if (op->size) {
+                    ASSERT(op->size % 8 == 0, "Can't work with local var sizes not divisible by 8.\n");
+                    fprintf(file,"\t" "sub rsp, %lu\n", op->size);
+                    fprintf(file,"\t" "mov rcx, %lu\n", op->size / 8);
+                    fprintf(file,"\t" "lea rdi, [rbp - %lu]\n", op->size);
+                    fprintf(file,"\t" "xor rax, rax\n");
+                    fprintf(file,"\t" "rep stosq\n");
+                }
                 break;
             case OP_return:
                 if      (op->size == 0);

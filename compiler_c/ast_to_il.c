@@ -510,7 +510,7 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         case AST_function: {
             Symbol *s_fun = n->fun.symbol;
             ASSERT(s_fun, "IL gen tried to generate function '%.*s' with null symbol\n", SV_prnt(n->fun.name));
-            push_opcode(OP_begin_fn, &n->fun.name, s_fun->size);
+            push_opcode_sz(OP_begin_fn, &n->fun.name, 0, s_fun->size);
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             break;
         }
