@@ -209,6 +209,7 @@ void type_propagate_binary_operator(AST_node *n) {
             case TOK_asterisk:
             case TOK_slash:
             case TOK_percent:
+            case TOK_up_arrow:
                 try_convert_to_type_if_necessary(&n->binary.left, &builtin_i64, sb_left.buffer);
                 try_convert_to_type_if_necessary(&n->binary.right, &builtin_i64, sb_right.buffer);
 
@@ -309,6 +310,15 @@ void type_check_variadic_operator (AST_node *n){
         default: NOT_IMPLEMENTED("Type checking variadic operator %s is not implemented yet.",
             token_kind_printable(n->variadic_operator.members[0].token_kind))
             break;
+    }
+}
+
+void type_check_builder_string(AST_node *b_str) {
+    for (AST_node **n = &b_str->builder_string.body; *n; n = &(*n)->next) {
+        auto_dereference(n);
+        if (is_integer_kind((*n)->type)) continue;
+        if ((*n)->type == &builtin_u8_slice) continue;
+        try_convert_to_type_if_necessary(n, &builtin_i64, "Argument of builder string");
     }
 }
 
@@ -711,6 +721,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_builder_string:
+            type_check_builder_string(n);
             n->type = &builtin_u8_slice;
             break;
 

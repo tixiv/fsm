@@ -139,6 +139,7 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_asterisk: return("'*'");
         case TOK_slash: return("'/'");
         case TOK_percent: return("'%'");
+        case TOK_up_arrow: return("'^'");
         case TOK_equal_assign: return("'='");
         case TOK_bind_ref: return("'=>'");
         case TOK_equal: return("'=='");
@@ -348,6 +349,10 @@ void tokenize_fsm (Tokenizer *tok) {
         else if ('*' == c) {
             sv_pop(code);
             push_token(TOK_asterisk, nullptr, tok->line_number);
+        }
+        else if ('^' == c) {
+            sv_pop(code);
+            push_token(TOK_up_arrow, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "//")) {
             while(code->len && *code->begin != '\n')

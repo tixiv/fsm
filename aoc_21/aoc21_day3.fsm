@@ -1,0 +1,91 @@
+
+import * from "std";
+
+fn take_line (str: u8[]&) : u8[] {
+    let line = str;
+    line.len = 0
+    while (str.len && str.begin != '\n') {
+        str++
+        line.len++
+    }
+    str++
+    return line
+}
+
+enum Mode { Oxygen, CO2}
+
+fn find_rating (lines: i64[], line_count, mode: Mode, num_bits) {
+    let removed: u8[10000];
+
+    let lines_left = line_count;
+
+    let finished = 0
+    for (let bp = num_bits-1; bp >= 0 && !finished; bp--) {
+        let bit_count_1 = 0;
+        let bit_count_0 = 0;
+
+        for (let line = 0; line < line_count; line++) {
+            if (!removed[line]) {
+                if (bittest(lines[line], bp))
+                    bit_count_1++
+                else
+                    bit_count_0++
+            }
+        }
+
+        let keep = if (mode == Mode::Oxygen) (bit_count_1 >= bit_count_0)
+                   else                      (bit_count_0 >  bit_count_1);
+
+        puts($"mode={mode.name}, keep={keep}, bit_count_1={bit_count_1}, bit_count_0={bit_count_0}, lines_left={lines_left}\n")
+
+        for (let line = 0; line < line_count && !finished; line++) {
+            if (!removed[line]) {
+                let bv = bittest(lines[line], bp)
+                if ( keep != bv) {
+                    removed[line] = 1;
+                    lines_left--;
+                    if (lines_left == 1) finished = 1;
+                }
+            }
+        }
+    }
+
+    for (let line = 0; line < line_count; line++) {
+        if (!removed[line]) {
+            return lines[line];
+        }
+    }
+
+    return 0;
+}
+
+fn main () {
+    let content = read_file ("aoc_21/aoc21_day3.input")
+
+    let bit_counts: i32[32];
+    let lines: i64[10000];
+    let num_bits = 0;
+
+    let line_count = for (let count = 0; content.len; count++; count) {
+        let line = take_line(content)
+        num_bits = line.len
+        lines[count] = parse_integer_in_base(line, 2);
+
+        for (let i=0; i<32; i++) {
+            if (bittest(lines[count], i)) bit_counts[i] ++;
+        }
+    }
+
+    let gamma_rate = 0;
+
+    for (let i=0; i<32; i++)
+        if (bit_counts[i] > (line_count / 2))
+            setbit(gamma_rate, i, 1)
+
+    let epsilon = bitand((2 ^ num_bits) - 1, bitnot(gamma_rate));
+    let oxygen = find_rating(lines, line_count, Mode::Oxygen, num_bits);
+    let co2    = find_rating(lines, line_count, Mode::CO2,    num_bits);
+
+    puts($"\ngamma_rate = {gamma_rate}, epsilon = {epsilon}, power_consumption = {gamma_rate * epsilon}\n");
+    puts($"oxygen = {oxygen}, co2 = {co2}, life_support = {oxygen * co2}\n");
+}

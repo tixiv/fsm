@@ -417,7 +417,7 @@ static AST_node *parse_primary()
     return n;
 }
 
-#define NUM_PRIOS 7
+#define NUM_PRIOS 8
 #define NUM_MAX_OPERATORS_IN_PRIO 4
 
 const uint8_t operator_table[NUM_PRIOS][NUM_MAX_OPERATORS_IN_PRIO] =  {
@@ -428,6 +428,7 @@ const uint8_t operator_table[NUM_PRIOS][NUM_MAX_OPERATORS_IN_PRIO] =  {
     { TOK_equal, TOK_unequal, TOK_or_equal_to, TOK_and_not_equal_to},
     { TOK_plus, TOK_minus, 0, 0},
     { TOK_asterisk, TOK_slash, TOK_percent, 0},
+    { TOK_up_arrow, 0, 0, 0},
 };
 
 static bool is_in_prio(int op, int prio) {

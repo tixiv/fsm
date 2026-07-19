@@ -12,6 +12,7 @@
     X(OP_mul) \
     X(OP_div) \
     X(OP_mod) \
+    X(OP_ipow) \
     X(OP_equal) \
     X(OP_unequal) \
     X(OP_not) \

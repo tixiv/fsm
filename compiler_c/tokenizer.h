@@ -36,6 +36,7 @@ typedef struct {
     X(TOK_minus_minus) \
     X(TOK_asterisk) \
     X(TOK_slash) \
+    X(TOK_up_arrow) \
     X(TOK_percent) \
     X(TOK_equal_assign) \
     X(TOK_bind_ref) \

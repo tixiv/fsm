@@ -129,6 +129,7 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen, bool result_used) {
             case TOK_asterisk:      if (result_used) push_opcode(OP_mul, nullptr, 0); break;
             case TOK_slash:         if (result_used) push_opcode(OP_div, nullptr, 0); break;
             case TOK_percent:       if (result_used) push_opcode(OP_mod, nullptr, 0); break;
+            case TOK_up_arrow:      if (result_used) push_opcode(OP_ipow, nullptr, 0); break;
             case TOK_equal:         if (result_used) push_opcode(OP_equal, nullptr, 0); break;
             case TOK_unequal:       if (result_used) push_opcode(OP_unequal, nullptr, 0); break;
             case TOK_greater:       if (result_used) push_opcode(OP_compare_GT, nullptr, 0); break;

@@ -1,0 +1,24 @@
+File 'aoc_21/aoc21_day3.input' has been opened. Read bytes: 12999
+mode=Oxygen, keep=0, bit_count_1=492, bit_count_0=508, lines_left=1000
+mode=Oxygen, keep=1, bit_count_1=255, bit_count_0=253, lines_left=508
+mode=Oxygen, keep=0, bit_count_1=119, bit_count_0=136, lines_left=255
+mode=Oxygen, keep=1, bit_count_1=71, bit_count_0=65, lines_left=136
+mode=Oxygen, keep=1, bit_count_1=40, bit_count_0=31, lines_left=71
+mode=Oxygen, keep=1, bit_count_1=21, bit_count_0=19, lines_left=40
+mode=Oxygen, keep=1, bit_count_1=12, bit_count_0=9, lines_left=21
+mode=Oxygen, keep=1, bit_count_1=6, bit_count_0=6, lines_left=12
+mode=Oxygen, keep=0, bit_count_1=2, bit_count_0=4, lines_left=6
+mode=Oxygen, keep=1, bit_count_1=3, bit_count_0=1, lines_left=4
+mode=Oxygen, keep=1, bit_count_1=2, bit_count_0=1, lines_left=3
+mode=Oxygen, keep=1, bit_count_1=1, bit_count_0=1, lines_left=2
+mode=CO2, keep=1, bit_count_1=492, bit_count_0=508, lines_left=1000
+mode=CO2, keep=0, bit_count_1=252, bit_count_0=240, lines_left=492
+mode=CO2, keep=0, bit_count_1=128, bit_count_0=112, lines_left=240
+mode=CO2, keep=1, bit_count_1=53, bit_count_0=59, lines_left=112
+mode=CO2, keep=1, bit_count_1=23, bit_count_0=30, lines_left=53
+mode=CO2, keep=1, bit_count_1=10, bit_count_0=13, lines_left=23
+mode=CO2, keep=0, bit_count_1=8, bit_count_0=2, lines_left=10
+mode=CO2, keep=0, bit_count_1=1, bit_count_0=1, lines_left=2
+
+gamma_rate = 1776, epsilon = 2319, power_consumption = 4118544
+oxygen = 1527, co2 = 2510, life_support = 3832770
