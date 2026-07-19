@@ -252,34 +252,42 @@ static void gen_cast(AST_node *n) {
 }
 
 static void gen_call(AST_node *n, IL_gen *gen, bool result_used) {
-    Symbol *s_call = n->call.symbol;
-    ASSERT(s_call, "Symbol for called function '%.*s' is not resolved\n", SV_prnt(n->call.name))
-    ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
-    if (sv_compare_cstr(&n->call.name, "bittest")) {
-        push_opcode(OP_bittest, nullptr, 0);
-    }
-    else if (sv_compare_cstr(&n->call.name, "bitshift")) {
-        push_opcode(OP_bitshift, nullptr, 0);
-    }
-    else if (sv_compare_cstr(&n->call.name, "bitand")) {
-        push_opcode(OP_bitand, nullptr, 0);
-    }
-    else if (sv_compare_cstr(&n->call.name, "bitor")) {
-        push_opcode(OP_bitor, nullptr, 0);
-    }
-    else if (sv_compare_cstr(&n->call.name, "bitxor")) {
-        push_opcode(OP_bitxor, nullptr, 0);
-    }
-    else if (sv_compare_cstr(&n->call.name, "bitnot")) {
-        push_opcode(OP_bitnot, nullptr, 0);
-    }
-    else if (sv_compare_cstr(&n->call.name, "setbit")) {
-        push_opcode(OP_setbit, nullptr, 0);
+    if (n->call.target->kind == AST_symbol) {
+        Symbol *s_call = n->call.target->symbol.symbol;
+        SV name = n->call.target->symbol.name;
+        ASSERT(s_call, "Symbol for called function '%.*s' is not resolved\n", SV_prnt(name));
+        ast_visit_chain(n->call.args, (AstVisitor)gen_value_visitor, gen);
+        if (sv_compare_cstr(&name, "bittest")) {
+            push_opcode(OP_bittest, nullptr, 0);
+        }
+        else if (sv_compare_cstr(&name, "bitshift")) {
+            push_opcode(OP_bitshift, nullptr, 0);
+        }
+        else if (sv_compare_cstr(&name, "bitand")) {
+            push_opcode(OP_bitand, nullptr, 0);
+        }
+        else if (sv_compare_cstr(&name, "bitor")) {
+            push_opcode(OP_bitor, nullptr, 0);
+        }
+        else if (sv_compare_cstr(&name, "bitxor")) {
+            push_opcode(OP_bitxor, nullptr, 0);
+        }
+        else if (sv_compare_cstr(&name, "bitnot")) {
+            push_opcode(OP_bitnot, nullptr, 0);
+        }
+        else if (sv_compare_cstr(&name, "setbit")) {
+            push_opcode(OP_setbit, nullptr, 0);
+        }
+        else {
+            push_opcode_sz(OP_call, &name, 0, get_function_arguments_size(s_call->type));
+            if (result_used)
+                push_opcode_sz(OP_push_result, nullptr, 0, n->type->storage_size);
+        }
     }
     else {
-        push_opcode_sz(OP_call, &n->call.name, 0, get_function_arguments_size(s_call->type));
-        if (result_used)
-            push_opcode_sz(OP_push_result, nullptr, 0, n->type->storage_size);
+        NOT_IMPLEMENTED("icall is not implemented yet.\n");
+        //        ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+
     }
 }
 

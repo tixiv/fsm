@@ -348,50 +348,48 @@ static AST_node *parse_primary()
         n->minus_minus.body = parse_primary();
     }
     else if (CT->kind == TOK_identifier) {
-        SV* name = &CT->value;
-        int line_number = CT->line_number;
+        n = ast_alloc(AST_symbol, CT->line_number);
+        n->symbol.name = CT->value;
         MOVE_NEXT();
 
-        if (CT->kind == TOK_lparen) {
-            n = ast_alloc(AST_call, CT->line_number);
-            n->call.name = *name;
-            n->call.args = parse_call_arguments();
-        }
-        else {
-            n = ast_alloc(AST_symbol, line_number);
-            n->symbol.name = *name;
+        while (CT->kind == TOK_lparen || CT->kind == TOK_lbracket
+               || CT->kind == TOK_dot || CT->kind == TOK_colon_colon)
+        {
+            if (CT->kind == TOK_lparen) {
+                AST_node *ast_call = ast_alloc(AST_call, CT->line_number);
+                ast_call->call.target = n;
+                ast_call->call.args = parse_call_arguments();
+                n = ast_call;
+            }
+            else if (CT->kind == TOK_lbracket) {
+                AST_node *ast_arr = ast_alloc(AST_array_access, CT->line_number);
+                MOVE_NEXT();
+                ast_arr->_array.array = n;
+                ast_arr->_array.index = parse_expression();
 
-            while (CT->kind == TOK_lbracket || CT->kind == TOK_dot || CT->kind == TOK_colon_colon) {
-                if (CT->kind == TOK_lbracket) {
-                    AST_node *ast_arr = ast_alloc(AST_array_access, CT->line_number);
-                    MOVE_NEXT();
-                    ast_arr->_array.array = n;
-                    ast_arr->_array.index = parse_expression();
-
-                    AST_node *ast_deref = ast_alloc(AST_dereference, CT->line_number);
-                    ast_deref->deref.body = ast_arr;
-                    
-                    n = ast_deref;
-                    take_expected(TOK_rbracket);
-                } 
-                if (CT->kind == TOK_dot) {
-                    AST_node *ast_member_access = ast_alloc(AST_member_access, CT->line_number);
-                    MOVE_NEXT();
-                    expect_token(TOK_identifier);
-                    ast_member_access->member_access.body = n;
-                    ast_member_access->member_access.name = CT->value;
-                    n = ast_member_access;
-                    MOVE_NEXT();
-                }
-                if (CT->kind == TOK_colon_colon) {
-                    AST_node *ast_namespace_access = ast_alloc(AST_namespace_access, CT->line_number);
-                    MOVE_NEXT();
-                    expect_token(TOK_identifier);
-                    ast_namespace_access->namespace_access.body = n;
-                    ast_namespace_access->namespace_access.name = CT->value;
-                    MOVE_NEXT();
-                    n = ast_namespace_access;
-                }
+                AST_node *ast_deref = ast_alloc(AST_dereference, CT->line_number);
+                ast_deref->deref.body = ast_arr;
+                
+                n = ast_deref;
+                take_expected(TOK_rbracket);
+            } 
+            if (CT->kind == TOK_dot) {
+                AST_node *ast_member_access = ast_alloc(AST_member_access, CT->line_number);
+                MOVE_NEXT();
+                expect_token(TOK_identifier);
+                ast_member_access->member_access.body = n;
+                ast_member_access->member_access.name = CT->value;
+                n = ast_member_access;
+                MOVE_NEXT();
+            }
+            if (CT->kind == TOK_colon_colon) {
+                AST_node *ast_namespace_access = ast_alloc(AST_namespace_access, CT->line_number);
+                MOVE_NEXT();
+                expect_token(TOK_identifier);
+                ast_namespace_access->namespace_access.body = n;
+                ast_namespace_access->namespace_access.name = CT->value;
+                MOVE_NEXT();
+                n = ast_namespace_access;
             }
         }
     }

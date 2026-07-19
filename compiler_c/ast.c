@@ -170,6 +170,7 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             visit_non_null(n->unary.body, visit, arg);
             break;
         case AST_call:
+            visit_non_null(n->call.target, visit, arg);
             ast_visit_chain(n->call.args, visit, arg);
             break;
         case AST_cast:
@@ -372,19 +373,18 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_call:
-            printf("%.*s%s '%.*s' ", (int)spaces, spc, kind_name, SV_prnt(n->call.name));
-            print_symbol(n->call.symbol);
-            printf(" (%s)\n", get_type_name_r(buf, n->type));
+            printf("%.*s%s ", (int)spaces, spc, kind_name);
+            printf("(%s)\n", get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_cast: {
-                char buf_1[1024], buf_2[1024];
-                printf("%.*s%s '%s' <- '%s'\n", (int)spaces, spc, kind_name,
-                    get_type_name_r(buf_1, n->type),
-                    get_type_name_r(buf_2, n->_cast.right_type));
-                ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-                break;
-            }
+            char buf_1[1024], buf_2[1024];
+            printf("%.*s%s '%s' <- '%s'\n", (int)spaces, spc, kind_name,
+                get_type_name_r(buf_1, n->type),
+                get_type_name_r(buf_2, n->_cast.right_type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        }
         default:
             NOT_IMPLEMENTED("Dumping %s is not implemented yet.\n", ast_kind_name(n->kind));
             break;

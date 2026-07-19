@@ -151,7 +151,6 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
             break;
 
         case AST_call:
-            n->call.symbol = resolver_lookup_symbol(res, &n->call.name, n->line_number, true);
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             break;
 

@@ -125,9 +125,8 @@ typedef struct AST_node_s {
         } program;
 
         struct {
+            struct AST_node_s *target;
             struct AST_node_s *args;
-            Symbol *symbol;
-            SV name;
         } call;
 
         struct {

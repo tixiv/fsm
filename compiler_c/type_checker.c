@@ -92,8 +92,10 @@ void annotate_used_visitor(AST_node *n, uint64_t used) {
             // unused builder string implies handing it to 'puts'
             if (!used) {
                 AST_node *ast_call = ast_alloc(AST_call, n->line_number);
-                ast_call->call.name = mkSV("puts");
-                ast_call->call.symbol = get_symbol_by_name(&builtin_functions, &mkSV("puts"));
+                AST_node *ast_symbol = ast_alloc(AST_symbol, n->line_number);
+                ast_symbol->symbol.name = mkSV("puts");
+                ast_symbol->symbol.symbol = get_symbol_by_name(&builtin_functions, &mkSV("puts"));
+                ast_call->call.target = ast_symbol;
                 ast_insert_node(n, ast_call);
                 ast_visit_children(n, (AstVisitor)annotate_used_visitor, (void*)true);    
             }
@@ -335,8 +337,8 @@ void type_check_builder_string(AST_node *b_str) {
 }
 
 void type_check_call_args(AST_node *n_call) {
-    Type *symbol_type = n_call->call.symbol->type;
-    int num_args_expected = symbol_type->fun.num_arguments;
+    Type *fn_type = n_call->call.target->type;
+    int num_args_expected = fn_type->fun.num_arguments;
     int num_args = ast_count_chain(n_call->call.args);
 
     if (num_args < num_args_expected) type_checker_error(n_call->line_number, "Not enough arguments to function call.\n");
@@ -344,7 +346,7 @@ void type_check_call_args(AST_node *n_call) {
 
     AST_node *arg = n_call->call.args;
     for (int i = 0; i < num_args; i++) {
-        Type *expected_type = symbol_type->fun.argument_types[i];
+        Type *expected_type = fn_type->fun.argument_types[i];
         
         try_convert_to_type_if_necessary(arg, expected_type, "Function argument");
 
@@ -485,13 +487,12 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
         case AST_call:
             type_check_call_args(n);
-            n->type = n->call.symbol->type->fun.return_type;
+            n->type = n->call.target->type->fun.return_type;
             if (!n->type) type_checker_error(n->line_number,
-                "The return type for recursive function '%.*s' can't be determined automatically, please specify it!",
-                SV_prnt(n->call.symbol->name));
+                "The return type for the recursive function can't be determined automatically, please specify it!");
             n->addressable = false;
             break;
-        
+
         case AST_cast:
             ASSERT(n->type, "Cast without a type. It should have been set at construction.\n");
             n->addressable = n->_cast.body->addressable;
