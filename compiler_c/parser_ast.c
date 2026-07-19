@@ -122,15 +122,52 @@ static AST_node *parse_typedecl_postifx(AST_node *inner) {
     return inner;
 }
 
+static AST_node *parse_typedecl() {
+    if (CT->kind == TOK_keyword_fn) {
+        AST_node *ast_fn_type = ast_alloc(AST_function_type, CT->line_number);
+        MOVE_NEXT();
+
+        take_expected(TOK_lparen);
+
+        while (CT->kind != TOK_rparen) {
+            AST_node *arg = parse_typedecl();
+            if (arg == nullptr) parser_error(CT->line_number, "Expected function argument type or ')' but have %s",
+                                        token_kind_printable(CT->kind));
+
+            ast_link_to_chain(&ast_fn_type->_function_type.function_args, arg);
+            if (CT->kind == TOK_komma){
+                MOVE_NEXT();
+            }
+            else if (CT->kind == TOK_rparen) {
+            }
+            else {
+                parser_error(CT->line_number, "Expected ',' or ')' but have %s", token_kind_printable(CT->kind));
+            }
+        }
+        MOVE_NEXT();
+
+        take_expected(TOK_colon);
+
+        ast_fn_type->_function_type.function_ret = parse_typedecl();
+        return ast_fn_type;
+    }
+    else if (CT->kind == TOK_identifier) {
+        AST_node *ast_type = ast_alloc(AST_typename, CT->line_number);
+        ast_type->_typename.name = CT->value;
+        MOVE_NEXT();
+        return parse_typedecl_postifx(ast_type);
+    }
+    
+    return nullptr;
+}
+
 static AST_node *try_parse_typedecl() {
     if(CT->kind == TOK_colon) {
         MOVE_NEXT();
-        AST_node *ast_type = ast_alloc(AST_typename, CT->line_number);
-        expect_token(TOK_identifier);
-        ast_type->_typename.name = CT->value;
-        MOVE_NEXT();
-
-        return parse_typedecl_postifx(ast_type);
+        AST_node *n = parse_typedecl();
+        if (!n)
+            parser_error(CT->line_number, "Expected typename but have %s", token_kind_printable(CT->kind));
+        return n;
     }
     return nullptr;
 }

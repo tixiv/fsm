@@ -6,6 +6,7 @@
 #include "string_builder.h"
 #include "sv.h"
 #include <malloc.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -140,6 +141,10 @@ bool is_reference_kind(Type *t) {
     return t->kind == T_reference;
 }
 
+bool is_function_kind(Type *t) {
+    return t->kind == T_function;
+}
+
 int get_ref_order(Type *t) {
     int ord = 0;
     while (is_reference_kind(t)) {
@@ -247,6 +252,7 @@ void calculate_storage_size(Type *_struct) {
 }
 
 size_t get_function_arguments_size(Type *t) {
+    if (is_reference_kind(t)) t = dereferenced_type(t);
     ASSERT(t->kind == T_function,"get_function_arguments_size() called on something that is not a function.\n")
     size_t size = 0;
     for (int i = 0; i < t->fun.num_arguments; i++) {
@@ -336,6 +342,32 @@ Type *get_sclice_type(Type *element_type) {
     Type *slice = make_slice_type(element_type);
     dyn_array_push_p(&slice_types, slice);
     return slice;
+}
+
+Dyn_array function_types;
+
+Type *get_function_type(Type *ret_type, Type *arg_types[], size_t num_args) {
+    if (function_types.capacity == 0)
+        dyn_array_init(&function_types, sizeof(Type*), 16);
+
+    for (int i = 0; i < function_types.count; i++) {
+        Type *fn_type = ((Type**)function_types.data)[i];
+        if (fn_type->fun.return_type == ret_type && fn_type->fun.num_arguments == num_args) {
+            for (size_t i = 0; i < fn_type->fun.num_arguments; i++) {
+                if (fn_type->fun.argument_types[i] != arg_types[i]) goto next;
+            }
+            return fn_type;
+        }
+        next:;
+    }
+    Type * new_fun = type_alloc(T_function);
+    new_fun->fun.return_type = ret_type;
+    new_fun->fun.num_arguments = num_args;
+    new_fun->fun.argument_types = malloc(sizeof(Type*) * num_args);
+    for (int i = 0; i < num_args; i++)
+        new_fun->fun.argument_types[i] = arg_types[i];
+    dyn_array_push_p(&function_types, new_fun);
+    return new_fun;
 }
 
 bool is_slice_type(Type *t) {

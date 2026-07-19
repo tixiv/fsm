@@ -13,9 +13,13 @@
 #include <stdint.h>
 #include <string.h>
 
+static AST_node *ast_root;
+
 static void type_checker_error(int line_number, const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
+
+    ast_dump_tree(ast_root);
 
     fprintf(stderr, "[FSM Type Checker] %s:%d Error: ", current_filename, line_number);
     vfprintf(stderr, fmt, args);
@@ -336,29 +340,52 @@ void type_check_builder_string(AST_node *b_str) {
     }
 }
 
-void type_check_call_args(AST_node *n_call) {
+typedef struct {
+    Symbol *current_function_symbol;
+    Type *current_function_ret_type_decl;
+    Type *current_function_ret_type;
+    Dyn_array arg_symbols;
+} PropagationVisitorData;
+
+void type_check_function_call(AST_node *n_call, PropagationVisitorData *prop) {
+    char buf[1024];
     Type *fn_type = n_call->call.target->type;
+    if (is_reference_kind(fn_type)) fn_type = dereferenced_type(fn_type);
+
+    if (!is_function_kind(fn_type)) type_checker_error(n_call->line_number,
+            "Trying to call something that is not a function. have '%s'", get_type_name_r(buf, n_call->call.target->type));
+
     int num_args_expected = fn_type->fun.num_arguments;
     int num_args = ast_count_chain(n_call->call.args);
 
-    if (num_args < num_args_expected) type_checker_error(n_call->line_number, "Not enough arguments to function call.\n");
-    if (num_args > num_args_expected) type_checker_error(n_call->line_number, "Too many arguments to function call.\n");
+    if (num_args < num_args_expected) type_checker_error(n_call->line_number,
+            "Not enough arguments to function call. Expected %d, got %d.\n", num_args_expected, num_args);
+    
+    if (num_args > num_args_expected) type_checker_error(n_call->line_number,
+            "Too many arguments to function call. Expected %d, got %d.\n", num_args_expected, num_args);
 
     AST_node *arg = n_call->call.args;
     for (int i = 0; i < num_args; i++) {
         Type *expected_type = fn_type->fun.argument_types[i];
-        
-        try_convert_to_type_if_necessary(arg, expected_type, "Function argument");
 
+        try_convert_to_type_if_necessary(arg, expected_type, "Function argument");
         arg = arg->next;
     }
+    
+    n_call->type = fn_type->fun.return_type;
 }
 
-typedef struct {
-    Symbol *current_function_symbol;
-    Type *current_cuntion_type_decl;
-    Dyn_array arg_symbols;
-} PropagationVisitorData;
+void update_current_function_type(PropagationVisitorData *prop) {
+    // Check ret type changed during function type propagating
+    if (prop->current_function_symbol->type->fun.return_type != prop->current_function_ret_type)
+    {
+        // yes: update function symbol with proper type
+        prop->current_function_symbol->type =
+            get_function_type(prop->current_function_ret_type,
+                prop->current_function_symbol->type->fun.argument_types,
+                prop->current_function_symbol->type->fun.num_arguments);
+    }
+}
 
 void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
     char buf_1[1024]; char buf_2[1024];
@@ -367,18 +394,23 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
     switch (n->kind) {
         case AST_function:
             prop->current_function_symbol = n->fun.symbol;
-            prop->current_cuntion_type_decl = nullptr;
-            n->fun.symbol->type = type_alloc(T_function);
+            prop->current_function_ret_type_decl = nullptr;
+            prop->current_function_ret_type = nullptr;
 
             if (n->fun.ret_typedecl) {
                 type_propagation_visitor(n->fun.ret_typedecl, prop);
-                n->fun.symbol->type->fun.return_type = n->fun.ret_typedecl->type;
-                prop->current_cuntion_type_decl = n->fun.ret_typedecl->type;
+                prop->current_function_ret_type = n->fun.ret_typedecl->type;
+                prop->current_function_ret_type_decl = n->fun.ret_typedecl->type;
             }
             
             if (n->fun.args) type_propagation_visitor(n->fun.args, prop);
             if (n->fun.body) type_propagation_visitor(n->fun.body, prop);
+
+            update_current_function_type(prop);
+
             prop->current_function_symbol = nullptr;
+            prop->current_function_ret_type = nullptr;
+            prop->current_function_ret_type_decl = nullptr;
             break;
 
         case AST_arg_list: {
@@ -394,8 +426,8 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                 arg_types[i] = get_symbol(&prop->arg_symbols, i)->type;
             }
 
-            s_fun->type->fun.num_arguments = prop->arg_symbols.count;
-            s_fun->type->fun.argument_types = arg_types;
+            prop->current_function_symbol->type =
+                get_function_type(prop->current_function_ret_type, arg_types, prop->arg_symbols.count);
             break;
         }
 
@@ -474,6 +506,23 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
         }
         case AST_symbol: {
+            // check for recursive use of the function we are propagating right now
+            if (n->symbol.symbol == prop->current_function_symbol &&
+                !n->symbol.symbol->type->fun.return_type)
+            {
+                // Maybe we have a return type by now? In the recursive fibonacci
+                // test we would for example because it returns something before
+                // doing the recursion
+                update_current_function_type(prop);
+
+                // Still no return type?
+                if (!n->symbol.symbol->type->fun.return_type) {
+                    type_checker_error(n->line_number,
+                        "The return type for function '%.*s()' can't be determined automatically in recursive use. Please specify it!",
+                        SV_prnt(n->symbol.name));
+                }
+            }
+            
             Type *t = n->symbol.symbol->type;
             n->type = t;
             n->addressable = true;
@@ -486,10 +535,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_call:
-            type_check_call_args(n);
-            n->type = n->call.target->type->fun.return_type;
-            if (!n->type) type_checker_error(n->line_number,
-                "The return type for the recursive function can't be determined automatically, please specify it!");
+            type_check_function_call(n, prop);
             n->addressable = false;
             break;
 
@@ -506,17 +552,15 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             else
                 ret_type = &builtin_void;
 
-            Type **fun_ret_type = &prop->current_function_symbol->type->fun.return_type;
-
-            if (*fun_ret_type == nullptr) {
-                *fun_ret_type = ret_type;
+            if (prop->current_function_ret_type == nullptr) {
+                prop->current_function_ret_type = ret_type;
             } else {
-                if (prop->current_cuntion_type_decl && prop->current_cuntion_type_decl != &builtin_void) {
+                if (prop->current_function_ret_type_decl && prop->current_function_ret_type_decl != &builtin_void) {
                     if (ret_type == &builtin_void) type_checker_error(n->line_number, "'return' without a value in function returning non void.\n");
-                    try_convert_to_type_if_necessary(n->ret.body, prop->current_cuntion_type_decl, "Return argument");
-                } else if (!types_are_equivalent(*fun_ret_type, ret_type)) {
+                    try_convert_to_type_if_necessary(n->ret.body, prop->current_function_ret_type_decl, "Return argument");
+                } else if (!types_are_equivalent(prop->current_function_ret_type, ret_type)) {
                     type_checker_error(n->line_number, "Returning different types from the same function. Have '%s' and '%s'. Please declare a return type!\n",
-                        get_type_name_r(buf_1, *fun_ret_type), get_type_name_r(buf_2, ret_type));
+                        get_type_name_r(buf_1, prop->current_function_ret_type), get_type_name_r(buf_2, ret_type));
                 }
             }
             n->type = &builtin_void; // The return itself always has 'void' type.
@@ -750,6 +794,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
         case AST_type_ref:
         case AST_type_array:
         case AST_type_slice:
+        case AST_function_type:
             // already filled in by type resolver
             break;
 
@@ -768,9 +813,11 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 }
 
 void run_typechecking(AST_node *root) {
+    ast_root = root;
+
+    annotate_used_visitor(root, 0);
+
     PropagationVisitorData pvd = {0};
     dyn_array_init(&pvd.arg_symbols, sizeof(void*), 8);
     type_propagation_visitor(root, &pvd);
-
-    annotate_used_visitor(root, 0);
 }

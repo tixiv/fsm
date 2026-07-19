@@ -46,12 +46,7 @@ Dyn_array builtin_functions; // Dyn_array<Symbol*>
 
 void declare_builtin_fn(SV name, Type *return_type, size_t num_args, Type *arg_types[]) {
     Symbol *s = alloc_symbol(SYM_global, name);
-    s->type = type_alloc(T_function);
-    s->type->fun.return_type = return_type;
-    s->type->fun.num_arguments = num_args;
-    s->type->fun.argument_types = malloc(sizeof(Type*) * num_args);
-    for (int i = 0; i < num_args; i++)
-        s->type->fun.argument_types[i] = arg_types[i];
+    s->type = get_function_type(return_type, arg_types, num_args);
     dyn_array_push_p(&builtin_functions, s);
 }
 

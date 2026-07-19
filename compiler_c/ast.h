@@ -64,6 +64,7 @@ typedef struct {
     X(AST_type_ref) \
     X(AST_type_array) \
     X(AST_type_slice) \
+    X(AST_function_type) \
     X(AST_member_access) \
     X(AST_namespace_access) \
     X(AST_array_to_slice) \
@@ -260,6 +261,11 @@ typedef struct AST_node_s {
         struct {
             SV name;
         } _typename;
+
+        struct {
+            struct AST_node_s *function_args;
+            struct AST_node_s *function_ret;
+        } _function_type;
 
         struct {
             struct AST_node_s *body;

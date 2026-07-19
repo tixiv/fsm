@@ -103,6 +103,7 @@ bool is_array_kind(Type *t);
 bool is_struct_kind(Type *t);
 bool is_enum_kind(Type *t);
 bool is_reference_kind(Type *t);
+bool is_function_kind(Type *t);
 
 bool is_slice_type(Type *t);
 
@@ -125,6 +126,8 @@ Type *get_ref_type_for(Type *t);
 
 Type *get_array_type(Type *element_type, size_t n_elements);
 Type *get_sclice_type(Type *element_type);
+Type *get_function_type(Type *ret_type, Type *arg_types[], size_t num_args);
+
 Type *get_slice_element_type(Type *slice);
 
 bool is_castable_to(Type *to, Type *from, const char **out_warn);
@@ -137,3 +140,4 @@ struct AST_node_s *make_cast(Type *to, Type *from);
 int64_t get_max_enum_value (Type *t);
 int64_t get_min_enum_value (Type *t);
 EnumMember *get_enum_member_by_value(Type *t, int64_t value);
+

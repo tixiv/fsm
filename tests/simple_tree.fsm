@@ -1,34 +1,52 @@
 
+import * from "std";
+
+enum NodeKind {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Number,
+}
+
 struct TreeNode {
-    type: i64;
+    kind: NodeKind;
     value: i64;
     left: TreeNode&;
     right: TreeNode&;
 }
 
 fn init_number (n: TreeNode&, v) {
-    n.type = 0;
+    n.kind = NodeKind::Number;
     n.value = v;
 }
 
-fn init_add (n: TreeNode&, left: TreeNode&, right: TreeNode&) {
-    n.type = 1;
+fn init_operator (n: TreeNode&, kind: NodeKind, left: TreeNode&, right: TreeNode&) {
+    n.kind = kind
     n.left => left;
     n.right => right;
 }
 
-fn tree_visitor(n: TreeNode&) : i64 {
-    if (n.type == 1) {
-        let a = tree_visitor(n.left)
-        let b = tree_visitor(n.right)
-        puts("+\n=")
-        print (a + b)
-        return a + b
+fn visit_children (n: TreeNode&, visit: fn (TreeNode&) : void ) {
+    if (n.kind == NodeKind::Add |== NodeKind::Sub |== NodeKind::Mul |== NodeKind::Div) {
+        visit(n.left)
+        visit(n.right)
+    }
+    else if (n.kind == NodeKind::Number)
+    {}
+    else $"Visiting {n.kind.name} is not implemented yet.\n"
+}
+
+fn tree_visitor(n: TreeNode&) : void {
+    if (n.kind == NodeKind::Add) {
+        visit_children(n, tree_visitor)
+        let a = n.left.value
+        let b = n.right.value
+        n.value = a + b
+        $"+\n={n.value}\n"
     } else {
         print (n.value)
-        return n.value
     }
-    return 0
 }
 
 fn main () {
@@ -39,9 +57,9 @@ fn main () {
     let c: TreeNode;
     init_number(&c, 13370000);
     let add_1: TreeNode;
-    init_add(&add_1, &a, &b);
+    init_operator(&add_1, NodeKind::Add, &a, &b);
     let add_2: TreeNode;
-    init_add(&add_2, &add_1, &c);
+    init_operator(&add_2, NodeKind::Add, &add_1, &c);
 
     tree_visitor(&add_2)
 }

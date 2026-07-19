@@ -70,6 +70,7 @@ void ast_insert_node(AST_node *at, AST_node *new_node) {
 
     new_node->line_number = at->line_number;
     new_node->next = at->next;
+    new_node->result_used = at->result_used;
 
     switch (new_node->kind) {
         case AST_cast:           new_node->_cast.body = at_copy; break;
@@ -232,6 +233,10 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             visit_non_null(n->builder_string.var_decl_arr, visit, arg);
             ast_visit_chain(n->builder_string.body, visit, arg);
             break;
+        case AST_function_type:
+            ast_visit_chain(n->_function_type.function_args, visit, arg);
+            visit_non_null(n->_function_type.function_ret, visit, arg);
+            break;
 
         case AST_enum_member:
         case AST_symbol:
@@ -285,6 +290,7 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
         case AST_array_access:
         case AST_array_len:
         case AST_array_to_slice:
+        case AST_function_type:
             printf("%.*s%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
@@ -334,6 +340,9 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             break;
         case AST_number:
             printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->number.value), get_type_name_r(buf, n->type));
+            break;
+        case AST_bool:
+            printf("%.*s%s '%d' (%s)\n", (int)spaces, spc, kind_name, n->boolean.value, get_type_name_r(buf, n->type));
             break;
         case AST_string:
         case AST_char_constant:

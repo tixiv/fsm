@@ -7,6 +7,7 @@
 #include "type.h"
 #include "symbol.h"
 #include <stdarg.h>
+#include <stddef.h>
 #include <string.h>
 
 static void type_resolver_error(int line_number, const char * fmt, ...) {
@@ -198,6 +199,21 @@ void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
             ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
             n->type = get_type_by_name(&n->_typename.name);
             if (!n->type) type_resolver_error(n->line_number, "The typename '%.*s' could not be resolved.\n", SV_prnt(n->_typename.name));
+            break;
+        }
+
+        case AST_function_type: {
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
+
+            size_t num_arguments = ast_count_chain(n->_function_type.function_args);
+            Type**args = malloc(sizeof(Type*) * num_arguments);
+            AST_node *arg = n->_function_type.function_args;
+            for (size_t i = 0; i < num_arguments; i++) {
+                args[i] = arg->type;
+                arg = arg->next;
+            }
+
+            n->type = get_ref_type_for(get_function_type(n->_function_type.function_ret->type, args, num_arguments));
             break;
         }
 

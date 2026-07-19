@@ -400,6 +400,11 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file, "\t" "call fn_" SV_FMT "\n", SV_prnt(op->string_value));
                 if (op->size) fprintf(file, "\t" "add rsp, %lu\n", op->size);
                 break;
+            case OP_icall:
+                fprintf(file, "\t" "pop rax\n");
+                fprintf(file, "\t" "call rax\n");
+                if (op->size) fprintf(file, "\t" "add rsp, %lu\n", op->size);
+                break;
             case OP_push_result:
                 if      (op->size == 0);
                 else if (op->size <= 8) fprintf(file, "\t" "push rax\n");
@@ -440,6 +445,10 @@ void output_asm(const char *asm_file_name) {
                 break;
             case OP_push_local_var_address:
                 fprintf(file, "\t" "lea rax, [rbp-%lu]\n", op->u64_value);
+                fprintf(file, "\t" "push rax\n");
+                break;
+            case OP_push_global_address:
+                fprintf(file, "\t" "mov rax, fn_%.*s\n", SV_prnt(op->string_value));
                 fprintf(file, "\t" "push rax\n");
                 break;
             case OP_if:
