@@ -61,34 +61,30 @@ void ast_link_to_chain(AST_node **chain_p, AST_node *n) {
     }
 }
 
-void ast_insert_node(AST_node **at, AST_node *new_node) {
-    AST_node *child = *at;
-    switch (new_node->kind) {
-        case AST_cast:
-            new_node->_cast.body = child;
-            break;
-        
-        case AST_dereference:
-            new_node->deref.body = child;
-            break;
+void ast_insert_node(AST_node *at, AST_node *new_node) {
+    // We overwrite the old node with the new one.
+    // make a copy first.
+    AST_node *at_copy = ast_alloc(at->kind, at->line_number);
+    memcpy (at_copy, at, sizeof(AST_node));
+    at_copy->next = nullptr; // zero chain pointer in case it was used
 
-        case AST_reference:
-            new_node->reference.body = child;
-            break;
-        
-        case AST_array_to_slice:
-            new_node->_array_to_slice.body = child;
-            break;
-        
+    new_node->line_number = at->line_number;
+    new_node->next = at->next;
+
+    switch (new_node->kind) {
+        case AST_cast:           new_node->_cast.body = at_copy; break;
+        case AST_dereference:    new_node->deref.body = at_copy; break;
+        case AST_reference:      new_node->reference.body = at_copy; break;
+        case AST_array_to_slice: new_node->_array_to_slice.body = at_copy; break;
+        case AST_call:           new_node->call.args = at_copy; break;
+
         default:
             NOT_IMPLEMENTED("Inserting AST node of kind %s is not implemented yet.\n", ast_kind_name(new_node->kind));
-
     }
 
-    new_node->line_number = child->line_number;
-    new_node->next = child->next;
-    child->next = 0;
-    *at = new_node;
+    // overwrite the old node with the new one that has the old
+    // ones copy linked
+    memcpy(at, new_node, sizeof(AST_node));
 }
 
 void ast_remove_node(AST_node *n) {
@@ -239,6 +235,7 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_enum_member:
         case AST_symbol:
         case AST_number:
+        case AST_bool:
         case AST_string:
         case AST_char_constant:
         case AST_array_len:

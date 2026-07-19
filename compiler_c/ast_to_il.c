@@ -361,6 +361,10 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             push_opcode(OP_push_literal, &n->number.value, 0);
             break;
 
+        case AST_bool:
+            push_opcode(OP_push_literal, nullptr, n->boolean.value);
+            break;
+
         case AST_array_len:
             push_opcode(OP_push_literal, nullptr, n->array_len.len);
             break;

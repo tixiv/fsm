@@ -8,6 +8,7 @@
 #include "common.h"
 #include "string_builder.h"
 #include "resolver.h"
+#include "symbol.h"
 #include <stdarg.h>
 #include <stdint.h>
 #include <string.h>
@@ -87,6 +88,17 @@ void annotate_used_visitor(AST_node *n, uint64_t used) {
             }
             break;
 
+        case AST_builder_string:
+            // unused builder string implies handing it to 'puts'
+            if (!used) {
+                AST_node *ast_call = ast_alloc(AST_call, n->line_number);
+                ast_call->call.name = mkSV("puts");
+                ast_call->call.symbol = get_symbol_by_name(&builtin_functions, &mkSV("puts"));
+                ast_insert_node(n, ast_call);
+                ast_visit_children(n, (AstVisitor)annotate_used_visitor, (void*)true);    
+            }
+            break;
+
         default:
             ast_visit_children(n, (AstVisitor)annotate_used_visitor, (void*)used);
             break;
@@ -94,30 +106,30 @@ void annotate_used_visitor(AST_node *n, uint64_t used) {
 }
 
 
-void insert_dereference(AST_node **n) {
-    ASSERT (is_reference_kind((*n)->type), "Trying to insert dereference for something that is not a reference.\n")
+void insert_dereference(AST_node *n) {
+    ASSERT (is_reference_kind(n->type), "Trying to insert dereference for something that is not a reference.\n")
     AST_node *deref = ast_alloc(AST_dereference, 0);
-    deref->type = dereferenced_type((*n)->type);
+    deref->type = dereferenced_type(n->type);
     deref->addressable = true;
     ast_insert_node(n, deref);
 }
 
-void auto_dereference(AST_node **n) {
-    if (!is_reference_kind((*n)->type)) return;
+void auto_dereference(AST_node *n) {
+    if (!is_reference_kind(n->type)) return;
     insert_dereference(n);
 }
 
-void insert_take_reference(AST_node **n) {
+void insert_take_reference(AST_node *n) {
     AST_node *ref = ast_alloc(AST_reference, 0);
-    ref->type = get_ref_type_for((*n)->type);
+    ref->type = get_ref_type_for(n->type);
     ref->addressable = false;
     ast_insert_node(n, ref);
 }
 
-void try_convert_to_type_if_necessary(AST_node **n, Type *target_type, const char *desc) {
+void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char *desc) {
     char buf_1[1024], buf_2[1024];
 
-    Type *original_type = (*n)->type;
+    Type *original_type = n->type;
 
     if (target_type == original_type) return;
 
@@ -125,23 +137,23 @@ void try_convert_to_type_if_necessary(AST_node **n, Type *target_type, const cha
         insert_dereference(n);
     }
     
-    if (is_slice_type(target_type) && is_array_kind((*n)->type)) {
+    if (is_slice_type(target_type) && is_array_kind(n->type)) {
         
-        if (get_slice_element_type(target_type) == (*n)->type->_array.element_type) {
-            AST_node *conv = ast_alloc(AST_array_to_slice, (*n)->line_number);
-            conv->type = get_sclice_type((*n)->type->_array.element_type);
+        if (get_slice_element_type(target_type) == n->type->_array.element_type) {
+            AST_node *conv = ast_alloc(AST_array_to_slice, n->line_number);
+            conv->type = get_sclice_type(n->type->_array.element_type);
             ast_insert_node(n, conv);
             return;
         }
         else {
-            type_checker_error((*n)->line_number, "Can't convert %s of type '%s' to '%s'.\n",
+            type_checker_error(n->line_number, "Can't convert %s of type '%s' to '%s'.\n",
                 desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
         }
     }
 
     if (target_type == get_ref_type_for(&builtin_any)) {
         if (!is_reference_kind(original_type)) {
-            if ((*n)->addressable == false) type_checker_error((*n)->line_number, "Can't convert %s of type '%s' to '%s' because it is not addressable.\n",
+            if (n->addressable == false) type_checker_error(n->line_number, "Can't convert %s of type '%s' to '%s' because it is not addressable.\n",
                     desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
             
             insert_take_reference(n);
@@ -150,23 +162,23 @@ void try_convert_to_type_if_necessary(AST_node **n, Type *target_type, const cha
     }
 
     if (is_reference_kind(target_type) && !is_reference_kind(original_type)) {
-        if ((*n)->addressable == false) type_checker_error((*n)->line_number, "Can't convert %s of type '%s' to '%s' because it is not addressable.\n",
+        if (n->addressable == false) type_checker_error(n->line_number, "Can't convert %s of type '%s' to '%s' because it is not addressable.\n",
                 desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
         insert_take_reference(n);
     }
 
-    if ((*n)->type == target_type) return;
+    if (n->type == target_type) return;
 
-    if (is_integer_kind(target_type) && is_enum_kind((*n)->type)) return;
-    if (is_enum_kind(target_type) && is_integer_kind((*n)->type)) return;
+    if (is_integer_kind(target_type) && is_enum_kind(n->type)) return;
+    if (is_enum_kind(target_type) && is_integer_kind(n->type)) return;
 
     const char *warning;
-    if (is_castable_to(target_type, (*n)->type, &warning)) {
-        ast_insert_node(n, make_cast(target_type, (*n)->type));
-        if (warning) type_checker_warning((*n)->line_number, warning);
+    if (is_castable_to(target_type, n->type, &warning)) {
+        ast_insert_node(n, make_cast(target_type, n->type));
+        if (warning) type_checker_warning(n->line_number, warning);
     }
     else {
-        type_checker_error((*n)->line_number, "Can't convert %s of type '%s' to '%s'.\n",
+        type_checker_error(n->line_number, "Can't convert %s of type '%s' to '%s'.\n",
             desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
     }
 }
@@ -184,7 +196,7 @@ void type_propagate_binary_operator(AST_node *n) {
         if (!is_reference_kind(n->binary.right->type)) {
             if (!n->binary.right->addressable) type_checker_error(n->line_number, "Operator %s requires either another reference or something addressable on the right side. Have '%s' and '%s'.\n",
                 token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
-            insert_take_reference(&n->binary.right);
+            insert_take_reference(n->binary.right);
         }
 
         Type *any_ref = get_ref_type_for(&builtin_any);
@@ -210,8 +222,8 @@ void type_propagate_binary_operator(AST_node *n) {
             case TOK_slash:
             case TOK_percent:
             case TOK_up_arrow:
-                try_convert_to_type_if_necessary(&n->binary.left, &builtin_i64, sb_left.buffer);
-                try_convert_to_type_if_necessary(&n->binary.right, &builtin_i64, sb_right.buffer);
+                try_convert_to_type_if_necessary(n->binary.left, &builtin_i64, sb_left.buffer);
+                try_convert_to_type_if_necessary(n->binary.right, &builtin_i64, sb_right.buffer);
 
                 n->type = &builtin_i64;
                 break;
@@ -220,23 +232,23 @@ void type_propagate_binary_operator(AST_node *n) {
             case TOK_lower:
             case TOK_greater_equal:
             case TOK_lower_equal:
-                try_convert_to_type_if_necessary(&n->binary.left, &builtin_i64, sb_left.buffer);
-                try_convert_to_type_if_necessary(&n->binary.right, &builtin_i64, sb_right.buffer);
+                try_convert_to_type_if_necessary(n->binary.left, &builtin_i64, sb_left.buffer);
+                try_convert_to_type_if_necessary(n->binary.right, &builtin_i64, sb_right.buffer);
 
                 n->type = &builtin_bool;
                 break;
             
             case TOK_boolean_and:
             case TOK_boolean_or:
-                try_convert_to_type_if_necessary(&n->binary.left, &builtin_bool, sb_left.buffer);
-                try_convert_to_type_if_necessary(&n->binary.right, &builtin_bool, sb_right.buffer);
+                try_convert_to_type_if_necessary(n->binary.left, &builtin_bool, sb_left.buffer);
+                try_convert_to_type_if_necessary(n->binary.right, &builtin_bool, sb_right.buffer);
                 n->type = &builtin_bool;            
                 break;
             
             case TOK_equal:
             case TOK_unequal: {
-                auto_dereference(&n->binary.left);
-                auto_dereference(&n->binary.right);
+                auto_dereference(n->binary.left);
+                auto_dereference(n->binary.right);
                 bool okay = n->binary.left->type == n->binary.right->type || (is_integer_kind(n->binary.left->type) && is_integer_kind(n->binary.right->type));
                 if (!okay) {
                     type_checker_error(n->line_number, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
@@ -247,8 +259,8 @@ void type_propagate_binary_operator(AST_node *n) {
             }
 
             case TOK_equal_assign:
-                auto_dereference(&n->binary.left);
-                auto_dereference(&n->binary.right);
+                auto_dereference(n->binary.left);
+                auto_dereference(n->binary.right);
 
                 if (types_are_equivalent(n->binary.left->type, n->binary.right->type)) {
                 }
@@ -278,8 +290,8 @@ void type_check_variadic_operator (AST_node *n){
         case TOK_greater_equal:
         case TOK_lower_equal:
             for (int i = 0; i < n->variadic_operator.num_members; i++) {
-                try_convert_to_type_if_necessary(&n->variadic_operator.left, &builtin_i64, "Argument of variadic operator");
-                try_convert_to_type_if_necessary(&n->variadic_operator.members[i].right, &builtin_i64, "Argument of variadic operator");                
+                try_convert_to_type_if_necessary(n->variadic_operator.left, &builtin_i64, "Argument of variadic operator");
+                try_convert_to_type_if_necessary(n->variadic_operator.members[i].right, &builtin_i64, "Argument of variadic operator");                
             }
             n->type = &builtin_bool;
             n->addressable = false;
@@ -287,14 +299,14 @@ void type_check_variadic_operator (AST_node *n){
         
         case TOK_equal:
         case TOK_unequal:
-            auto_dereference(&n->variadic_operator.left);
+            auto_dereference(n->variadic_operator.left);
             
             Type *left_type = n->variadic_operator.left->type;
             bool all_same_type = true;
             bool all_integer = is_integer_kind(left_type);
 
             for (int i = 0; i < n->variadic_operator.num_members; i++) {
-                auto_dereference(&n->variadic_operator.members[i].right);
+                auto_dereference(n->variadic_operator.members[i].right);
                 if (left_type != n->variadic_operator.members[i].right->type) all_same_type = false;
                 if (!is_integer_kind(n->variadic_operator.members[i].right->type)) all_integer = false;
             }
@@ -314,10 +326,10 @@ void type_check_variadic_operator (AST_node *n){
 }
 
 void type_check_builder_string(AST_node *b_str) {
-    for (AST_node **n = &b_str->builder_string.body; *n; n = &(*n)->next) {
+    for (AST_node *n = b_str->builder_string.body; n; n = n->next) {
         auto_dereference(n);
-        if (is_integer_kind((*n)->type)) continue;
-        if ((*n)->type == &builtin_u8_slice) continue;
+        if (is_integer_kind(n->type)) continue;
+        if (n->type == &builtin_u8_slice) continue;
         try_convert_to_type_if_necessary(n, &builtin_i64, "Argument of builder string");
     }
 }
@@ -330,13 +342,13 @@ void type_check_call_args(AST_node *n_call) {
     if (num_args < num_args_expected) type_checker_error(n_call->line_number, "Not enough arguments to function call.\n");
     if (num_args > num_args_expected) type_checker_error(n_call->line_number, "Too many arguments to function call.\n");
 
-    AST_node **arg = &n_call->call.args;
+    AST_node *arg = n_call->call.args;
     for (int i = 0; i < num_args; i++) {
         Type *expected_type = symbol_type->fun.argument_types[i];
         
         try_convert_to_type_if_necessary(arg, expected_type, "Function argument");
 
-        arg = &(*arg)->next;
+        arg = arg->next;
     }
 }
 
@@ -396,6 +408,10 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             n->type = &builtin_i64;
             n->addressable = false;
             break;
+        case AST_bool:
+            n->type = &builtin_bool;
+            n->addressable = false;
+            break;
         case AST_var_decl: {
             Type *t;
             if (n->var_decl._typedecl) {
@@ -413,7 +429,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                             get_type_name_r(buf_1, t));
                     }
                     else if (ord) {
-                        insert_dereference(&n->var_decl.initializer);
+                        insert_dereference(n->var_decl.initializer);
                         t = dereferenced_type(t);
                     }
                 } else if (n->var_decl.initializer_operator == TOK_bind_ref) {
@@ -423,7 +439,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                     if (!is_reference_kind(n->var_decl.initializer->type)) {
                         if (!n->var_decl.initializer->addressable) type_checker_error(n->line_number, "Can't bind a reference to a non addressable target.\n");
                         t = get_ref_type_for(n->var_decl.initializer->type);
-                        insert_take_reference(&n->var_decl.initializer);
+                        insert_take_reference(n->var_decl.initializer);
                     }
                     else {
                         t = n->var_decl.initializer->type;
@@ -438,7 +454,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             n->var_decl.symbol->type = t;
 
             if (n->var_decl.initializer)
-                try_convert_to_type_if_necessary(&n->var_decl.initializer, t, "Initializer");
+                try_convert_to_type_if_necessary(n->var_decl.initializer, t, "Initializer");
 
             n->type = &builtin_void; // the declaration itself has no value.
             break;
@@ -496,7 +512,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             } else {
                 if (prop->current_cuntion_type_decl && prop->current_cuntion_type_decl != &builtin_void) {
                     if (ret_type == &builtin_void) type_checker_error(n->line_number, "'return' without a value in function returning non void.\n");
-                    try_convert_to_type_if_necessary(&n->ret.body, prop->current_cuntion_type_decl, "Return argument");
+                    try_convert_to_type_if_necessary(n->ret.body, prop->current_cuntion_type_decl, "Return argument");
                 } else if (!types_are_equivalent(*fun_ret_type, ret_type)) {
                     type_checker_error(n->line_number, "Returning different types from the same function. Have '%s' and '%s'. Please declare a return type!\n",
                         get_type_name_r(buf_1, *fun_ret_type), get_type_name_r(buf_2, ret_type));
@@ -513,7 +529,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_while:
-            try_convert_to_type_if_necessary(&n->_while.condition, &builtin_bool, "'while' loop condition");
+            try_convert_to_type_if_necessary(n->_while.condition, &builtin_bool, "'while' loop condition");
             n->type = &builtin_void;
             n->addressable = false;
             break;
@@ -521,7 +537,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
         case AST_for:
             n->type = &builtin_void;
             if (n->_for.condition)
-                try_convert_to_type_if_necessary(&n->_for.condition, &builtin_bool, "'for' loop condition");
+                try_convert_to_type_if_necessary(n->_for.condition, &builtin_bool, "'for' loop condition");
             if (n->_for.result)
                 n->type = n->_for.result->type;
 
@@ -529,7 +545,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
         
         case AST_if:
-            try_convert_to_type_if_necessary(&n->_if.condition, &builtin_bool, "'if' condition");
+            try_convert_to_type_if_necessary(n->_if.condition, &builtin_bool, "'if' condition");
             Type *_if_type = n->_if.if_clause->type;
             Type *_else_type = n->_if.else_clause ? n->_if.else_clause->type : &builtin_void;
             if (n->result_used && _if_type != _else_type) {
@@ -553,7 +569,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
         case AST_array_access:
             if (is_reference_kind(n->_array.array->type))
-                insert_dereference(&n->_array.array);
+                insert_dereference(n->_array.array);
 
             if (is_array_kind(n->_array.array->type)) {
                 n->type = get_ref_type_for(n->_array.array->type->_array.element_type);    
@@ -599,11 +615,11 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
         case AST_unary:
             if (n->unary.token_kind == TOK_exclam) {
-                try_convert_to_type_if_necessary(&n->unary.body, &builtin_bool, "Argument of unary '!'");
+                try_convert_to_type_if_necessary(n->unary.body, &builtin_bool, "Argument of unary '!'");
                 n->type = &builtin_bool;
             }
             else if (n->unary.token_kind == TOK_minus) {
-                try_convert_to_type_if_necessary(&n->unary.body, &builtin_i64, "Argument of unary '-'");
+                try_convert_to_type_if_necessary(n->unary.body, &builtin_i64, "Argument of unary '-'");
                 n->type = &builtin_i64;
             }
             else NOT_IMPLEMENTED("Type checking unary operator %s is not implemented yet.\n", token_kind_printable(n->unary.token_kind));
@@ -612,7 +628,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
         
         case AST_plus_plus: {
             Type * original_type = n->plus_plus.body->type;
-            auto_dereference(&n->plus_plus.body);
+            auto_dereference(n->plus_plus.body);
             if (is_slice_type(n->plus_plus.body->type)) {
                 if (n->result_used) type_checker_error(n->line_number, "Operator '++' on slice type argument has no value which can be used.\n");
                 n->type = &builtin_void;
@@ -630,7 +646,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
         case AST_minus_minus: {
             Type * original_type = n->minus_minus.body->type;
-            auto_dereference(&n->minus_minus.body);
+            auto_dereference(n->minus_minus.body);
             if (!is_integer_kind(n->minus_minus.body->type)) {
                 type_checker_error(n->line_number, "Operator '--' needs integer type argument. Have '%s'",
                     get_type_name_r(buf_1, original_type));
@@ -655,7 +671,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                         get_type_name_r(buf_1, container));
 
                 if (!is_reference_kind(n->member_access.body->type))
-                    insert_take_reference(&n->member_access.body);
+                    insert_take_reference(n->member_access.body);
 
                 n->type = get_ref_type_for(t);
                 n->member_access.offset = offset;

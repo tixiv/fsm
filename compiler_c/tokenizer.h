@@ -23,6 +23,8 @@ typedef struct {
     X(TOK_keyword_struct) \
     X(TOK_keyword_enum) \
     X(TOK_keyword_import) \
+    X(TOK_keyword_true) \
+    X(TOK_keyword_false) \
     X(TOK_keyword_fsm_debug) \
     X(TOK_lparen) \
     X(TOK_rparen) \

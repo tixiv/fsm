@@ -131,13 +131,16 @@ fn main () {
 - [X] Implement unary minus operator
 - [X] Implement scopes inside functions
 - [X] Implement enums
-- [ ] Formatted string printing
+- [X] Formatted string printing
+- [X] Zero initialize all variables
+- [X] Make 'bool' 'true' and 'false' available
+- [ ] Implement function refs
+- [ ] Implement nested structs and unions
 - [ ] Implement initializers for arrays and structs
 - [ ] Write more documentation
 - [ ] Implement null type for refs
 - [ ] Runtime bounds checks
 - [ ] Global variables
-- [ ] Implement function refs
 - [ ] Memory management
 - [ ] Make the compiler self hosting at some point
 

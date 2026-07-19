@@ -303,6 +303,16 @@ static AST_node *parse_primary()
         n->number.value = CT->value;
         MOVE_NEXT();
     }
+    else if (CT->kind == TOK_keyword_true) {
+        n = ast_alloc(AST_bool, CT->line_number);
+        n->boolean.value = true;
+        MOVE_NEXT();
+    }
+    else if (CT->kind == TOK_keyword_false) {
+        n = ast_alloc(AST_bool, CT->line_number);
+        n->boolean.value = false;
+        MOVE_NEXT();
+    }
     else if (CT->kind == TOK_string) {
         n = ast_alloc(AST_string, CT->line_number);
         n->str.value = CT->value;
@@ -552,7 +562,7 @@ static AST_node *parse_statement()
         n = nullptr;
     }
     else {
-        return parse_expression();
+        n = parse_expression();
     }
 
     debug_log_parser("Leaving %s\n", __func__);

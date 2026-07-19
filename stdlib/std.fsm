@@ -32,14 +32,14 @@ fn is_allowed_in_identifier(c: i32) { return is_alpha(c) || is_numeric(c) || c =
 fn skip_whitespace (s: u8[]&) { while (s.len && is_whitespace(s.begin)) s++ }
 
 fn sv_equal (s1: u8[], s2: u8[]) {
-    if (s1.len != s2.len) return 0;
+    if (s1.len != s2.len) return false;
     for (let i = 0; i < s1.len; i = i + 1)
-        if (s1[i] != s2[i]) return 0;
-    return 1;
+        if (s1[i] != s2[i]) return false;
+    return true;
 }
 
 fn sv_starts_with (s: u8[], start: u8[]) {
-    if (s.len < start.len) return 0
+    if (s.len < start.len) return false
     s.len = start.len
     return sv_equal(s, start)
 }
@@ -156,12 +156,12 @@ fn sb_puti(sb: StringBuilder&, num) {
         num = -num
         sb_putc(sb, '-')
     }
-    let zero_blank = 1
+    let zero_blank = true;
     for (let a = 1000000000000000000; a != 0; a = a / 10) {
         let digit = num / a
         num = num - a * digit
         if (!(digit == 0 && zero_blank && a > 1)) {
-            zero_blank = 0
+            zero_blank = false;
             sb_putc(sb, digit + '0')
         }
     }

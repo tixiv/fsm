@@ -39,6 +39,7 @@ typedef struct {
     X(AST_var_decl) \
     X(AST_arg_decl) \
     X(AST_number) \
+    X(AST_bool) \
     X(AST_string) \
     X(AST_char_constant) \
     X(AST_symbol) \
@@ -156,6 +157,10 @@ typedef struct AST_node_s {
         struct {
             SV value;
         } number;
+
+        struct {
+            bool value;
+        } boolean;
 
         struct {
             SV value;
@@ -281,7 +286,7 @@ typedef struct AST_node_s {
 AST_node *ast_alloc(AST_kind kind, int line_number);
 
 AST_node *get_last_in_chain(AST_node *n);
-void ast_insert_node(AST_node **at, AST_node *new_node);
+void ast_insert_node(AST_node *at, AST_node *new_node);
 void ast_remove_node(AST_node *n);
 void ast_link_to_chain(AST_node **chain_p, AST_node *n);
 

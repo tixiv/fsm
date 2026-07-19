@@ -125,6 +125,8 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_keyword_struct: return("'struct'");
         case TOK_keyword_enum: return("'enum'");
         case TOK_keyword_import: return("'import'");
+        case TOK_keyword_true: return("'true'");
+        case TOK_keyword_false: return("'false'");
         case TOK_keyword_fsm_debug: return("'fsm_debug'");
         case TOK_lparen: return("'('");
         case TOK_rparen: return("')'");
@@ -211,6 +213,12 @@ void handle_word(SV *word, int line_number) {
     else if (sv_compare_cstr(word, "import")) {
         push_token(TOK_keyword_import, nullptr, line_number);
     }
+    else if (sv_compare_cstr(word, "true")) {
+        push_token(TOK_keyword_true, nullptr, line_number);
+    }
+    else if (sv_compare_cstr(word, "false")) {
+        push_token(TOK_keyword_false, nullptr, line_number);
+    }
     else if (sv_compare_cstr(word, "fsm_debug")) {
         push_token(TOK_keyword_fsm_debug, nullptr, line_number);
     }
@@ -230,7 +238,10 @@ void read_builder_string(Tokenizer *tokenizer) {
     str.begin = tokenizer->code.begin;
     str.len = 0;
     while(tokenizer->code.len && '"' != *tokenizer->code.begin) {
-        if (sv_starts_with(&tokenizer->code, "\\\"")) {
+        if (sv_starts_with(&tokenizer->code, "\\\"")
+           || sv_starts_with(&tokenizer->code, "\\{")
+           || sv_starts_with(&tokenizer->code, "\\}"))
+        {
             str.len += 2; sv_pop(&tokenizer->code); sv_pop(&tokenizer->code);
         }
         else {

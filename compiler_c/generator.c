@@ -22,6 +22,8 @@ static size_t unescaped_string_len(SV str) {
 uint8_t get_unescaped_char(uint8_t c) {
     switch (c) {
         case '\\': return '\\'; break;
+        case '{':  return '{'; break;
+        case '}':  return '}'; break;
         case 'a':  return '\a'; break;
         case 'b':  return '\b'; break;
         case 'e':  return '\e'; break;
