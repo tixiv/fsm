@@ -146,6 +146,19 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
 
     if (target_type == original_type) return;
 
+    if (target_type == &builtin_bool && is_reference_kind(original_type)) {
+        if (dereferenced_type(original_type) == &builtin_bool) {
+            type_checker_warning(n->line_number,
+                "Using 'bool&' in boolean context will dereference the target and not perform a null reference check. "
+                "Suggest to either dereference, when the value is what you want, or to write '... != null' if you wanted "
+                "to perform a null reference check.");
+        }
+        else {
+            ast_insert_node(n, make_cast(&builtin_bool, original_type));
+            return;
+        }
+    }
+
     if (!is_reference_kind(target_type) && is_reference_kind(original_type)) {
         insert_dereference(n);
     }
@@ -583,7 +596,13 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                 if (prop->current_function_ret_type_decl && prop->current_function_ret_type_decl != &builtin_void) {
                     if (ret_type == &builtin_void) type_checker_error(n->line_number, "'return' without a value in function returning non void.\n");
                     try_convert_to_type_if_necessary(n->ret.body, prop->current_function_ret_type_decl, "Return argument");
-                } else if (!types_are_equivalent(prop->current_function_ret_type, ret_type)) {
+                }
+                else if (is_reference_kind(prop->current_function_ret_type) && ret_type == &builtin_null) {
+                }
+                else if (prop->current_function_ret_type == &builtin_null && is_reference_kind(ret_type)) {
+                    prop->current_function_ret_type = ret_type;
+                }
+                else if (!types_are_equivalent(prop->current_function_ret_type, ret_type)) {
                     type_checker_error(n->line_number, "Returning different types from the same function. Have '%s' and '%s'. Please declare a return type!\n",
                         get_type_name_r(buf_1, prop->current_function_ret_type), get_type_name_r(buf_2, ret_type));
                 }
@@ -809,6 +828,10 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
         case AST_builder_string:
             type_check_builder_string(n);
             n->type = &builtin_u8_slice;
+            break;
+
+        case AST_null:
+            n->type = &builtin_null;
             break;
 
         case AST_typename:

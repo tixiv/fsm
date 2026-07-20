@@ -11,6 +11,7 @@
 #include <string.h>
 
 Type builtin_void = (Type){T_void};
+Type builtin_null = (Type){T_null};
 Type builtin_bool = (Type){T_boolean, .storage_size = 8};
 
 Type builtin_u64 = (Type){T_unsigned_integer, .storage_size = 8, .integer.num_bits = 64};
@@ -54,6 +55,7 @@ static void print_array_type(SB *sb, Type *arr_t) {
 const char *get_type_name_r(char print_buf[1024], Type *type) {
     if (type == nullptr)       return "(null type)";
     if (type == &builtin_void) return "void";
+    if (type == &builtin_null) return "null";
     if (type == &builtin_bool) return "bool";
     if (type == &builtin_any)  return "any";
     if (type == &builtin_u64)  return "u64";

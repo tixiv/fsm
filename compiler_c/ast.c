@@ -242,6 +242,7 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_symbol:
         case AST_number:
         case AST_bool:
+        case AST_null:
         case AST_string:
         case AST_char_constant:
         case AST_array_len:
@@ -291,6 +292,7 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
         case AST_array_len:
         case AST_array_to_slice:
         case AST_function_type:
+        case AST_null:
             printf("%.*s%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;

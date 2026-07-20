@@ -40,6 +40,7 @@ typedef struct {
     X(AST_arg_decl) \
     X(AST_number) \
     X(AST_bool) \
+    X(AST_null) \
     X(AST_string) \
     X(AST_char_constant) \
     X(AST_symbol) \

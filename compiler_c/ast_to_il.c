@@ -235,6 +235,9 @@ static void gen_cast(AST_node *n, bool result_used) {
         if (is_boolean_kind(to) && is_integer_kind(from)) {
             push_opcode(OP_to_bool, nullptr, 0);
         }
+        else if (is_boolean_kind(to) && is_reference_kind(from)) {
+            push_opcode(OP_to_bool, nullptr, 0);
+        }
         else if (is_integer_kind(to) && is_boolean_kind(from)) {
             // No cast needed. our 64 bit bools can be used as integer directly.
         }
@@ -387,6 +390,10 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
 
         case AST_bool:
             push_opcode(OP_push_literal, nullptr, n->boolean.value);
+            break;
+
+        case AST_null:
+            push_opcode(OP_push_literal, nullptr, (uint64_t)nullptr);
             break;
 
         case AST_array_len:

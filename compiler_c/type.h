@@ -13,6 +13,7 @@ typedef enum {
     T_boolean,
     T_function,
     T_reference,
+    T_null,
     T_array,
     T_slice,
     T_struct,
@@ -74,6 +75,7 @@ typedef struct Type_s {
 } Type;
 
 extern Type builtin_void;
+extern Type builtin_null;
 extern Type builtin_bool;
 extern Type builtin_any;
 

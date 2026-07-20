@@ -1,0 +1,129 @@
+
+import * from "std";
+
+fn take_line (str: u8[]&) : u8[] {
+    let line = str;
+    line.len = 0
+    while (str.len && str.begin != '\n') {
+        str++
+        line.len++
+    }
+    str++
+    return line
+}
+
+fn sv_split(str: u8[]&, splitter: u8[]) : u8[] {
+    let start = str;
+    start.len = 0;
+    for (; str.len; {str++ start.len++}) {
+        if (sv_starts_with(str, splitter)) {
+            for (let i = 0; i < splitter.len; i++)
+                str++
+            return start;
+        }
+    }
+    return start;
+}
+
+struct Node {
+    name: u8[];
+    connections: Node&[20];
+    num_connections;
+    num_visits;
+}
+
+struct NodeAllocator {
+    nodes: Node[200];
+    num_nodes;
+}
+
+fn alloc_node (allocator: NodeAllocator&) {
+    if (!(allocator.num_nodes < allocator.nodes.len))
+        return null;
+
+    return &allocator.nodes[allocator.num_nodes++];
+}
+
+fn find_node (allocator: NodeAllocator&, name: u8[]) {
+    for (let i = 0; i < allocator.num_nodes; i++) {
+        if (sv_equal(allocator.nodes[i].name, name))
+            return &allocator.nodes[i];
+    }
+    return null;
+}
+
+fn get_node (allocator: NodeAllocator&, name: u8[]) {
+    let node => find_node(allocator, name);
+    if (!node) {
+        node => alloc_node(allocator)
+        if (!node) return node;
+        node.name = name;
+    }
+    return node;
+}
+
+fn link_nodes(a: Node&, b: Node&) {
+    for (let i = 0; i < a.num_connections; i++) {
+        if (sv_equal(a.connections[i].name, b.name)) return;
+    }
+    a.connections[a.num_connections++] => b;
+    b.connections[b.num_connections++] => a;
+}
+
+fn can_visit(n: Node&) {
+    if (sv_equal(n.name, "start")) return false;
+    if (sv_equal(n.name, "end")) return true;
+    if ('A' <= n.name.begin <= 'Z') return true;
+
+    return n.num_visits == 0
+}
+
+fn traverse (n: Node&, joker: bool) {
+    n.num_visits++;
+    if (sv_equal(n.name, "end")) {
+        return;
+    }
+    else {
+        for (let i = 0; i < n.num_connections; i++) {
+            let next => n.connections[i];
+            if (can_visit(next)) {
+                traverse(next, joker);
+            }
+            else if (joker && !sv_equal(next.name, "end") && !sv_equal(next.name, "start")) {
+                traverse(next, false);
+            }
+        }
+    }
+    n.num_visits--;
+}
+
+fn main () {
+    let content = read_file ("aoc_21/aoc21_day12.input")
+
+    let allocator: NodeAllocator;
+
+    let start_node: Node&;
+    let end_node: Node&;
+
+    let num_lines = for (let i = 0; content.len; i++; i) {
+        let line = take_line(content);
+        let a = sv_split(line, "-");
+
+        let node_1 => get_node(allocator, a);
+        let node_2 => get_node(allocator, line);
+
+        if (sv_equal(node_1.name, "start")) start_node => node_1;
+        if (sv_equal(node_2.name, "start")) start_node => node_2;
+        if (sv_equal(node_1.name, "end")) end_node => node_1;
+        if (sv_equal(node_2.name, "end")) end_node => node_2;
+
+        if (!(node_1 && node_2)) {
+            $"Error: Out of nodes.\n"
+            return;
+        }
+        link_nodes(node_1, node_2);
+    }
+
+    traverse(start_node, true);
+    print(end_node.num_visits);
+}

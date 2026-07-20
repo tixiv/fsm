@@ -25,6 +25,7 @@ typedef struct {
     X(TOK_keyword_import) \
     X(TOK_keyword_true) \
     X(TOK_keyword_false) \
+    X(TOK_keyword_null) \
     X(TOK_keyword_fsm_debug) \
     X(TOK_lparen) \
     X(TOK_rparen) \

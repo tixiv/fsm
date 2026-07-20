@@ -127,6 +127,7 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_keyword_import: return("'import'");
         case TOK_keyword_true: return("'true'");
         case TOK_keyword_false: return("'false'");
+        case TOK_keyword_null: return("'null'");
         case TOK_keyword_fsm_debug: return("'fsm_debug'");
         case TOK_lparen: return("'('");
         case TOK_rparen: return("')'");
@@ -218,6 +219,9 @@ void handle_word(SV *word, int line_number) {
     }
     else if (sv_compare_cstr(word, "false")) {
         push_token(TOK_keyword_false, nullptr, line_number);
+    }
+    else if (sv_compare_cstr(word, "null")) {
+        push_token(TOK_keyword_null, nullptr, line_number);
     }
     else if (sv_compare_cstr(word, "fsm_debug")) {
         push_token(TOK_keyword_fsm_debug, nullptr, line_number);

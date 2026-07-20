@@ -350,6 +350,10 @@ static AST_node *parse_primary()
         n->boolean.value = false;
         MOVE_NEXT();
     }
+    else if (CT->kind == TOK_keyword_null) {
+        n = ast_alloc(AST_null, CT->line_number);
+        MOVE_NEXT();
+    }
     else if (CT->kind == TOK_string) {
         n = ast_alloc(AST_string, CT->line_number);
         n->str.value = CT->value;
