@@ -145,6 +145,11 @@ bool is_function_kind(Type *t) {
     return t->kind == T_function;
 }
 
+bool is_function_reference(Type *t) {
+    return is_reference_kind(t) &&
+        is_function_kind(dereferenced_type(t));
+}
+
 int get_ref_order(Type *t) {
     int ord = 0;
     while (is_reference_kind(t)) {

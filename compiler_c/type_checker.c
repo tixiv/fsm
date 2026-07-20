@@ -132,6 +132,13 @@ void insert_take_reference(AST_node *n) {
     ast_insert_node(n, ref);
 }
 
+bool check_function_argument_compatible(Type *arg_1, Type *arg_2) {
+    return arg_1 == arg_2
+        || (is_reference_kind(arg_1) && is_reference_kind(arg_2)
+             && (dereferenced_type(arg_1) == &builtin_any
+                  || dereferenced_type(arg_2) == &builtin_any) );
+}
+
 void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char *desc) {
     char buf_1[1024], buf_2[1024];
 
@@ -177,6 +184,24 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
 
     if (is_integer_kind(target_type) && is_enum_kind(n->type)) return;
     if (is_enum_kind(target_type) && is_integer_kind(n->type)) return;
+
+
+    if (is_function_reference(target_type) && is_function_reference(n->type)) {
+        Type *fn_1 = dereferenced_type(target_type);
+        Type *fn_2 = dereferenced_type(n->type);
+        if (fn_1->fun.num_arguments == fn_2->fun.num_arguments
+            && check_function_argument_compatible(fn_1->fun.return_type, fn_2->fun.return_type))
+        {
+            for (size_t i = 0; i < fn_2->fun.num_arguments; i++) {
+                if (!check_function_argument_compatible(fn_1->fun.argument_types[i], fn_2->fun.argument_types[i])) {
+                    goto nope;
+                }
+            }
+            // yes:
+            return;
+            nope:;
+        }
+    }
 
     const char *warning;
     if (is_castable_to(target_type, n->type, &warning)) {

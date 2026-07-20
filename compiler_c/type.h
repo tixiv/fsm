@@ -104,6 +104,7 @@ bool is_struct_kind(Type *t);
 bool is_enum_kind(Type *t);
 bool is_reference_kind(Type *t);
 bool is_function_kind(Type *t);
+bool is_function_reference(Type *t);
 
 bool is_slice_type(Type *t);
 
