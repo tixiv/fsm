@@ -413,6 +413,9 @@ void type_check_function_call(AST_node *n_call, PropagationVisitorData *prop) {
     }
     
     n_call->type = fn_type->fun.return_type;
+    if (!n_call->type) type_checker_error(n_call->line_number,
+        "Trying to call function that doesn't have a resolved return type yet. "
+        "Please define the function's return type when it's definition follows the call.\n");
 }
 
 void update_current_function_type(PropagationVisitorData *prop) {
@@ -427,10 +430,7 @@ void update_current_function_type(PropagationVisitorData *prop) {
     }
 }
 
-void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
-    char buf_1[1024]; char buf_2[1024];
-
-    // actions while traversing the tree down
+void type_resolve_functions_visitor(AST_node *n, PropagationVisitorData *prop) {
     switch (n->kind) {
         case AST_function:
             prop->current_function_symbol = n->fun.symbol;
@@ -438,15 +438,12 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             prop->current_function_ret_type = nullptr;
 
             if (n->fun.ret_typedecl) {
-                type_propagation_visitor(n->fun.ret_typedecl, prop);
+                type_resolve_functions_visitor(n->fun.ret_typedecl, prop);
                 prop->current_function_ret_type = n->fun.ret_typedecl->type;
                 prop->current_function_ret_type_decl = n->fun.ret_typedecl->type;
             }
             
-            if (n->fun.args) type_propagation_visitor(n->fun.args, prop);
-            if (n->fun.body) type_propagation_visitor(n->fun.body, prop);
-
-            update_current_function_type(prop);
+            if (n->fun.args) type_resolve_functions_visitor(n->fun.args, prop);
 
             prop->current_function_symbol = nullptr;
             prop->current_function_ret_type = nullptr;
@@ -459,7 +456,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             prop->arg_symbols.count = 0;
 
             // visiting the children of the arg list will fill up 'arg_symbols'
-            ast_visit_children(n, (AstVisitor)type_propagation_visitor, prop);
+            ast_visit_children(n, (AstVisitor)type_resolve_functions_visitor, prop);
 
             Type **arg_types = malloc(sizeof(Type*) * prop->arg_symbols.count);
             for (int i = 0; i < prop->arg_symbols.count; i++) {
@@ -470,6 +467,49 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                 get_function_type(prop->current_function_ret_type, arg_types, prop->arg_symbols.count);
             break;
         }
+
+        case AST_arg_decl: {
+            Type *t;
+            if (n->arg_decl._typedecl)
+                t = n->arg_decl._typedecl->type;
+            else
+                t = &builtin_i64;
+
+            n->arg_decl.symbol->type = t;
+            dyn_array_push_p(&prop->arg_symbols, n->arg_decl.symbol);
+            n->type = &builtin_void; // the declaration itself has no value.
+            break;
+        }
+
+        default:
+            ast_visit_children(n, (AstVisitor)type_resolve_functions_visitor, prop);
+            break;
+    }
+}
+
+void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
+    char buf_1[1024]; char buf_2[1024];
+
+    // actions while traversing the tree down
+    switch (n->kind) {
+        case AST_function:
+            prop->current_function_symbol = n->fun.symbol;
+            prop->current_function_ret_type_decl = nullptr;
+            prop->current_function_ret_type = nullptr;
+
+            if (n->fun.ret_typedecl) {
+                prop->current_function_ret_type = n->fun.ret_typedecl->type;
+                prop->current_function_ret_type_decl = n->fun.ret_typedecl->type;
+            }
+            
+            if (n->fun.body) type_propagation_visitor(n->fun.body, prop);
+
+            update_current_function_type(prop);
+
+            prop->current_function_symbol = nullptr;
+            prop->current_function_ret_type = nullptr;
+            prop->current_function_ret_type_decl = nullptr;
+            break;
 
         default:
             ast_visit_children(n, (AstVisitor)type_propagation_visitor, prop);
@@ -530,18 +570,6 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             if (n->var_decl.initializer)
                 try_convert_to_type_if_necessary(n->var_decl.initializer, t, "Initializer");
 
-            n->type = &builtin_void; // the declaration itself has no value.
-            break;
-        }
-        case AST_arg_decl: {
-            Type *t;
-            if (n->arg_decl._typedecl)
-                t = n->arg_decl._typedecl->type;
-            else
-                t = &builtin_i64;
-
-            n->arg_decl.symbol->type = t;
-            dyn_array_push_p(&prop->arg_symbols, n->arg_decl.symbol);
             n->type = &builtin_void; // the declaration itself has no value.
             break;
         }
@@ -869,5 +897,6 @@ void run_typechecking(AST_node *root) {
 
     PropagationVisitorData pvd = {0};
     dyn_array_init(&pvd.arg_symbols, sizeof(void*), 8);
+    type_resolve_functions_visitor(root, &pvd);
     type_propagation_visitor(root, &pvd);
 }

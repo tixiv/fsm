@@ -111,14 +111,25 @@ static void resolver_leave_scope(Resolver *res) {
     res->local_symbols.count = res->locals_stack[--res->locals_stack_pointer];
 }
 
-static void resolver_visitor(AST_node *n, Resolver *res) {
+static void resolve_globals_visitor (AST_node *n, Resolver *res) {
     switch (n->kind) {
-
         case AST_function: {
             Symbol *s_fun = alloc_symbol(SYM_global, n->fun.name);
             push_symbol(res, &global_symbols, s_fun, n->line_number);
             n->fun.symbol = s_fun;
-            resolver_enter_function(res, s_fun);
+            break;
+        }
+        default:
+            ast_visit_children(n, (AstVisitor)resolve_globals_visitor, res);
+            break;
+    }
+}
+
+static void resolver_visitor(AST_node *n, Resolver *res) {
+    switch (n->kind) {
+
+        case AST_function: {
+            resolver_enter_function(res,  n->fun.symbol);
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             resolver_leave_function(res);
             break;
@@ -204,6 +215,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
 
 void resolver(AST_node *root) {
     Resolver res;
+    resolve_globals_visitor(root, &res);
     dyn_array_init(&res.local_symbols, sizeof(Symbol *), 32);
     resolver_visitor(root, &res);
 }
