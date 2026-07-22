@@ -90,7 +90,15 @@ void read_char_constant(SV *str, SV *input, int *line_number) {
 
     str->begin = input->begin;
     str->len = 0;
-    while(input->len && '\'' != *input->begin) {
+    while(input->len) {
+        if (sv_starts_with(input, "\\'")) {
+            sv_pop(input);
+            str->len++;
+        }
+        else if ('\'' == *input->begin) {
+            sv_pop(input);
+            return;
+        }
         if ('\n' == sv_pop(input)) (*line_number)++;
         str->len++;
     }

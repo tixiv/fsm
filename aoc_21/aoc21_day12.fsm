@@ -12,19 +12,6 @@ fn take_line (str: u8[]&) : u8[] {
     return line
 }
 
-fn sv_split(str: u8[]&, splitter: u8[]) : u8[] {
-    let start = str;
-    start.len = 0;
-    for (; str.len; {str++ start.len++}) {
-        if (sv_starts_with(str, splitter)) {
-            for (let i = 0; i < splitter.len; i++)
-                str++
-            return start;
-        }
-    }
-    return start;
-}
-
 struct Node {
     name: u8[];
     connections: Node&[20];

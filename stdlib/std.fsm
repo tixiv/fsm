@@ -44,6 +44,18 @@ fn sv_starts_with (s: u8[], start: u8[]) {
     return sv_equal(s, start)
 }
 
+fn sv_split(str: u8[]&, splitter: u8[]) : u8[] {
+    let start = str;
+    for (start.len = 0; str.len; {str++ start.len++}) {
+        if (sv_starts_with(str, splitter)) {
+            for (let i = 0; i < splitter.len; i++)
+                str++
+            return start;
+        }
+    }
+    return start;
+}
+
 fn is_digit_in_base(digit: i32, base) {
     if (base == 16) return is_hex_digit(digit);
     return '0' <= digit < '0' + base

@@ -134,17 +134,22 @@ fn main () {
 - [X] Formatted string printing
 - [X] Zero initialize all variables
 - [X] Make 'bool' 'true' and 'false' available
-- [ ] Implement function refs
+- [X] Implement function refs
+- [X] Implement null type for refs
 - [ ] Implement nested structs and unions
 - [ ] Implement initializers for arrays and structs
 - [ ] Write more documentation
-- [ ] Implement null type for refs
 - [ ] Runtime bounds checks
 - [ ] Global variables
 - [ ] Memory management
-- [ ] Make the compiler self hosting at some point
-
-
+- [ ] Make the compiler self hosting
+  - [X] Port the tokenizer to FSM
+  - [ ] Port the parser to FSM
+  - [ ] Port the resolver to FSM
+  - [ ] Port the type checker to FSM
+  - [ ] Write new IL gen in FSM that uses TOC instead of being stack based
+  - [ ] Write new machine code generation backend
+- [ ] Implement a language server for FSM
 
 # NOT to do:
 - [NOT] Impement C style pointers. FSM uses references, which are essentially pointers implementation wise, but they don't have any arithmetic operations. "Pointer arithmetic" is done in FSM by rebinding a reference to another element of an array or a slice, because that is the only context in which pointer arithmetic makes sense.
