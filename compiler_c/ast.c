@@ -202,8 +202,14 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_enum:
             ast_visit_chain(n->_enum.body, visit, arg);
             break;
+        case AST_union:
+            ast_visit_chain(n->_union.body, visit, arg);
+            break;
         case AST_member_def:
-            visit_non_null(n->member_def._typedef, visit, arg);
+            visit_non_null(n->struct_member_def._typedef, visit, arg);
+            break;
+        case AST_union_member_def:
+            visit_non_null(n->union_member_def._typedef, visit, arg);
             break;
         case AST_member_access:
             visit_non_null(n->member_access.body, visit, arg);
@@ -301,7 +307,7 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_member_def:
-            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->member_def.name), get_type_name_r(buf, n->type));
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->struct_member_def.name), get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_member_access:
@@ -314,6 +320,14 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             break;
         case AST_enum_member:
             printf("%.*s%s '%.*s' %ld (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->_enum_member.name), n->_enum_member.value, get_type_name_r(buf, n->type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_union:
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->_union.name), get_type_name_r(buf, n->type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_union_member_def:
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->union_member_def.name), get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_namespace_access:

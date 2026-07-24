@@ -12,23 +12,52 @@
 #include "type_resolver.h"
 #include "calculate_stacks.h"
 #include "modules.h"
+#include <bits/getopt_core.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <getopt.h>
 
 
 bool debug_opcodes = false;
 
-int main (int argc, const char *argv[]) {
-    
-    if (argc < 2) {
-        fprintf(stderr, "Usage: fsm <input.fsm>\n");
+static struct option long_options[] = {
+    {"help",    no_argument,       0, 'h'},
+    {"debug-ast",  required_argument, 0, 'a'},
+    {0, 0, 0, 0}
+};
+
+static void usage(const char *prg) {
+    fprintf(stderr, "Usage: %s [options] <input.fsm>\n", prg);
+    fprintf(stderr, "  -a --debug_ast <n> : Debug the AST at different points\n");
+}
+
+int main (int argc, char **argv) {
+    int option_index = 0;
+
+    int opt;
+    while ((opt = getopt_long(argc, argv, "ha:", long_options, &option_index)) != -1) {
+        switch (opt) {
+            case 'h':
+                usage(argv[0]);
+                return 0;
+            case 'a':
+                debug_ast = optarg;
+                break;
+            default:
+                fprintf(stderr, "Unknown option '-%c'\n", optopt);
+                return 1;
+        }
+    }
+
+    if (optind == argc) {
+        fprintf(stderr, "%s: Error: No input file\n", argv[0]);
         exit(EXIT_FAILURE);
     }
     
-    compile_program(argv[1]);
+    compile_program(argv[optind]);
 
     ast_to_il_init();
     

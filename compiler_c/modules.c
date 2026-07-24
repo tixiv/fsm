@@ -55,7 +55,8 @@ void read_file(SV *contents, const char *path)
 
 
 bool debug_tokens = false;
-bool debug_ast = false;
+
+const char *debug_ast;
 
 void compile_module(const char *filename) {
     current_module = dyn_array_push(&modules);
@@ -70,17 +71,15 @@ void compile_module(const char *filename) {
 
     AST_node *ast = parse_program_ast();
 
+    if (debug_ast && debug_ast[0] == '0') ast_dump_tree(ast);
     run_type_resolver(ast);
-
+    if (debug_ast && debug_ast[0] == '1') ast_dump_tree(ast);
     resolver(ast);
-
+    if (debug_ast && debug_ast[0] == '2') ast_dump_tree(ast);
     run_typechecking(ast);
-
-    if (debug_ast)
-        ast_dump_tree(ast);
+    if (debug_ast && debug_ast[0] == '3') ast_dump_tree(ast);
 
     calculate_stacks(ast);
-
     current_module->ast = ast;
 }
 

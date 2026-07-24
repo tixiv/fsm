@@ -725,17 +725,8 @@ static AST_node *parse_function() {
     return ast_fn;
 }
 
-static AST_node *parse_struct() {
+static void parse_struct_body(AST_node *ast_struct) {
     debug_log_parser("Entering %s\n", __func__);
-
-    expect_token(TOK_keyword_struct);
-    AST_node *ast_struct = ast_alloc(AST_struct, CT->line_number);
-    MOVE_NEXT();
-
-    expect_token(TOK_identifier);
-    ast_struct->_struct.name = CT->value;
-    MOVE_NEXT();
-
     take_expected(TOK_lbrace);
 
     // Members
@@ -749,9 +740,9 @@ static AST_node *parse_struct() {
             }
             else if(CT->kind == TOK_identifier) {
                 AST_node *member = ast_alloc(AST_member_def, CT->line_number);
-                member->member_def.name = CT->value;
+                member->struct_member_def.name = CT->value;
                 MOVE_NEXT();
-                member->member_def._typedef = try_parse_typedecl();
+                member->struct_member_def._typedef = try_parse_typedecl();
 
                 if (latest) {
                     latest->next = member;
@@ -770,8 +761,97 @@ static AST_node *parse_struct() {
     }
 
     debug_log_parser("Leaving %s\n", __func__);
+}
+
+static AST_node *parse_struct() {
+    debug_log_parser("Entering %s\n", __func__);
+
+    expect_token(TOK_keyword_struct);
+    AST_node *ast_struct = ast_alloc(AST_struct, CT->line_number);
+    MOVE_NEXT();
+
+    expect_token(TOK_identifier);
+    ast_struct->_struct.name = CT->value;
+    MOVE_NEXT();
+
+    parse_struct_body(ast_struct);
+
+    debug_log_parser("Leaving %s\n", __func__);
     return ast_struct;
 }
+
+
+static AST_node *parse_union() {
+    debug_log_parser("Entering %s\n", __func__);
+
+    expect_token(TOK_keyword_union);
+    AST_node *ast_union = ast_alloc(AST_union, CT->line_number);
+    MOVE_NEXT();
+
+    expect_token(TOK_identifier);
+    ast_union->_union.name = CT->value;
+    MOVE_NEXT();
+
+    take_expected(TOK_lbrace);
+
+    // Members
+    {
+        AST_node *latest = nullptr;
+        int64_t latest_value = 0;
+
+        while (1) {
+            if (CT->kind == TOK_rbrace) {
+                MOVE_NEXT();
+                break;
+            }
+            else if(CT->kind == TOK_keyword_struct) {
+                AST_node *member = ast_alloc(AST_union_member_def, CT->line_number);
+                MOVE_NEXT();
+
+                if (CT->kind == TOK_identifier) {
+                    member->union_member_def.name = CT->value;
+                    MOVE_NEXT();
+                    if (CT->kind == TOK_equal_assign) {
+                        MOVE_NEXT();
+                        bool neg = CT->kind == TOK_minus;
+                        if (neg) MOVE_NEXT();
+                        expect_token(TOK_number);
+                        latest_value = strtoul(CT->value.begin, nullptr, 0);
+                        if (neg) latest_value = -latest_value;
+                        MOVE_NEXT();
+                    }
+                    member->union_member_def.enum_value = latest_value++;
+
+                    AST_node *ast_struct = ast_alloc(AST_struct, CT->line_number);
+                    ast_struct->_struct.name = member->union_member_def.name;
+                    parse_struct_body(ast_struct);
+                    
+                    member->union_member_def._typedef = ast_struct;
+
+                    if (latest) {
+                        latest->next = member;
+                    } else {
+                        ast_union->_union.body = member;
+                    }
+                    latest = member;
+
+                    if (CT->kind == TOK_semicolon || CT->kind == TOK_komma) {
+                        MOVE_NEXT();
+                    }
+                }
+                else NOT_IMPLEMENTED("unnamed structs in unions are not implemented yet.\n");
+            }
+            else {
+                parser_error(CT->line_number, "Expected '}' or struct member definition but got %s",
+                    token_kind_name(CT->kind));
+            }
+        }
+    }
+
+    debug_log_parser("Leaving %s\n", __func__);
+    return ast_union;
+}
+
 
 static AST_node *parse_enum() {
     debug_log_parser("Entering %s\n", __func__);
@@ -862,6 +942,14 @@ AST_node *parse_program_ast() {
         }
         else if (CT->kind == TOK_keyword_struct) {
             AST_node *n = parse_struct();
+            if (last) 
+                last->next = n;
+            else
+                root->program.body = n;
+            last = n;
+        }
+        else if (CT->kind == TOK_keyword_union) {
+            AST_node *n = parse_union();
             if (last) 
                 last->next = n;
             else

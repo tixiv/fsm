@@ -161,11 +161,11 @@ void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
         case AST_member_def: {
             ASSERT(trs->current_struct, "Encountered %s outside of struct.\n", ast_kind_name(n->kind));
             TypeMember *member = dyn_array_push(&trs->struct_members);
-            member->name = n->member_def.name;
+            member->name = n->struct_member_def.name;
             ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
-            if (n->member_def._typedef) {
-                if (!n->member_def._typedef->type) type_resolver_error(n->line_number, "The type for struct member '%.*s' could not be resolved.\n", SV_prnt(member->name));
-                n->type = n->member_def._typedef->type;
+            if (n->struct_member_def._typedef) {
+                if (!n->struct_member_def._typedef->type) type_resolver_error(n->line_number, "The type for struct member '%.*s' could not be resolved.\n", SV_prnt(member->name));
+                n->type = n->struct_member_def._typedef->type;
             }
             else {
                 n->type = &builtin_i64;

@@ -61,6 +61,8 @@ typedef struct {
     X(AST_member_def) \
     X(AST_enum) \
     X(AST_enum_member) \
+    X(AST_union) \
+    X(AST_union_member_def) \
     X(AST_typename) \
     X(AST_type_ref) \
     X(AST_type_array) \
@@ -231,7 +233,28 @@ typedef struct AST_node_s {
         struct {
             struct AST_node_s *_typedef;
             SV name;
-        } member_def;
+        } struct_member_def;
+
+        struct {
+            struct AST_node_s *body;
+            SV name;
+        } _enum;
+
+        struct {
+            SV name;
+            int64_t value;
+        } _enum_member;
+
+        struct {
+            struct AST_node_s *body;
+            SV name;
+        } _union;
+
+        struct {
+            struct AST_node_s *_typedef;
+            SV name;
+            int64_t enum_value;
+        } union_member_def;
 
         struct {
             struct AST_node_s *body;
@@ -244,16 +267,6 @@ typedef struct AST_node_s {
             SV name;
             int64_t enum_value;
         } namespace_access;
-
-        struct {
-            struct AST_node_s *body;
-            SV name;
-        } _enum;
-
-        struct {
-            SV name;
-            int64_t value;
-        } _enum_member;
 
         struct {
             size_t len;
