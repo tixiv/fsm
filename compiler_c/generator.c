@@ -68,6 +68,8 @@ const char *make_movx(const char*reg, size_t size, bool _sigend) {
     return buf;
 }
 
+extern const char *builtin_functions_asm;
+
 void output_asm(const char *asm_file_name) {
     FILE *file = fopen(asm_file_name, "w");
 
@@ -85,150 +87,8 @@ void output_asm(const char *asm_file_name) {
     // from the Porth compiler https://gitlab.com/tsoding/porth which
     // was also the main inspiration for me to start this project.
 
-    const char *builtin_functions =
-    "fn_print:\n"
-    "mov rdi, [rsp+8]\n"
-    "test rdi, rdi\n"
-    "jns @f\n"
-    "push rdi\n"
-    "push '-'\n"
-    "call fn_putc\n"
-    "pop rdi\n"
-    "pop rdi\n"
-    "neg rdi\n"
-    "@@:\n"
-    "mov     r9, -3689348814741910323\n"
-    "sub     rsp, 40\n"                 
-    "mov     BYTE [rsp+31], 10\n"       
-    "lea     rcx, [rsp+30]\n"           
-    ".L2:\n"                            
-    "mov     rax, rdi\n"                
-    "lea     r8, [rsp+32]\n"            
-    "mul     r9\n"                      
-    "mov     rax, rdi\n"                
-    "sub     r8, rcx\n"                 
-    "shr     rdx, 3\n"                  
-    "lea     rsi, [rdx+rdx*4]\n"        
-    "add     rsi, rsi\n"                
-    "sub     rax, rsi\n"                
-    "add     eax, 48\n"                 
-    "mov     BYTE [rcx], al\n"          
-    "mov     rax, rdi\n"                
-    "mov     rdi, rdx\n"                
-    "mov     rdx, rcx\n"                
-    "sub     rcx, 1\n"                  
-    "cmp     rax, 9\n"                  
-    "ja      .L2\n"                     
-    "lea     rax, [rsp+32]\n"           
-    "mov     edi, 1\n"                  
-    "sub     rdx, rax\n"                
-    "xor     eax, eax\n"                
-    "lea     rsi, [rsp+32+rdx]\n"       
-    "mov     rdx, r8\n"                 
-    "mov     rax, 1\n"                  
-    "syscall\n"                         
-    "add     rsp, 40\n"                 
-    "ret\n"
-
-    "fn_putc:\n"
-    "mov rax, 1          ; SYS_write\n"
-    "mov rdi, 1          ; stdout\n"
-    "lea rsi, [rsp+8]    ; pointer to the char\n"
-    "mov rdx, 1          ; length\n"
-    "syscall\n"
-    "ret\n"
-
-    "fn_puts:\n"
-    "mov rax, 1          ; SYS_write\n"
-    "mov rdi, 1          ; stdout\n"
-    "mov rsi, [rsp+8]    ; pointer\n"
-    "mov rdx, [rsp+16]   ; length\n"
-    "syscall\n"
-    "ret\n"
-
-    "SYS_OPEN    = 2\n"
-    "SYS_CLOSE   = 3\n"
-    "SYS_FSTAT   = 5\n"
-    "SYS_MMAP    = 9\n"
-    "O_RDONLY    = 0\n"
-    "PROT_READ   = 1\n"
-    "MAP_PRIVATE = 2\n"
-    "STAT_SIZE      = 144          ; sizeof(struct stat) on x86-64 Linux\n"
-    "ST_SIZE_OFFSET = 48           ; offsetof(st_size)\n"
-    "\n"
-    "fn_open: ; open(filename: u8 &, flags: i64) : i64\n"
-    "    mov     eax, SYS_OPEN\n"
-    "    mov     rdi, [rsp+16]     ; filename\n"
-    "    mov     rsi, [rsp+8]      ; flags\n"
-    "    xor     rdx, rdx          ; mode\n"
-    "    syscall                   ; fd is in rax\n"
-    "    ret\n"
-    "\n"
-    "fn_mmap: ; mmap(lenght: i64, fd: i64) : u8 &\n"
-    "   mov     rax, SYS_MMAP\n"
-    "   xor     rdi, rdi          ; addr = NULL\n"
-    "   mov     rsi, [rsp+16]     ; length\n"
-    "   mov     rdx, PROT_READ\n"
-    "   mov     r10, MAP_PRIVATE\n"
-    "   mov     r8,  [rsp+8]      ; fd\n"
-    "   xor     r9, r9            ; offset = 0\n"
-    "   syscall\n"
-    "   ret\n"
-    "\n"
-    "fn_fsize: ; fsize(fd: i64) : i64\n"
-    "   push rbp\n"
-    "   mov rbp, rsp\n"
-    "   sub     rsp, STAT_SIZE\n"
-    "   mov     eax, SYS_FSTAT\n"
-    "   mov     rdi, [rbp+16]    ; fd\n"
-    "   mov     rsi, rsp         ; struct statbuf*\n"
-    "   syscall\n"
-    "   test    rax, rax\n"
-    "   js      .cleanup\n"
-    "   mov     rax, [rsp + ST_SIZE_OFFSET]\n"
-    "   mov rsp, rbp\n"
-    "   pop rbp\n"
-    "   ret\n"
-    ".cleanup:\n"
-    "   xor rax, rax\n"
-    "   mov rsp, rbp\n"
-    "   pop rbp\n"
-    "   ret\n";
-/*
-
-    ;---------------------------------------
-    ; close(fd)
-    ;---------------------------------------
-
-    mov     eax, SYS_CLOSE
-    mov     rdi, r12
-    syscall
-
-    add     rsp, STAT_SIZE
-
-    ; return slice
-    mov     rax, r14
-    mov     rdx, r13
-    ret
-
-.cleanup:
-
-    mov     eax, SYS_CLOSE
-    mov     rdi, r12
-    syscall
-
-    add     rsp, STAT_SIZE
-
-.error:
-
-    xor     eax, eax
-    xor     edx, edx
-    ret
-
-*/
-
     fprintf(file, "%s", header);
-    fprintf(file, "%s", builtin_functions);
+    fprintf(file, "%s", builtin_functions_asm);
     
     for (int i=0; i<num_opcodes; i++) {
         Opcode *op = &opcodes[i];

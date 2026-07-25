@@ -20,14 +20,22 @@ $(BUILD_DIR):
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/%.o: $(BUILD_DIR)/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 
 O_FILES  = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(C_SRCS))
+O_FILES += $(BUILD_DIR)/builtin_functions.o
 DEPS     = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.d,$(C_SRCS))
 
 # Link
 $(FSM): $(O_FILES)
 	$(CC) $(CFLAGS) -o $@ $(O_FILES)
 
+$(BUILD_DIR)/builtin_functions.c: $(SRC_DIR)/builtin_functions.asm
+	echo "const char *builtin_functions_asm =" >$@
+	sed 's/.*/"&\\n"/' $< >> $@
+	echo ";" >> $@
 
 TESTS  = $(wildcard $(TEST_DIR)/*.fsm)
 TESTS += $(wildcard $(AOC21_DIR)/*.fsm)
