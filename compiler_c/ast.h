@@ -228,6 +228,7 @@ typedef struct AST_node_s {
         struct {
             struct AST_node_s *body;
             SV name;
+            bool is_record;
         } _struct;
 
         struct {

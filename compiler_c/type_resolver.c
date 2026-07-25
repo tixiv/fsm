@@ -90,6 +90,22 @@ void push_struct(SV name, int line_number) {
     type_resolver_push_symbol(s, line_number);
 }
 
+void push_record(SV name, int line_number) {
+    if (get_type_by_name(&name)) {
+        type_resolver_error(line_number, "Tried to redefine type '%.*s'\n", SV_prnt(name));
+    }
+
+    Type *t = type_alloc(T_record);
+    t->name = name;
+    dyn_array_push_p(&dyn_structs, t);
+
+    Symbol *s = alloc_symbol(SYM_type, name);
+    s->name = name;
+    s->type = t;
+
+    type_resolver_push_symbol(s, line_number);
+}
+
 void push_enum(SV name, int line_number) {
     if (get_type_by_name(&name)) {
         type_resolver_error(line_number, "Tried to redefine type '%.*s'\n", SV_prnt(name));
@@ -110,7 +126,10 @@ void push_enum(SV name, int line_number) {
 void type_lookup_visitor(AST_node *n, void *arg) {
     switch (n->kind) {
         case AST_struct:
-            push_struct(n->_struct.name, n->line_number);
+            if (n->_struct.is_record)
+                push_record(n->_struct.name, n->line_number);
+            else
+                push_struct(n->_struct.name, n->line_number);
             break;
         
         case AST_enum:

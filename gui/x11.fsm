@@ -1,0 +1,46 @@
+
+import * from "std";
+
+record SockaddrUnix
+{
+    sun_family : u16;
+    sun_path   : u8[108];
+}
+
+record X11_ConnectMessage {
+    endian         : u8;
+    _              : u8;
+    version_major  : u16;
+    version_minor  : u16;
+    proto_len      : u16;
+    proto_data_len : u16;
+    _              : u16;
+}
+
+fn main () {
+    let AF_UNIX = 1;
+    let SOCK_STREAM = 1;
+    let SOCK_CLOEXEC = 0x80000;
+    let fd = socket(AF_UNIX, bitor(SOCK_STREAM, SOCK_CLOEXEC), 0);
+
+    let addr: SockaddrUnix;
+    addr.sun_family = AF_UNIX;
+
+    let sb_addr: StringBuilder;
+    sb_init(sb_addr, addr.sun_path);
+    sb_puts(sb_addr, "/tmp/.X11-unix/X0\0")
+
+    connect(fd, addr);
+
+    let connect_message: X11_ConnectMessage;
+    connect_message.endian = 'l';
+    connect_message.version_major = 11;
+
+    write(fd, connect_message);
+
+    let data: u8[0x10000];
+
+    let len = read(fd, data);
+
+    $"fd={fd}, len_recevied={len}\n"
+}

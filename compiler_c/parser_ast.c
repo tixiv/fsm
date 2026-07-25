@@ -86,7 +86,7 @@ static AST_node *parse_typedecl_postifx(AST_node *inner) {
             MOVE_NEXT();
             if (CT->kind == TOK_number) {
                 AST_node *ast_array = ast_alloc(AST_type_array, line_number);
-                ast_array->_type_array.n_elements = strtoul(CT->value.begin, 0, 10);
+                ast_array->_type_array.n_elements = strtoul(CT->value.begin, 0, 0);
                 MOVE_NEXT();
                 take_expected(TOK_rbracket);
 
@@ -766,8 +766,15 @@ static void parse_struct_body(AST_node *ast_struct) {
 static AST_node *parse_struct() {
     debug_log_parser("Entering %s\n", __func__);
 
-    expect_token(TOK_keyword_struct);
     AST_node *ast_struct = ast_alloc(AST_struct, CT->line_number);
+
+    if (CT->kind == TOK_keyword_struct) {
+    }
+    else if (CT->kind == TOK_keyword_record) {
+        ast_struct->_struct.is_record = true;
+    }
+    else ASSERT(false, "Need to have struct or record here.\n");
+
     MOVE_NEXT();
 
     expect_token(TOK_identifier);
@@ -940,7 +947,7 @@ AST_node *parse_program_ast() {
                 root->program.body = fun;
             last = fun;
         }
-        else if (CT->kind == TOK_keyword_struct) {
+        else if (CT->kind == TOK_keyword_struct || CT->kind == TOK_keyword_record) {
             AST_node *n = parse_struct();
             if (last) 
                 last->next = n;

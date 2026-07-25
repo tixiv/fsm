@@ -164,7 +164,6 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
     }
     
     if (is_slice_type(target_type) && is_array_kind(n->type)) {
-        
         if (get_slice_element_type(target_type) == n->type->_array.element_type) {
             AST_node *conv = ast_alloc(AST_array_to_slice, n->line_number);
             conv->type = get_sclice_type(n->type->_array.element_type);
@@ -175,6 +174,11 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
             type_checker_error(n->line_number, "Can't convert %s of type '%s' to '%s'.\n",
                 desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
         }
+    }
+
+    if (is_slice_type(target_type) && is_record_kind(n->type)) {
+        ast_insert_node(n, make_cast(target_type, n->type));
+        return;
     }
 
     if (target_type == get_ref_type_for(&builtin_any)) {
@@ -779,11 +783,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             Type *container = n->member_access.body->type;
             if (is_reference_kind(container)) container = dereferenced_type(container);
             
-            if (!type_can_have_members(container))
-                type_checker_error(n->line_number, "Tried to access a member in something that can't have members. Have '%s'.\n",
-                        get_type_name_r(buf_1, container));
-
-            if (is_struct_kind(container)) {
+            if (is_struct_kind(container) || is_record_kind(container)) {
                 size_t offset;
                 Type *t = get_member_type_and_offset(container, &n->member_access.name, &offset);
                 if (!t) type_checker_error(n->line_number, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->member_access.name),
@@ -830,7 +830,8 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                 }
             }
             else {
-                NOT_IMPLEMENTED("accessing members in '%s' is not implemented yet.\n", get_type_name_r(buf_1, container));
+                type_checker_error(n->line_number, "Tried to access a member in something that can't have members. Have '%s'.\n",
+                        get_type_name_r(buf_1, container));
             }
 
             break;

@@ -31,6 +31,7 @@ uint8_t get_unescaped_char(uint8_t c) {
         case 'r':  return '\r'; break;
         case 't':  return '\t'; break;
         case '"':  return '"'; break;
+        case '0':  return 0; break;
         case '\'':  return '\''; break;
         default:
             NOT_IMPLEMENTED("Genearating assembly for the escape sequence '\\%c' = %d is not implemented yet.\n", c, c);

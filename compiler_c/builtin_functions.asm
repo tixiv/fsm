@@ -62,22 +62,64 @@ fn_puts:
     syscall
     ret
 
+SYS_READ    = 0
+SYS_WRITE   = 1
 SYS_OPEN    = 2
 SYS_CLOSE   = 3
 SYS_FSTAT   = 5
 SYS_MMAP    = 9
+SYS_SOCKET  = 41
+SYS_CONNECT = 42
 O_RDONLY    = 0
 PROT_READ   = 1
 MAP_PRIVATE = 2
 STAT_SIZE      = 144          ; sizeof(struct stat) on x86-64 Linux
 ST_SIZE_OFFSET = 48           ; offsetof(st_size)
 
-fn_open: ; open(filename: u8 &, flags: i64) : i64
+fn_open: ; open (filename: u8 &, flags: i64) : i64
     mov     eax, SYS_OPEN
     mov     rdi, [rsp+16]     ; filename
     mov     rsi, [rsp+8]      ; flags
     xor     rdx, rdx          ; mode
     syscall                   ; fd is in rax
+    ret
+
+fn_close: ; close (fd: i64) : i64
+    mov eax, SYS_CLOSE
+    mov rdi, [rsp+8]          ; fd
+    syscall
+    ret
+
+fn_read: ; read (fd: i64, buffer: u8[]) : i64
+    mov eax, SYS_READ
+    mov rsi, [rsp+8]        ; char * buf
+    mov rdx, [rsp+16]       ; size_t count
+    mov rdi, [rsp+24]       ; fd
+    syscall
+    ret
+
+fn_write: ; write (fd: i64, data: u8[]) : i64
+    mov eax, SYS_WRITE
+    mov rsi, [rsp+8]        ; const char * buf
+    mov rdx, [rsp+16]       ; size_t count
+    mov rdi, [rsp+24]       ; fd
+    syscall
+    ret
+
+fn_socket: ; socket (domain: i64, type: i64, protocol: i64) : i64
+    mov eax, SYS_SOCKET
+    mov rdx, [rsp+8]        ; int protocol
+    mov rsi, [rsp+16]       ; int type
+    mov rdi, [rsp+24]       ; int domain
+    syscall
+    ret
+
+fn_connect: ; connect (fd: i64, addr: u8[]) : i64
+    mov eax, SYS_CONNECT
+    mov rdx, [rsp+16]       ; socklen_t addrlen
+    mov rsi, [rsp+8]        ; const struct sockaddr * addr
+    mov rdi, [rsp+24]       ; int sockfd
+    syscall
     ret
 
 fn_mmap: ; mmap(lenght: i64, fd: i64) : u8 &
@@ -110,9 +152,3 @@ fn_fsize: ; fsize(fd: i64) : i64
    mov rsp, rbp
    pop rbp
    ret;
-
-fn_close:
-    mov eax, SYS_CLOSE
-    pop rdi
-    syscall
-    ret

@@ -95,7 +95,7 @@
             "patterns": [
                 {
                     "name": "keyword.control.fsm",
-                    "match": "\\b(fn|struct|enum|if|else|while|for|return|let|import|from|true|false)\\b"
+                    "match": "\\b(fn|struct|record|union|enum|if|else|while|for|return|let|import|from|true|false)\\b"
                 }
             ]
         },

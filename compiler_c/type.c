@@ -99,6 +99,14 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
                 sb_printf(&sb, "anonymous struct", SV_prnt(type->name));
             }
             break;
+        case T_record:
+            if (type->name.begin) {
+                sb_printf(&sb, "record %.*s", SV_prnt(type->name));
+            }
+            else {
+                sb_printf(&sb, "anonymous record", SV_prnt(type->name));
+            }
+            break;
         case T_enum:
             if (type->name.begin) {
                 sb_printf(&sb, "enum %.*s", SV_prnt(type->name));
@@ -135,6 +143,10 @@ bool is_struct_kind(Type *t) {
     return t->kind == T_struct;
 }
 
+bool is_record_kind(Type *t) {
+    return t->kind == T_record;
+}
+
 bool is_enum_kind(Type *t) {
     return t->kind == T_enum;
 }
@@ -169,10 +181,6 @@ Type *dereferenced_type(Type *t) {
     return t->reference.target_type;
 }
 
-bool type_can_have_members(Type *t) {
-    return t->kind == T_struct || t->kind == T_array || t->kind == T_slice || t->kind == T_enum;
-}
-
 size_t get_storage_size(Type *t) {
     return t->storage_size;
 }
@@ -203,6 +211,7 @@ bool is_castable_to(Type *to, Type *from, const char **out_warn) {
             return true;
         }
     }
+    if (to == &builtin_u8_slice && is_record_kind(from)) return true;
 
     return false;
 }
@@ -220,7 +229,8 @@ AST_node *make_cast(Type *to, Type *from) {
 Type *get_member_type_and_offset(Type *_struct, SV *member_name, size_t *out_offset) {
 
     if (is_reference_kind(_struct)) _struct = dereferenced_type(_struct);
-    ASSERT(_struct->kind == T_struct,"get_member_type_and_offset() called on something that is not a struct or a struct reference.\n")
+    ASSERT(_struct->kind == T_struct || _struct->kind == T_record,
+        "get_member_type_and_offset() called on something that is not a struct or a struct reference.\n")
 
     size_t offset = 0;
     for (int i = 0; i < _struct->_struct.num_members; i++) {
@@ -249,13 +259,24 @@ bool get_enum_member_value (Type *t, SV *member_name, int64_t *enum_value) {
 }
 
 void calculate_storage_size(Type *_struct) {
-    ASSERT(_struct->kind == T_struct,"calculate_storage_size() called on something that is not a struct.\n")
-    size_t offset = 0;
-    for (int i = 0; i < _struct->_struct.num_members; i++) {
-        TypeMember *member = &_struct->_struct.members[i];
-        offset += member->type->storage_size;
+    char buf[1024];
+    if (is_struct_kind(_struct)) {
+        size_t offset = 0;
+        for (int i = 0; i < _struct->_struct.num_members; i++) {
+            TypeMember *member = &_struct->_struct.members[i];
+            offset += member->type->storage_size;
+        }
+        _struct->storage_size = offset;
     }
-    _struct->storage_size = offset;
+    else if (is_record_kind(_struct)) {
+        size_t offset = 0;
+        for (int i = 0; i < _struct->_struct.num_members; i++) {
+            TypeMember *member = &_struct->_struct.members[i];
+            offset += member->type->storage_size;
+        }
+        _struct->storage_size = offset;
+    }
+    else NOT_IMPLEMENTED("calculate_storage_size() for %s is not implemented.\n", get_type_name_r(buf, _struct));
 }
 
 size_t get_function_arguments_size(Type *t) {

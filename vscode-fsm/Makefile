@@ -1,0 +1,3 @@
+
+all:
+	vsce package

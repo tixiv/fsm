@@ -224,39 +224,51 @@ static void gen_variadic_operators(AST_node *n, IL_gen *gen, bool result_used) {
     if (!result_used) push_opcode(OP_pop, nullptr, 0);
 }
 
-static void gen_cast(AST_node *n, bool result_used) {
+static void gen_cast(AST_node *n, IL_gen *gen, bool result_used) {
     ASSERT(n->kind == AST_cast, "gen_cast() called on wrong kind of AST node\n");
     char buf_1[1024], buf_2[1024];
 
     Type *to = n->type;
     Type *from = n->_cast.right_type;
     
-    if (result_used) {
-        if (is_boolean_kind(to) && is_integer_kind(from)) {
-            push_opcode(OP_to_bool, nullptr, 0);
-        }
-        else if (is_boolean_kind(to) && is_reference_kind(from)) {
-            push_opcode(OP_to_bool, nullptr, 0);
-        }
-        else if (is_integer_kind(to) && is_boolean_kind(from)) {
-            // No cast needed. our 64 bit bools can be used as integer directly.
-        }
-        else if (is_integer_kind(to) && from->kind == T_unsigned_integer &&
-                to->integer.num_bits >= from->integer.num_bits)
-        {
-            // No cast needed.
-        }
-        else if (to->kind == T_signed_integer && from->kind == T_signed_integer) {
-            if (to->storage_size > from->storage_size)
-                push_opcode_sz(OP_sign_extend, nullptr, 0, from->storage_size);
-        }
-        else if (is_integer_kind(to) && from->kind == T_signed_integer) {
-            // Just put no cast for now, let's fix potential problems later
-        }
-        else {
-            NOT_IMPLEMENTED("Generating IL for cast to '%s' from '%s' is not implemented yet.\n",
-                get_type_name_r(buf_1, to), get_type_name_r(buf_2, from));
-        }
+    if (!result_used) {
+        il_gen_error(n->line_number, "Cast with unused result is not supported.\n");
+    }
+
+    if (is_boolean_kind(to) && is_integer_kind(from)) {
+        ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+        push_opcode(OP_to_bool, nullptr, 0);
+    }
+    else if (is_boolean_kind(to) && is_reference_kind(from)) {
+        ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+        push_opcode(OP_to_bool, nullptr, 0);
+    }
+    else if (is_integer_kind(to) && is_boolean_kind(from)) {
+        ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+        // No cast needed. our 64 bit bools can be used as integer directly.
+    }
+    else if (is_integer_kind(to) && from->kind == T_unsigned_integer &&
+            to->integer.num_bits >= from->integer.num_bits)
+    {
+        ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+        // No cast needed.
+    }
+    else if (to->kind == T_signed_integer && from->kind == T_signed_integer) {
+        ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+        if (to->storage_size > from->storage_size)
+            push_opcode_sz(OP_sign_extend, nullptr, 0, from->storage_size);
+    }
+    else if (is_integer_kind(to) && from->kind == T_signed_integer) {
+        ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+        // Just put no cast for now, let's fix potential problems later
+    }
+    else if (to == &builtin_u8_slice && is_record_kind(from)) {
+        push_opcode(OP_push_literal, nullptr, get_storage_size(from));
+        ast_visit_children(n, (AstVisitor)gen_address_visitor, gen);
+    }
+    else {
+        NOT_IMPLEMENTED("Generating IL for cast to '%s' from '%s' is not implemented yet.\n",
+            get_type_name_r(buf_1, to), get_type_name_r(buf_2, from));
     }
 }
 
@@ -424,8 +436,7 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             break;
 
         case AST_cast:
-            ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
-            gen_cast(n, true);
+            gen_cast(n, gen, true);
             break;
         
         case AST_unary:
@@ -486,7 +497,7 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
 
         case AST_member_access: {
             Type *t = n->member_access.body->type;
-            if (is_reference_kind(t) && is_struct_kind(dereferenced_type(t))) {
+            if (is_reference_kind(t) && (is_struct_kind(dereferenced_type(t)) || is_record_kind(dereferenced_type(t)))) {
                 ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
                 push_opcode(OP_member_access, nullptr, n->member_access.offset);
             }
