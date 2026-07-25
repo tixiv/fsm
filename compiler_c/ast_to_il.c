@@ -386,7 +386,90 @@ static void gen_address_visitor(AST_node *n, IL_gen *gen) {
     }
 }
 
+static void gen_builder_string_put_struct (Symbol *s_sb, AST_node *arg, IL_gen *gen) {
+    char buf[1024];
 
+    push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
+    push_opcode(OP_push_string_literal, &mkSV("{\n"), num_strings++);
+    push_opcode_sz(OP_call, &mkSV("sb_puts"), 0, 24);
+
+    Type *t = arg->type;
+    for (size_t i = 0; i < t->_struct.num_members; i++) {
+        TypeMember *member = &t->_struct.members[i];
+        size_t offset;
+        get_member_type_and_offset(t, &member->name, &offset);
+
+        push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
+        push_opcode(OP_push_string_literal, &mkSV("    "), num_strings++);
+        push_opcode_sz(OP_call, &mkSV("sb_puts"), 0, 24);
+
+        push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
+        push_opcode(OP_push_string_literal, &member->name, num_strings++);
+        push_opcode_sz(OP_call, &mkSV("sb_puts"), 0, 24);
+
+        push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
+        push_opcode(OP_push_string_literal, &mkSV(" : "), num_strings++);
+        push_opcode_sz(OP_call, &mkSV("sb_puts"), 0, 24);
+
+        if (is_integer_kind(member->type)) {
+            push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
+            gen_address_visitor(arg, gen);
+            push_opcode(OP_push_literal, nullptr, offset);
+            push_opcode(OP_add, nullptr, 0);
+            push_opcode_t(OP_load, nullptr, 0, member->type);
+            push_opcode_sz(OP_call, &mkSV("sb_puti"), 0, 16);
+        }
+        else if (member->type == &builtin_u8_slice) {
+            push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
+            gen_address_visitor(arg, gen);
+            push_opcode(OP_push_literal, nullptr, offset);
+            push_opcode(OP_add, nullptr, 0);
+            push_opcode_t(OP_load, nullptr, 0, member->type);
+            push_opcode_sz(OP_call, &mkSV("sb_puts"), 0, 24);
+        }
+        else NOT_IMPLEMENTED("Printing %s inside a struct or record in builder string is not implemented yet.\n",
+                get_type_name_r(buf, member->type));
+        
+        push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
+        push_opcode(OP_push_string_literal, &mkSV("\n"), num_strings++);
+        push_opcode_sz(OP_call, &mkSV("sb_puts"), 0, 24);
+    }
+
+    push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
+    push_opcode(OP_push_string_literal, &mkSV("}\n"), num_strings++);
+    push_opcode_sz(OP_call, &mkSV("sb_puts"), 0, 24);
+}
+
+static void gen_builder_string (AST_node *n, IL_gen *gen) {
+    char buf[1024];
+    Symbol *s_sb = n->builder_string.var_decl_sb->symbol.symbol;
+    Symbol *s_arr = n->builder_string.var_decl_arr->symbol.symbol;
+    push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
+    push_opcode(OP_push_literal, nullptr, 1024);
+    push_opcode(OP_push_local_var_address, nullptr, s_arr->offset);
+    push_opcode_sz(OP_call, &mkSV("sb_init"), 0, 24);
+
+    for (AST_node *arg = n->builder_string.body; arg; arg = arg->next) {
+        if (arg->type == &builtin_u8_slice) {
+            push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
+            gen_value_visitor(arg, gen);
+            push_opcode_sz(OP_call, &mkSV("sb_puts"), 0, 24);
+        }
+        else if (is_integer_kind(arg->type)) {
+            push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
+            gen_value_visitor(arg, gen);
+            push_opcode_sz(OP_call, &mkSV("sb_puti"), 0, 16);
+        }
+        else if (is_struct_kind(arg->type) || is_record_kind(arg->type)){
+            gen_builder_string_put_struct(s_sb, arg, gen);
+        }
+        else NOT_IMPLEMENTED("Generating IL for type %s in builder string is not implemented yet.\n", get_type_name_r(buf, arg->type));
+    }
+
+    push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
+    push_opcode(OP_member_access, nullptr, 16);
+    push_opcode_sz(OP_load, nullptr, 0, 16);
+}
 
 static void gen_value_visitor(AST_node *n, IL_gen *gen) {
     char buf[1024];
@@ -517,31 +600,9 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             else NOT_IMPLEMENTED("Generating IL for namespace acces for type %s is not implemented yet", get_type_name_r(buf, n->type))
             break;
 
-        case AST_builder_string: {
-            Symbol *s_sb = n->builder_string.var_decl_sb->symbol.symbol;
-            Symbol *s_arr = n->builder_string.var_decl_arr->symbol.symbol;
-            push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
-            push_opcode(OP_push_literal, nullptr, 1024);
-            push_opcode(OP_push_local_var_address, nullptr, s_arr->offset);
-            push_opcode_sz(OP_call, &mkSV("sb_init"), 0, 24);
-
-            for (AST_node *arg = n->builder_string.body; arg; arg = arg->next) {
-                push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
-                gen_value_visitor(arg, gen);
-                if (arg->type == &builtin_u8_slice) {
-                    push_opcode_sz(OP_call, &mkSV("sb_puts"), 0, 24);
-                }
-                else if (is_integer_kind(arg->type)) {
-                    push_opcode_sz(OP_call, &mkSV("sb_puti"), 0, 16);
-                }
-                else NOT_IMPLEMENTED("Generating IL for type %s in builder string is not implemented yet.\n", get_type_name_r(buf, arg->type));
-            }
-
-            push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
-            push_opcode(OP_member_access, nullptr, 16);
-            push_opcode_sz(OP_load, nullptr, 0, 16);
+        case AST_builder_string:
+            gen_builder_string(n, gen);
             break;
-        }
 
         default:
             NOT_IMPLEMENTED("gen_value_visitor for %s is not implemented yet.\n", ast_kind_name(n->kind));

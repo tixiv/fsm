@@ -1,13 +1,58 @@
 
 import * from "std";
 
+fn strerror (error_code) {
+    if (error_code == -1) return "Operation not permitted";
+    if (error_code == -2) return "No such file or directory";
+
+    print(error_code)
+    return "unknown error"
+}
+
+fn take_from (_to: u8[], _from: u8[]&) {
+    while (_to.len && _from.len) {
+        _to.begin = _from.begin;
+        _to++ _from++
+    }
+}
+
 record SockaddrUnix
 {
     sun_family : u16;
     sun_path   : u8[108];
 }
 
-record X11_ConnectMessage {
+fn open_x11_socket() {
+    let AF_UNIX = 1;
+    let SOCK_STREAM = 1;
+    let SOCK_CLOEXEC = 0x80000;
+    let fd = socket(AF_UNIX, bitor(SOCK_STREAM, SOCK_CLOEXEC), 0);
+
+    if (fd < 0) {
+        $"open_x11_socket() Error creating socket: {strerror(fd)}\n";
+        exit(1);
+    }
+
+    let addr: SockaddrUnix;
+    addr.sun_family = AF_UNIX;
+
+    let path = "/tmp/.X11-unix/X0";
+
+    let sb_addr: StringBuilder;
+    sb_init(sb_addr, addr.sun_path);
+    sb_puts(sb_addr, $"{path}\0")
+
+    let res = connect(fd, addr);
+
+    if (res < 0) {
+        $"open_x11_socket() Error connecting to '{path}': {strerror(res)}\n";
+        exit(1);
+    }
+
+    return fd;
+}
+
+record X11_SetupRequest {
     endian         : u8;
     _              : u8;
     version_major  : u16;
@@ -17,30 +62,67 @@ record X11_ConnectMessage {
     _              : u16;
 }
 
+record X11_SetupReplyHeader_1 {
+    status              : u8;
+    _                   : u8;
+    version_major       : u16;
+    version_minor       : u16;
+    additional_data_len : u16;
+}
+
+record X11_SetupReplyHeader_2 {
+    release_number             : u32;
+    resource_id_base           : u32;
+    resource_id_mask           : u32;
+    motion_buffer_size         : u32;
+    length_of_vendor           : u16;
+    maximum_request_length     : u16;
+    number_of_SCREENs_in_roots : u8;
+    number_of_pixmap_formats   : u8;
+    image_byte_order           : u8; // 0: LSBFirst, 1: MSBFirst
+    bitmap_format_bit_order    : u8; // 0: LeastSignificant, 1: MostSignificant
+    bitmap_format_scanline_unit: u8;
+    bitmap_format_scanline_pad : u8;
+    min_keycode                : u8;
+    max_keycode                : u8;
+    _                          : u32;
+    // length_of_vendor STRING8  vendor
+    // p unused, p=pad(length_of_vendor)
+}
+
+
+fn x11_setup() {
+    let fd = open_x11_socket();
+
+    {
+        let request: X11_SetupRequest;
+        request.endian = 'l';
+        request.version_major = 11;
+
+        write(fd, request);
+    }
+
+    let header: X11_SetupReplyHeader_1;
+    read (fd, header);
+
+    let additional_len_bytes = header.additional_data_len * 4;
+
+    let buffer: u8[0x10000];
+
+    let data: u8[] = buffer;
+    data.len = read(fd, buffer);
+
+    $"fd={fd}, len_recevied={data.len}\n"
+
+
+    let header2: X11_SetupReplyHeader_2;
+    take_from(header2, data);
+
+    $"header2: {header2}"
+
+
+}
+
 fn main () {
-    let AF_UNIX = 1;
-    let SOCK_STREAM = 1;
-    let SOCK_CLOEXEC = 0x80000;
-    let fd = socket(AF_UNIX, bitor(SOCK_STREAM, SOCK_CLOEXEC), 0);
-
-    let addr: SockaddrUnix;
-    addr.sun_family = AF_UNIX;
-
-    let sb_addr: StringBuilder;
-    sb_init(sb_addr, addr.sun_path);
-    sb_puts(sb_addr, "/tmp/.X11-unix/X0\0")
-
-    connect(fd, addr);
-
-    let connect_message: X11_ConnectMessage;
-    connect_message.endian = 'l';
-    connect_message.version_major = 11;
-
-    write(fd, connect_message);
-
-    let data: u8[0x10000];
-
-    let len = read(fd, data);
-
-    $"fd={fd}, len_recevied={len}\n"
+    x11_setup();
 }

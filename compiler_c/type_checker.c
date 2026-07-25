@@ -380,6 +380,8 @@ void type_check_builder_string(AST_node *b_str) {
         auto_dereference(n);
         if (is_integer_kind(n->type)) continue;
         if (n->type == &builtin_u8_slice) continue;
+        if (is_record_kind(n->type)) continue;
+        if (is_struct_kind(n->type)) continue;
         try_convert_to_type_if_necessary(n, &builtin_i64, "Argument of builder string");
     }
 }

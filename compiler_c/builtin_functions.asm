@@ -70,11 +70,17 @@ SYS_FSTAT   = 5
 SYS_MMAP    = 9
 SYS_SOCKET  = 41
 SYS_CONNECT = 42
+SYS_EXIT    = 60
 O_RDONLY    = 0
 PROT_READ   = 1
 MAP_PRIVATE = 2
 STAT_SIZE      = 144          ; sizeof(struct stat) on x86-64 Linux
 ST_SIZE_OFFSET = 48           ; offsetof(st_size)
+
+fn_exit: ; exit (exit_code: i64) : void
+    mov rax, SYS_EXIT
+    mov rdi, [rsp+8]
+    syscall
 
 fn_open: ; open (filename: u8 &, flags: i64) : i64
     mov     eax, SYS_OPEN

@@ -53,15 +53,18 @@ void declare_builtin_fn(SV name, Type *return_type, size_t num_args, Type *arg_t
 void init_builtin_functions() {
     dyn_array_init(&builtin_functions, sizeof(Symbol*), 8);
 
-    declare_builtin_fn(mkSV("print"), &builtin_void, 1, (Type*[]){&builtin_i64});
-    declare_builtin_fn(mkSV("putc"), &builtin_void, 1, (Type*[]){&builtin_u8});
-    declare_builtin_fn(mkSV("puts"), &builtin_void, 1, (Type*[]){&builtin_u8_slice});
-    declare_builtin_fn(mkSV("open"), &builtin_i64, 2, (Type*[]){&builtin_u8_reference, &builtin_i64 });// open(filename: u8 &, flags: i64) : i64
+    declare_builtin_fn(mkSV("exit"), &builtin_void, 1, (Type*[]){&builtin_i64 });
+    declare_builtin_fn(mkSV("open"), &builtin_i64, 2, (Type*[]){&builtin_u8_reference, &builtin_i64 });
     declare_builtin_fn(mkSV("close"), &builtin_i64, 1, (Type*[]){&builtin_i64});
     declare_builtin_fn(mkSV("read"), &builtin_i64, 2, (Type*[]){&builtin_i64, &builtin_u8_slice});
     declare_builtin_fn(mkSV("write"), &builtin_i64, 2, (Type*[]){&builtin_i64, &builtin_u8_slice});
     declare_builtin_fn(mkSV("socket"), &builtin_i64, 3, (Type*[]){&builtin_i64, &builtin_i64, &builtin_i64});
     declare_builtin_fn(mkSV("connect"), &builtin_i64, 2, (Type*[]){&builtin_i64, &builtin_u8_slice});
+
+
+    declare_builtin_fn(mkSV("print"), &builtin_void, 1, (Type*[]){&builtin_i64});
+    declare_builtin_fn(mkSV("putc"), &builtin_void, 1, (Type*[]){&builtin_u8});
+    declare_builtin_fn(mkSV("puts"), &builtin_void, 1, (Type*[]){&builtin_u8_slice});
     declare_builtin_fn(mkSV("mmap"), &builtin_u8_reference, 2, (Type*[]){&builtin_i64, &builtin_i64});// mmap(lenght: i64, fd: i64) : u8 &
     declare_builtin_fn(mkSV("fsize"), &builtin_i64, 1, (Type*[]){&builtin_i64});// fsize(fd: i64) : i64
 
