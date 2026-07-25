@@ -116,7 +116,8 @@ int get_ref_order(Type *t);
 
 bool types_are_equivalent(Type *t1, Type *t2);
 Type *dereferenced_type(Type *t);
-Type *get_member_type_and_offset(Type *_struct, SV *member_name, size_t *out_offset);
+size_t get_member_offset(Type *_struct, size_t index);
+Type *get_member_type_and_offset_by_name(Type *_struct, SV *member_name, size_t *out_offset);
 
 bool get_enum_member_value (Type *t, SV *member_name, int64_t *enum_value);
 

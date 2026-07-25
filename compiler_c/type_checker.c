@@ -311,20 +311,9 @@ void type_propagate_binary_operator(AST_node *n) {
             case TOK_equal_assign:
                 auto_dereference(n->binary.left);
                 auto_dereference(n->binary.right);
-
-                if (types_are_equivalent(n->binary.left->type, n->binary.right->type)) {
-                }
-                else if (is_integer_kind(n->binary.left->type) && is_integer_kind(n->binary.right->type)) {
-                    // TODO: Warn if sizes / signs are different
-                }
-                else {
-                    type_checker_error(n->line_number, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
-                        token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
-                }
+                try_convert_to_type_if_necessary(n->binary.right, n->binary.left->type, "Argument of operator '='");
                 n->type = n->binary.right->type;
                 break;
-
-        
 
             default:
                 NOT_IMPLEMENTED("Type checking binary operator of kind %s is not implemented yet.\n", token_kind_name(n->binary.token_kind));
@@ -787,7 +776,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             
             if (is_struct_kind(container) || is_record_kind(container)) {
                 size_t offset;
-                Type *t = get_member_type_and_offset(container, &n->member_access.name, &offset);
+                Type *t = get_member_type_and_offset_by_name(container, &n->member_access.name, &offset);
                 if (!t) type_checker_error(n->line_number, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->member_access.name),
                         get_type_name_r(buf_1, container));
 

@@ -16,6 +16,10 @@ fn take_from (_to: u8[], _from: u8[]&) {
     }
 }
 
+fn pad_size(size, pad) {
+    return bitand(size + pad - 1, bitnot(pad - 1))
+}
+
 record SockaddrUnix
 {
     sun_family : u16;
@@ -88,12 +92,67 @@ record X11_SetupReplyHeader_2 {
     _                          : u32;
     // length_of_vendor STRING8  vendor
     // p unused, p=pad(length_of_vendor)
+    // 8n LISTofFORMAT pixmap-formats
+    // m  LISTofSCREEN roots (m is always a multiple of 4)
+}
+
+record X11_PIXMAP_FORMAT {
+    depth          : u8;
+    bits_per_pixel : u8;
+    scanline_pad   : u8;
+    _              : u8[5];
 }
 
 
-fn x11_setup() {
-    let fd = open_x11_socket();
+record X11_SCREEN {
+    root_window              :  u32; // WINDOW
+    default_colormap         :  u32; // COLORMAP
+    white_pixel              :  u32;
+    black_pixel              :  u32;
+    current_input_masks      :  u32; // SETofEVENT
+    width_in_pixels          :  u16;
+    height_in_pixels         :  u16;
+    width_in_millimeters     :  u16;
+    height_in_millimeters    :  u16;
+    min_installed_maps       :  u16;
+    max_installed_maps       :  u16;
+    root_visual              :  u32; // VISUALID
+    backing_stores           :   u8; // 0: Never 1: WhenMapped 2: Always
+    save_unders              : bool;
+    root_depth               :   u8;
+    number_of_depths         :   u8;
+    // n LISTofDEPTH allowed_depths (n is always a multiple of 4)
+}
 
+record X11_DEPTH {
+    depth             : u8;
+    _                 : u8;
+    number_of_visuals : u16;
+    _                 : u32;
+    // 24n LISTofVISUALTYPE visuals
+}
+
+enum X11_VisualClass {
+    StaticGray  = 0,
+    GrayScale   = 1,
+    StaticColor = 2,
+    PseudoColor = 3,
+    TrueColor   = 4,
+    DirectColor = 5,
+}
+
+record X11_VISUAL_TYPE {
+    visual_id           : u32;
+    class               : u8; // enum X11_VisualClass
+    bits_per_rgb_value  : u8;
+    colormap_entries    : u16;
+    red_mask            : u32;
+    green_mask          : u32;
+    blue_mask           : u32;
+    _                   : u32;
+}
+
+fn x11_setup(fd) {
     {
         let request: X11_SetupRequest;
         request.endian = 'l';
@@ -106,23 +165,219 @@ fn x11_setup() {
     read (fd, header);
 
     let additional_len_bytes = header.additional_data_len * 4;
-
-    let buffer: u8[0x10000];
-
-    let data: u8[] = buffer;
-    data.len = read(fd, buffer);
-
-    $"fd={fd}, len_recevied={data.len}\n"
-
+    let len_read = 0;
 
     let header2: X11_SetupReplyHeader_2;
-    take_from(header2, data);
+    len_read = len_read + read(fd, header2);
 
     $"header2: {header2}"
 
+    let vendor_buf: u8[256];
+    let vendor: u8[] = vendor_buf;
+    vendor.len = pad_size(header2.length_of_vendor, 4);
+    len_read = len_read + read(fd, vendor);
+    vendor.len = header2.length_of_vendor;
 
+    $"vendor : '{vendor}'\n";
+
+    for (let i = 0; i < header2.number_of_pixmap_formats; i++) {
+        let format: X11_PIXMAP_FORMAT;
+        len_read = len_read + read(fd, format);
+        $"Format {i}: {format}";
+    }
+
+    let root_window = -1
+
+    for (let i = 0; i < header2.number_of_SCREENs_in_roots; i++) {
+        let screen: X11_SCREEN;
+        len_read = len_read + read(fd, screen);
+        $"Screen {i}: {screen}";
+        
+        if (i == 0) root_window = screen.root_window;
+
+        for (let j = 0; j < screen.number_of_depths; j++) {
+            let depth: X11_DEPTH;
+            len_read = len_read + read(fd, depth);
+            // $"Depth {j}: {depth}";
+            for (let k = 0; k < depth.number_of_visuals; k++) {
+                let visual: X11_VISUAL_TYPE;
+                len_read = len_read + read(fd, visual);
+                // $"Visual {k}: {visual}"
+            }
+        }
+    }
+
+    $"{additional_len_bytes}\n{len_read}\n";
+
+    return root_window;
 }
 
+record X11_QueryExtension {
+    opcode         :  u8; // 98
+    _              :  u8;
+    request_length : u16; // 2+(n+p)/4
+    length_of_name : u16; // n
+    _              : u16;
+    // n STRING8 name
+    // unused, p=pad(n)
+}
+
+enum X11_ValueMask {
+    function               =  0x00000001;
+    plane_mask             =  0x00000002;
+    foreground             =  0x00000004;
+    background             =  0x00000008;
+    line_width             =  0x00000010;
+    line_style             =  0x00000020;
+    cap_style              =  0x00000040;
+    join_style             =  0x00000080;
+    fill_style             =  0x00000100;
+    fill_rule              =  0x00000200;
+    tile                   =  0x00000400;
+    stipple                =  0x00000800;
+    tile_stipple_x_origin  =  0x00001000;
+    tile_stipple_y_origin  =  0x00002000;
+    font                   =  0x00004000;
+    subwindow_mode         =  0x00008000;
+    graphics_exposures     =  0x00010000;
+    clip_x_origin          =  0x00020000;
+    clip_y_origin          =  0x00040000;
+    clip_mask              =  0x00080000;
+    dash_offset            =  0x00100000;
+    dashes                 =  0x00200000;
+    arc_mode               =  0x00400000;
+}
+
+record X11_CreateGC {
+    opcode          : u8; // 55
+    _               : u8;
+    request_length  : u16; // 4+n
+    cid             : u32; // GCONTEXT (user chooses ID?)
+    drawable        : u32; // DRAWABLE (root window)
+    value_mask      : u32; // Which values we want to append
+    // 4n LISTofVALUE value_list
+}
+
+record X11_CARD32 {
+    value: u32;
+}
+
+fn x11_create_gc(fd, root_window) {
+    let create_gc: X11_CreateGC;
+    create_gc.opcode = 55;
+    create_gc.request_length = 5;
+    create_gc.cid = 0x600000;
+    create_gc.drawable = root_window;
+    create_gc.value_mask = X11_ValueMask::background;
+
+    write(fd, create_gc);
+
+    let background_color: X11_CARD32;
+    background_color.value = 0xffffff;
+
+    write(fd, background_color);
+
+    return create_gc.cid;
+}
+
+record X11_MapRequest {
+    opcode          :  u8; // 20
+    _               :  u8;
+    sequence_number : u16;
+    parent          : u32; // WINDOW
+    window          : u32; // WINDOW
+    _               : u8[20];
+}
+
+fn x11_map_request() {
+    let map_request: X11_MapRequest;
+    map_request.opcode = 20;
+    map_request.sequence_number = 1;
+}
+
+enum X11_CreateWindow_value_mask {
+    background_pixmap     = 0x00000001,
+    background_pixel      = 0x00000002,
+    border_pixmap         = 0x00000004,
+    border_pixel          = 0x00000008,
+    bit_gravity           = 0x00000010,
+    win_gravity           = 0x00000020,
+    backing_store         = 0x00000040,
+    backing_planes        = 0x00000080,
+    backing_pixel         = 0x00000100,
+    override_redirect     = 0x00000200,
+    save_under            = 0x00000400,
+    event_mask            = 0x00000800,
+    do_not_propagate_mask = 0x00001000,
+    colormap              = 0x00002000,
+    cursor                = 0x00004000,
+}
+
+record X11_CreateWindow {
+    opcode         : u8; // 1
+    depth          : u8;
+    request_length : u16; // 8+n
+    wid            : u32; // WINDOW
+    parent         : u32; // WINDOW
+    x              : u16;
+    y              : u16;
+    width          : u16;
+    height         : u16;
+    border_width   : u16;
+    class          : u16; // 0: CopyFromParent, 1: InputOutput, 2: InputOnly
+    visual         : u32; // VISUALID, 0: CopyFromParent
+    value_mask     : u32; // (has n bits set to 1)
+    //4n LISTofVALUE value_list
+}
+
+
+record X11_MapWindow {
+    opcode         : u8; // 8
+    _              : u8;
+    request_length : u16; // 2
+    window         : u32; // WINDOW
+}
+
+fn x11_open_window() {
+    let fd = open_x11_socket();
+    let root_window = x11_setup(fd);
+    let gc = x11_create_gc(fd, root_window);
+
+    let wid = gc + 1;
+
+    let create_window: X11_CreateWindow;
+    create_window.opcode = 1;
+    create_window.depth = 0;
+    create_window.request_length = 8 + 2;
+    create_window.wid = wid;
+    create_window.parent = root_window;
+    create_window.x = 0;
+    create_window.y = 0;
+    create_window.width = 0x320;
+    create_window.height = 0x258;
+    create_window.value_mask
+            = X11_CreateWindow_value_mask::background_pixel
+            + X11_CreateWindow_value_mask::border_pixel;
+    
+    write (fd, create_window);
+
+    let bg:     X11_CARD32;
+    let border: X11_CARD32;
+    bg.value       = 0xffffffff;
+    border.value   = 0;
+    write (fd, bg);
+    write (fd, border);
+
+    let map_window: X11_MapWindow;
+    map_window.opcode = 8;
+    map_window.request_length = 2;
+    map_window.window = wid;
+
+    write (fd, map_window);
+}
+
+
 fn main () {
-    x11_setup();
+    x11_open_window()
+    while(1){}
 }

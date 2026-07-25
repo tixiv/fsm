@@ -396,8 +396,8 @@ static void gen_builder_string_put_struct (Symbol *s_sb, AST_node *arg, IL_gen *
     Type *t = arg->type;
     for (size_t i = 0; i < t->_struct.num_members; i++) {
         TypeMember *member = &t->_struct.members[i];
-        size_t offset;
-        get_member_type_and_offset(t, &member->name, &offset);
+        if (sv_compare_cstr(&member->name, "_")) continue;
+        size_t offset = get_member_offset(t, i);
 
         push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
         push_opcode(OP_push_string_literal, &mkSV("    "), num_strings++);
@@ -411,7 +411,7 @@ static void gen_builder_string_put_struct (Symbol *s_sb, AST_node *arg, IL_gen *
         push_opcode(OP_push_string_literal, &mkSV(" : "), num_strings++);
         push_opcode_sz(OP_call, &mkSV("sb_puts"), 0, 24);
 
-        if (is_integer_kind(member->type)) {
+        if (is_integer_kind(member->type) || is_boolean_kind(member->type)) {
             push_opcode(OP_push_local_var_address, nullptr, s_sb->offset);
             gen_address_visitor(arg, gen);
             push_opcode(OP_push_literal, nullptr, offset);

@@ -12,7 +12,7 @@
 
 Type builtin_void = (Type){T_void};
 Type builtin_null = (Type){T_null};
-Type builtin_bool = (Type){T_boolean, .storage_size = 8};
+Type builtin_bool = (Type){T_boolean, .storage_size = 1};
 
 Type builtin_u64 = (Type){T_unsigned_integer, .storage_size = 8, .integer.num_bits = 64};
 Type builtin_i64 = (Type){T_signed_integer,   .storage_size = 8, .integer.num_bits = 64};
@@ -226,7 +226,23 @@ AST_node *make_cast(Type *to, Type *from) {
     return n;
 }
 
-Type *get_member_type_and_offset(Type *_struct, SV *member_name, size_t *out_offset) {
+size_t get_member_offset(Type *_struct, size_t index) {
+    ASSERT(_struct->kind == T_struct || _struct->kind == T_record,
+        "get_member_offset() called on something that is not a struct or record.\n")
+    ASSERT(index < _struct->_struct.num_members, "Index out of range.\n");
+
+    size_t offset = 0;
+    for (int i = 0; i < index; i++) {
+        TypeMember *member = &_struct->_struct.members[i];
+
+        offset += member->type->storage_size;
+    }
+
+    return offset;
+}
+
+Type *get_member_type_and_offset_by_name(Type *_struct, SV *member_name, size_t *out_offset) {
+    ASSERT(!sv_compare_cstr(member_name, "_"), "get_member_type_and_offset() called on '_'.\n" )
 
     if (is_reference_kind(_struct)) _struct = dereferenced_type(_struct);
     ASSERT(_struct->kind == T_struct || _struct->kind == T_record,
