@@ -82,11 +82,11 @@ fn_exit: ; exit (exit_code: i64) : void
     mov rdi, [rsp+8]
     syscall
 
-fn_open: ; open (filename: u8 &, flags: i64) : i64
-    mov     eax, SYS_OPEN
-    mov     rdi, [rsp+16]     ; filename
-    mov     rsi, [rsp+8]      ; flags
-    xor     rdx, rdx          ; mode
+fn___open: ; __open (filename: u8 &, flags: i64) : i64
+    mov eax, SYS_OPEN
+    mov rdi, [rsp+16]     ; filename
+    mov rsi, [rsp+8]      ; flags
+    xor rdx, rdx          ; mode
     syscall                   ; fd is in rax
     ret
 

@@ -1,0 +1,35 @@
+
+import * from "std";
+
+record AudioSample {
+    value: i16;
+}
+
+fn output(fd, v) {
+    let s: AudioSample;
+    s.value = v/4;
+    write(fd, s);
+}
+
+fn main() {
+    let O_WRONLY = 1
+    let fd = open("/tmp/audio.pipe", O_WRONLY)
+
+    let v = 0;
+
+    let p = 50
+    let m = 100
+
+    for(let i = 0; i < 1000; i++) {
+        while (v < 10000) {
+            v = v + p;
+            output(fd, v);
+        }
+        /*
+        while (v > -10000) {
+            v = v - m;
+            output(fd, v);
+        }*/
+        v = -10000;
+    }
+}

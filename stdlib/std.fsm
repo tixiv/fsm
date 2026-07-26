@@ -1,8 +1,21 @@
 
+fn strerror (error_code) {
+    if (error_code == -1) return "Operation not permitted";
+    if (error_code == -2) return "No such file or directory";
+
+    print(error_code)
+    return "unknown error"
+}
+
+fn open (filename: u8[], flags) {
+    let filename_zero_delimited = $"{filename}\0";
+    return __open (filename_zero_delimited.begin, flags)
+}
+
 fn read_file (filename: u8[]) : u8[]
 {
     let O_RDONLY = 0
-    let fd = open (filename.begin, O_RDONLY)
+    let fd = open (filename, O_RDONLY)
 
     let s: u8[];
     s.len = 0;
@@ -17,6 +30,10 @@ fn read_file (filename: u8[]) : u8[]
 
         puts("Read bytes: ") print(s.len)
         return s;
+    }
+    else {
+        write(2, $"Error: failed to read file '{filename}': {strerror(fd)}\n");
+        exit(1);
     }
 
     return s;

@@ -54,7 +54,7 @@ void init_builtin_functions() {
     dyn_array_init(&builtin_functions, sizeof(Symbol*), 8);
 
     declare_builtin_fn(mkSV("exit"), &builtin_void, 1, (Type*[]){&builtin_i64 });
-    declare_builtin_fn(mkSV("open"), &builtin_i64, 2, (Type*[]){&builtin_u8_reference, &builtin_i64 });
+    declare_builtin_fn(mkSV("__open"), &builtin_i64, 2, (Type*[]){&builtin_u8_reference, &builtin_i64 });
     declare_builtin_fn(mkSV("close"), &builtin_i64, 1, (Type*[]){&builtin_i64});
     declare_builtin_fn(mkSV("read"), &builtin_i64, 2, (Type*[]){&builtin_i64, &builtin_u8_slice});
     declare_builtin_fn(mkSV("write"), &builtin_i64, 2, (Type*[]){&builtin_i64, &builtin_u8_slice});

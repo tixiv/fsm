@@ -2,7 +2,7 @@
 fn read_file (filename: u8[])
 {
     let O_RDONLY = 0
-    let fd = open (filename.begin, O_RDONLY)
+    let fd = __open (filename.begin, O_RDONLY)
 
     if (fd >= 0) {
         puts("File has been opened\n")
