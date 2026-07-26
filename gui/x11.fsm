@@ -152,64 +152,76 @@ record X11_VISUAL_TYPE {
     _                   : u32;
 }
 
-fn x11_setup(fd) {
+struct FSM_X11_context {
+    fd;
+    root_window: u32;
+    default_colormap: u32;
+    gc: u32;
+    current_id: u32;
+}
+
+struct Drawable {
+    context:     FSM_X11_context&;
+    drawable_id: i64;
+}
+
+fn x11_setup(context: FSM_X11_context&) {
     {
         let request: X11_SetupRequest;
         request.endian = 'l';
         request.version_major = 11;
 
-        write(fd, request);
+        write(context.fd, request);
     }
 
     let header: X11_SetupReplyHeader_1;
-    read (fd, header);
+    read (context.fd, header);
 
     let additional_len_bytes = header.additional_data_len * 4;
     let len_read = 0;
 
     let header2: X11_SetupReplyHeader_2;
-    len_read = len_read + read(fd, header2);
+    len_read = len_read + read(context.fd, header2);
 
     $"header2: {header2}"
 
     let vendor_buf: u8[256];
     let vendor: u8[] = vendor_buf;
     vendor.len = pad_size(header2.length_of_vendor, 4);
-    len_read = len_read + read(fd, vendor);
+    len_read = len_read + read(context.fd, vendor);
     vendor.len = header2.length_of_vendor;
 
     $"vendor : '{vendor}'\n";
 
     for (let i = 0; i < header2.number_of_pixmap_formats; i++) {
         let format: X11_PIXMAP_FORMAT;
-        len_read = len_read + read(fd, format);
+        len_read = len_read + read(context.fd, format);
         $"Format {i}: {format}";
     }
 
-    let root_window = -1
-
     for (let i = 0; i < header2.number_of_SCREENs_in_roots; i++) {
         let screen: X11_SCREEN;
-        len_read = len_read + read(fd, screen);
+        len_read = len_read + read(context.fd, screen);
         $"Screen {i}: {screen}";
         
-        if (i == 0) root_window = screen.root_window;
+        if (i == 0) {
+            context.root_window = screen.root_window;
+            context.default_colormap = screen.default_colormap;
+        }
 
         for (let j = 0; j < screen.number_of_depths; j++) {
             let depth: X11_DEPTH;
-            len_read = len_read + read(fd, depth);
+            len_read = len_read + read(context.fd, depth);
             // $"Depth {j}: {depth}";
             for (let k = 0; k < depth.number_of_visuals; k++) {
                 let visual: X11_VISUAL_TYPE;
-                len_read = len_read + read(fd, visual);
+                len_read = len_read + read(context.fd, visual);
                 // $"Visual {k}: {visual}"
             }
         }
     }
 
     $"{additional_len_bytes}\n{len_read}\n";
-
-    return root_window;
 }
 
 record X11_QueryExtension {
@@ -262,20 +274,20 @@ record X11_CARD32 {
     value: u32;
 }
 
-fn x11_create_gc(fd, root_window) {
+fn x11_create_gc(context: FSM_X11_context&) {
     let create_gc: X11_CreateGC;
     create_gc.opcode = 55;
     create_gc.request_length = 5;
-    create_gc.cid = 0x600000;
-    create_gc.drawable = root_window;
+    create_gc.cid = context.current_id++;
+    create_gc.drawable = context.root_window;
     create_gc.value_mask = X11_ValueMask::background;
 
-    write(fd, create_gc);
+    write(context.fd, create_gc);
 
     let background_color: X11_CARD32;
     background_color.value = 0xffffff;
 
-    write(fd, background_color);
+    write(context.fd, background_color);
 
     return create_gc.cid;
 }
@@ -313,6 +325,13 @@ enum X11_CreateWindow_value_mask {
     cursor                = 0x00004000,
 }
 
+fn x11_connect (context: FSM_X11_context&) {
+    context.current_id = 0x600000;
+    context.fd = open_x11_socket();
+    x11_setup(context);
+    context.gc = x11_create_gc(context);
+}
+
 record X11_CreateWindow {
     opcode         : u8; // 1
     depth          : u8;
@@ -330,7 +349,6 @@ record X11_CreateWindow {
     //4n LISTofVALUE value_list
 }
 
-
 record X11_MapWindow {
     opcode         : u8; // 8
     _              : u8;
@@ -338,46 +356,121 @@ record X11_MapWindow {
     window         : u32; // WINDOW
 }
 
-fn x11_open_window() {
-    let fd = open_x11_socket();
-    let root_window = x11_setup(fd);
-    let gc = x11_create_gc(fd, root_window);
-
-    let wid = gc + 1;
+fn x11_open_window(context: FSM_X11_context&) : Drawable {
+    let wid = context.current_id++;
 
     let create_window: X11_CreateWindow;
     create_window.opcode = 1;
     create_window.depth = 0;
     create_window.request_length = 8 + 2;
     create_window.wid = wid;
-    create_window.parent = root_window;
+    create_window.parent = context.root_window;
     create_window.x = 0;
     create_window.y = 0;
-    create_window.width = 0x320;
-    create_window.height = 0x258;
+    create_window.width = 800;
+    create_window.height = 600;
     create_window.value_mask
             = X11_CreateWindow_value_mask::background_pixel
             + X11_CreateWindow_value_mask::border_pixel;
     
-    write (fd, create_window);
+    write (context.fd, create_window);
 
     let bg:     X11_CARD32;
     let border: X11_CARD32;
-    bg.value       = 0xffffffff;
-    border.value   = 0;
-    write (fd, bg);
-    write (fd, border);
+    bg.value       = 0x80;
+    border.value   = 0x404080;
+    write (context.fd, bg);
+    write (context.fd, border);
 
     let map_window: X11_MapWindow;
     map_window.opcode = 8;
     map_window.request_length = 2;
     map_window.window = wid;
 
-    write (fd, map_window);
+    write (context.fd, map_window);
+
+    let drawable: Drawable;
+    drawable.context => context;
+    drawable.drawable_id = wid;
+
+    return drawable;
+}
+
+record X11_CreatePixmap {
+    opcode         : u8;  // 53
+    depth          : u8;
+    request_length : u16; // 4
+    pid            : u32; // PIXMAP
+    drawable       : u32;
+    width          : u16;
+    height         : u16;
+}
+
+fn x11_create_pixmap (context: FSM_X11_context&, drawable: u32) {
+    let cp: X11_CreatePixmap;
+    cp.opcode = 53;
+    cp.depth  = 32;
+    cp.request_length = 4;
+    cp.pid = context.current_id++;
+    cp.drawable = drawable;
+    cp.width = 800;
+    cp.height = 600;
+
+    write (context.fd, cp);
+
+    return cp.pid;
+}
+
+record X11_PolyLine {
+    opcode          :  u8; // 65
+    coordinate_mode :  u8; // 0: Origin 1: Previous
+    request_length  : u16; // 3+n
+    drawable        : u32;
+    gc              : u32;
+    // 4n LISTofPOINT points
+}
+
+record Point {
+    x : u16;
+    y : u16;
 }
 
 
+fn x11_poly_line(drawable: Drawable, points: Point[]) {
+    let pl: X11_PolyLine;
+    pl.opcode = 65;
+    pl.coordinate_mode = 0;
+    pl.request_length = 3 + points.len;
+    pl.drawable = drawable.drawable_id;
+    pl.gc = drawable.context.gc;
+
+    write (drawable.context.fd, pl);
+    for (; points.len; points++) {
+        write (drawable.context.fd, points.begin)
+    }
+}
+
 fn main () {
-    x11_open_window()
-    while(1){}
+    let context: FSM_X11_context;
+    x11_connect(context);
+
+    let window = x11_open_window(context);
+
+    let points: Point[2];
+    points[0].x = 15;
+    points[0].y = 15;
+    points[1].x = 400;
+    points[1].y = 400;
+    points[1].x = 0;
+    points[1].y = 400;
+
+    x11_poly_line(window, points);
+
+    while(1)
+    {
+        let buf: u8[0x10000];
+        let len = read(context.fd, buf);
+        if (len == 0) exit(0);
+        print(len);
+    }
 }
