@@ -395,7 +395,7 @@ static void gen_builder_string_put_struct (Symbol *s_sb, AST_node *arg, IL_gen *
 
     Type *t = arg->type;
     for (size_t i = 0; i < t->_struct.num_members; i++) {
-        TypeMember *member = &t->_struct.members[i];
+        StructMember *member = &t->_struct.members[i];
         if (sv_compare_cstr(&member->name, "_")) continue;
         size_t offset = get_member_offset(t, i);
 

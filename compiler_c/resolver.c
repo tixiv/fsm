@@ -207,6 +207,8 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_namespace_access:
         case AST_enum:
         case AST_enum_member:
+        case AST_union:
+        case AST_union_member_def:
         case AST_typename:
         case AST_type_ref:
         case AST_type_array:

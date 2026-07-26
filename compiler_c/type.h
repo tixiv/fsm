@@ -28,7 +28,13 @@ struct Type_s;
 typedef struct {
     SV name;
     struct Type_s *type;
-} TypeMember;
+} StructMember;
+
+typedef struct {
+    SV name;
+    struct Type_s *type;
+    int64_t value;
+} UnionMember;
 
 typedef struct {
     SV name;
@@ -66,13 +72,18 @@ typedef struct Type_s {
 
         struct {
             int num_members;
-            TypeMember *members;
+            StructMember *members;
         } _struct;
 
         struct {
             int num_members;
             EnumMember *members;
         } _enum;
+
+        struct {
+            int num_members;
+            UnionMember *members;
+        } _union;
     };
 } Type;
 
@@ -106,6 +117,7 @@ bool is_boolean_kind(Type *t);
 bool is_array_kind(Type *t);
 bool is_struct_kind(Type *t);
 bool is_record_kind(Type *t);
+bool is_union_kind(Type *t);
 bool is_enum_kind(Type *t);
 bool is_reference_kind(Type *t);
 bool is_function_kind(Type *t);

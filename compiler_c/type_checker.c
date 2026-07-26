@@ -774,7 +774,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             Type *container = n->member_access.body->type;
             if (is_reference_kind(container)) container = dereferenced_type(container);
             
-            if (is_struct_kind(container) || is_record_kind(container)) {
+            if (is_struct_kind(container) || is_record_kind(container) || is_union_kind(container)) {
                 size_t offset;
                 Type *t = get_member_type_and_offset_by_name(container, &n->member_access.name, &offset);
                 if (!t) type_checker_error(n->line_number, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->member_access.name),
@@ -858,7 +858,9 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
         case AST_typename:
         case AST_member_def:
+        case AST_union_member_def:
         case AST_struct:
+        case AST_union:
         case AST_enum:
         case AST_enum_member:
         case AST_type_ref:

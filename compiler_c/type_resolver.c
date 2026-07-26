@@ -112,8 +112,13 @@ typedef struct {
     Dyn_array struct_members; // DynArray<TypeMember>
 } StructResolverState;
 
+typedef struct {
+    Type *current_union;
+    Dyn_array union_members; // DynArray<UnionMember>
+} UnionResolverState;
+
 void copy_struct_members(StructResolverState *trs){
-    size_t size = trs->struct_members.count * sizeof(TypeMember);
+    size_t size = trs->struct_members.count * sizeof(StructMember);
     trs->current_struct->_struct.members = malloc(size);
     memcpy(trs->current_struct->_struct.members, trs->struct_members.data, size);
     trs->current_struct->_struct.num_members = trs->struct_members.count;
@@ -127,7 +132,30 @@ void copy_enum_members(EnumResolverState *trs){
     trs->current_enum->_enum.num_members = trs->enum_members.count;
 }
 
+void copy_union_members(UnionResolverState *trs){
+    size_t size = trs->union_members.count * sizeof(UnionMember);
+    trs->current_union->_union.members = malloc(size);
+    memcpy(trs->current_union->_union.members, trs->union_members.data, size);
+    trs->current_union->_union.num_members = trs->union_members.count;
+}
+
 void type_resolver_visitor(AST_node *n, void *);
+void type_resolver_struct_visitor(AST_node *n, StructResolverState *trs);
+
+void type_resolve_struct(AST_node *n, bool global) {
+    StructResolverState trs_1;
+    dyn_array_init(&trs_1.struct_members, sizeof(StructMember), 8);
+    if (global) {
+        n->type = get_type_by_name(&n->_struct.name);
+        ASSERT(n->type, "The type name '%.*s' should exist because it should have been found in the lookup pass.\n", SV_prnt(n->_struct.name));
+    }
+    else {
+        n->type = type_alloc(n->_struct.is_record ? T_record : T_struct);
+    }
+    trs_1.current_struct = n->type;
+    ast_visit_children(n, (AstVisitor)type_resolver_struct_visitor, &trs_1);
+    copy_struct_members(&trs_1);
+}
 
 void type_resolver_enum_visitor(AST_node *n, EnumResolverState *trs) {
     switch (n->kind) {
@@ -135,7 +163,7 @@ void type_resolver_enum_visitor(AST_node *n, EnumResolverState *trs) {
             ASSERT(trs->current_enum, "Encountered %s outside of enum.\n", ast_kind_name(n->kind));
             EnumMember *member = dyn_array_push(&trs->enum_members);
             member->name = n->_enum_member.name;
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
             member->value = n->_enum_member.value;
             n->type = &builtin_i64;
             break;
@@ -151,7 +179,7 @@ void type_resolver_struct_visitor(AST_node *n, StructResolverState *trs) {
     switch (n->kind) {
         case AST_member_def: {
             ASSERT(trs->current_struct, "Encountered %s outside of struct.\n", ast_kind_name(n->kind));
-            TypeMember *member = dyn_array_push(&trs->struct_members);
+            StructMember *member = dyn_array_push(&trs->struct_members);
             member->name = n->struct_member_def.name;
             ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
             if (n->struct_member_def._typedef) {
@@ -171,18 +199,40 @@ void type_resolver_struct_visitor(AST_node *n, StructResolverState *trs) {
     }
 }
 
-void type_resolver_visitor(AST_node *n, void *arg) {
+void type_resolver_union_visitor(AST_node *n, UnionResolverState *trs) {
     switch (n->kind) {
-        case AST_struct: {
-            StructResolverState trs_1;
-            dyn_array_init(&trs_1.struct_members, sizeof(TypeMember), 8);
-            n->type = get_type_by_name(&n->_struct.name);
-            ASSERT(n->type, "The type name '%.*s' should exist because it should have been found in the lookup pass.\n", SV_prnt(n->_struct.name));
-            trs_1.current_struct = n->type;
-            ast_visit_children(n, (AstVisitor)type_resolver_struct_visitor, &trs_1);
-            copy_struct_members(&trs_1);
+        case AST_union_member_def: {
+            UnionMember *member = dyn_array_push(&trs->union_members);
+            member->name = n->union_member_def.name;
+            ast_visit_children(n, (AstVisitor)type_resolver_union_visitor, nullptr);
+            if (n->union_member_def._typedef) {
+                if (!n->union_member_def._typedef->type) type_resolver_error(n->line_number, "The type for union member '%.*s' could not be resolved.\n", SV_prnt(member->name));
+                n->type = n->union_member_def._typedef->type;
+            }
+            else {
+                n->type = &builtin_i64;
+            }
+            member->type = n->type;
+            member->value = n->union_member_def.enum_value;
             break;
         }
+
+        case AST_struct: {
+            type_resolve_struct(n, false);
+            break;
+        }
+
+        default:
+            NOT_IMPLEMENTED("type_resolver_union_visitor() is not implemented for %s.\n", ast_kind_name(n->kind));
+            break;
+    }
+}
+
+void type_resolver_visitor(AST_node *n, void *arg) {
+    switch (n->kind) {
+        case AST_struct:
+            type_resolve_struct(n, true);
+            break;
 
         case AST_enum: {
             EnumResolverState trs_1;
@@ -192,6 +242,17 @@ void type_resolver_visitor(AST_node *n, void *arg) {
             trs_1.current_enum = n->type;
             ast_visit_children(n, (AstVisitor)type_resolver_enum_visitor, &trs_1);
             copy_enum_members(&trs_1);
+            break;
+        }
+
+        case AST_union: {
+            UnionResolverState trs_1;
+            dyn_array_init(&trs_1.union_members, sizeof(UnionMember), 8);
+            n->type = get_type_by_name(&n->_union.name);
+            ASSERT(n->type, "The type name should exist because it should have been found in the lookup pass.\n");
+            trs_1.current_union = n->type;
+            ast_visit_children(n, (AstVisitor)type_resolver_union_visitor, &trs_1);
+            copy_union_members(&trs_1);
             break;
         }
 

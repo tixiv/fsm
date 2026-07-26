@@ -25,7 +25,7 @@ Type builtin_i8 =  (Type){T_signed_integer,   .storage_size = 1, .integer.num_bi
 
 
 Type builtin_u8_reference = (Type){T_reference, .storage_size = 8, .reference.target_type = &builtin_u8};
-static TypeMember builtin_u8_slice_members[2] = {{.name = mkSV("begin"), .type = &builtin_u8_reference}, {.name = mkSV("len"), .type = &builtin_i64}};
+static StructMember builtin_u8_slice_members[2] = {{.name = mkSV("begin"), .type = &builtin_u8_reference}, {.name = mkSV("len"), .type = &builtin_i64}};
 Type builtin_u8_slice = (Type){T_struct, .storage_size = 16, ._struct.num_members = 2, ._struct.members = builtin_u8_slice_members};
 
 Type builtin_any = (Type){T_any, .storage_size = 0};
@@ -107,6 +107,14 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
                 sb_printf(&sb, "anonymous record", SV_prnt(type->name));
             }
             break;
+        case T_union:
+            if (type->name.begin) {
+                sb_printf(&sb, "union %.*s", SV_prnt(type->name));
+            }
+            else {
+                sb_printf(&sb, "anonymous record", SV_prnt(type->name));
+            }
+            break;
         case T_enum:
             if (type->name.begin) {
                 sb_printf(&sb, "enum %.*s", SV_prnt(type->name));
@@ -145,6 +153,10 @@ bool is_struct_kind(Type *t) {
 
 bool is_record_kind(Type *t) {
     return t->kind == T_record;
+}
+
+bool is_union_kind(Type *t) {
+    return t->kind == T_union;
 }
 
 bool is_enum_kind(Type *t) {
@@ -233,7 +245,7 @@ size_t get_member_offset(Type *_struct, size_t index) {
 
     size_t offset = 0;
     for (int i = 0; i < index; i++) {
-        TypeMember *member = &_struct->_struct.members[i];
+        StructMember *member = &_struct->_struct.members[i];
 
         offset += member->type->storage_size;
     }
@@ -241,22 +253,36 @@ size_t get_member_offset(Type *_struct, size_t index) {
     return offset;
 }
 
-Type *get_member_type_and_offset_by_name(Type *_struct, SV *member_name, size_t *out_offset) {
+Type *get_member_type_and_offset_by_name(Type *t, SV *member_name, size_t *out_offset) {
     ASSERT(!sv_compare_cstr(member_name, "_"), "get_member_type_and_offset() called on '_'.\n" )
 
-    if (is_reference_kind(_struct)) _struct = dereferenced_type(_struct);
-    ASSERT(_struct->kind == T_struct || _struct->kind == T_record,
+    if (is_reference_kind(t)) t = dereferenced_type(t);
+    ASSERT(t->kind == T_struct || t->kind == T_record || t->kind == T_union,
         "get_member_type_and_offset() called on something that is not a struct or a struct reference.\n")
 
-    size_t offset = 0;
-    for (int i = 0; i < _struct->_struct.num_members; i++) {
-        TypeMember *member = &_struct->_struct.members[i];
+    if (t->kind == T_struct || t->kind == T_record) {
+        size_t offset = 0;
+        for (int i = 0; i < t->_struct.num_members; i++) {
+            StructMember *member = &t->_struct.members[i];
 
-        if (sv_equal(&member->name, member_name)) {
-            if (out_offset) *out_offset = offset;
-            return member->type;
+            if (sv_equal(&member->name, member_name)) {
+                if (out_offset) *out_offset = offset;
+                return member->type;
+            }
+            offset += member->type->storage_size;
         }
-        offset += member->type->storage_size;
+    }
+    else if (t->kind == T_union) {
+        size_t offset = 0;
+        for (int i = 0; i < t->_union.num_members; i++) {
+            UnionMember *member = &t->_union.members[i];
+
+            if (sv_equal(&member->name, member_name)) {
+                if (out_offset) *out_offset = offset;
+                return member->type;
+            }
+            // offset += member->type->storage_size;
+        }
     }
 
     return nullptr;
@@ -279,7 +305,7 @@ void calculate_storage_size(Type *_struct) {
     if (is_struct_kind(_struct)) {
         size_t offset = 0;
         for (int i = 0; i < _struct->_struct.num_members; i++) {
-            TypeMember *member = &_struct->_struct.members[i];
+            StructMember *member = &_struct->_struct.members[i];
             offset += member->type->storage_size;
         }
         _struct->storage_size = offset;
@@ -287,7 +313,7 @@ void calculate_storage_size(Type *_struct) {
     else if (is_record_kind(_struct)) {
         size_t offset = 0;
         for (int i = 0; i < _struct->_struct.num_members; i++) {
-            TypeMember *member = &_struct->_struct.members[i];
+            StructMember *member = &_struct->_struct.members[i];
             offset += member->type->storage_size;
         }
         _struct->storage_size = offset;
@@ -359,7 +385,7 @@ static Type *make_slice_type(Type *element_type) {
     Type *slice_t = type_alloc(T_struct);
     slice_t->_struct.num_members = 2;
 
-    size_t size = 2 * sizeof(TypeMember);
+    size_t size = 2 * sizeof(StructMember);
     slice_t->_struct.members = malloc(size);
     slice_t->_struct.members[0].type = get_ref_type_for(element_type);
     slice_t->_struct.members[0].name = mkSV("begin");
