@@ -19,6 +19,24 @@ fn take_from (_to: u8[], _from: u8[]&) {
 fn pad_size(size, pad) {
     return bitand(size + pad - 1, bitnot(pad - 1))
 }
+fn to_hex_digit (n) {
+    if (n < 10) return n + '0';
+    return n - 10 + 'A';
+}
+
+fn hexdump(d: u8[]) {
+    for (let i = 0; d.len; { i++ d++ }) {
+        if (i % 16 == 0) {
+            if (i) putc('\n');
+        }
+        else {
+            putc(' ');
+        }
+        putc(to_hex_digit(bitand(bitshift(d.begin, 4), 0x0f)));
+        putc(to_hex_digit(bitand(d.begin, 0x0f)));
+    }
+    putc('\n')
+}
 
 record SockaddrUnix
 {
@@ -55,6 +73,34 @@ fn open_x11_socket() {
 
     return fd;
 }
+
+enum X11_EventMask {
+    KeyPress             = 0x00000001;
+    KeyRelease           = 0x00000002;
+    OwnerGrabButton      = 0x00000004;
+    ButtonPress          = 0x00000008;
+    ButtonRelease        = 0x00000010;
+    EnterWindow          = 0x00000020;
+    LeaveWindow          = 0x00000040;
+    PointerMotion        = 0x00000080;
+    PointerMotionHint    = 0x00000100;
+    Button1Motion        = 0x00000200;
+    Button2Motion        = 0x00000400;
+    Button3Motion        = 0x00000800;
+    Button4Motion        = 0x00001000;
+    Button5Motion        = 0x00002000;
+    ButtonMotion         = 0x00004000;
+    Exposure             = 0x00008000;
+    VisibilityChange     = 0x00010000;
+    StructureNotify      = 0x00020000;
+    ResizeRedirect       = 0x00040000;
+    SubstructureNotify   = 0x00080000;
+    SubstructureRedirect = 0x00100000;
+    FocusChange          = 0x00200000;
+    PropertyChange       = 0x00400000;
+    ColormapChange       = 0x00800000;
+    KeymapState          = 0x01000000;
+} 
 
 record X11_SetupRequest {
     endian         : u8;
@@ -183,6 +229,8 @@ fn x11_setup(context: FSM_X11_context&) {
     let header2: X11_SetupReplyHeader_2;
     len_read = len_read + read(context.fd, header2);
 
+    context.current_id = header2.resource_id_base;
+
     $"header2: {header2}"
 
     let vendor_buf: u8[256];
@@ -277,17 +325,21 @@ record X11_CARD32 {
 fn x11_create_gc(context: FSM_X11_context&) {
     let create_gc: X11_CreateGC;
     create_gc.opcode = 55;
-    create_gc.request_length = 5;
+    create_gc.request_length = 4 + 2;
     create_gc.cid = context.current_id++;
     create_gc.drawable = context.root_window;
-    create_gc.value_mask = X11_ValueMask::background;
+    create_gc.value_mask = X11_ValueMask::background
+                         + X11_ValueMask::foreground;
 
     write(context.fd, create_gc);
 
     let background_color: X11_CARD32;
     background_color.value = 0xffffff;
+    let foreground_color: X11_CARD32;
+    foreground_color.value = 0xffffff;
 
     write(context.fd, background_color);
+    write(context.fd, foreground_color);
 
     return create_gc.cid;
 }
@@ -326,7 +378,6 @@ enum X11_CreateWindow_value_mask {
 }
 
 fn x11_connect (context: FSM_X11_context&) {
-    context.current_id = 0x600000;
     context.fd = open_x11_socket();
     x11_setup(context);
     context.gc = x11_create_gc(context);
@@ -362,7 +413,7 @@ fn x11_open_window(context: FSM_X11_context&) : Drawable {
     let create_window: X11_CreateWindow;
     create_window.opcode = 1;
     create_window.depth = 0;
-    create_window.request_length = 8 + 2;
+    create_window.request_length = 8 + 3;
     create_window.wid = wid;
     create_window.parent = context.root_window;
     create_window.x = 0;
@@ -371,16 +422,23 @@ fn x11_open_window(context: FSM_X11_context&) : Drawable {
     create_window.height = 600;
     create_window.value_mask
             = X11_CreateWindow_value_mask::background_pixel
-            + X11_CreateWindow_value_mask::border_pixel;
+            + X11_CreateWindow_value_mask::border_pixel
+            + X11_CreateWindow_value_mask::event_mask;
     
     write (context.fd, create_window);
 
     let bg:     X11_CARD32;
     let border: X11_CARD32;
+    let events: X11_CARD32;
     bg.value       = 0x80;
     border.value   = 0x404080;
+    events.value = X11_EventMask::Exposure
+                 + X11_EventMask::KeyPress
+                 + X11_EventMask::KeyRelease;
+                 
     write (context.fd, bg);
     write (context.fd, border);
+    write (context.fd, events);
 
     let map_window: X11_MapWindow;
     map_window.opcode = 8;
@@ -456,15 +514,13 @@ fn main () {
 
     let window = x11_open_window(context);
 
-    let points: Point[2];
+    let points: Point[3];
     points[0].x = 15;
     points[0].y = 15;
     points[1].x = 400;
     points[1].y = 400;
-    points[1].x = 0;
-    points[1].y = 400;
-
-    x11_poly_line(window, points);
+    points[2].x = 0;
+    points[2].y = 400;
 
     while(1)
     {
@@ -472,5 +528,9 @@ fn main () {
         let len = read(context.fd, buf);
         if (len == 0) exit(0);
         print(len);
+        let s: u8[] = buf;
+        s.len = len;
+        hexdump(s);
+        x11_poly_line(window, points);
     }
 }
