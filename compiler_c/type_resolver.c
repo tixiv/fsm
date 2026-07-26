@@ -22,18 +22,11 @@ static void type_resolver_error(int line_number, const char * fmt, ...) {
     va_end(args);
 }
 
-Dyn_array dyn_structs;
+Dyn_array named_types;
 
-Type *get_struct(size_t index) {
-    ASSERT(index < dyn_structs.count, "Tried to access struct that doesn't exist.\n");
-    return ((void**)dyn_structs.data)[index];
-}
-
-Dyn_array dyn_enums;
-
-Type *get_enum(size_t index) {
-    ASSERT(index < dyn_enums.count, "Tried to access enum that doesn't exist.\n");
-    return ((void**)dyn_enums.data)[index];
+Type *get_named_type(size_t index) {
+    ASSERT(index < named_types.count, "Named type index out of bounds.\n");
+    return ((void**)named_types.data)[index];
 }
 
 Type *get_type_by_name(const SV *name) {
@@ -49,14 +42,8 @@ Type *get_type_by_name(const SV *name) {
     if (sv_compare_cstr(name,"u8"))  return &builtin_u8;
     if (sv_compare_cstr(name,"i8"))  return &builtin_i8;
 
-    for (int i = 0; i < dyn_structs.count; i++) {
-        Type *t = get_struct(i);
-        if (sv_equal(&t->name, name))
-            return t;
-    }
-
-    for (int i = 0; i < dyn_enums.count; i++) {
-        Type *t = get_enum(i);
+    for (int i = 0; i < named_types.count; i++) {
+        Type *t = get_named_type(i);
         if (sv_equal(&t->name, name))
             return t;
     }
@@ -74,47 +61,13 @@ static void type_resolver_push_symbol(Symbol *s, int line_number) {
     dyn_array_push_p(&global_symbols, s);
 }
 
-void push_struct(SV name, int line_number) {
+void push_named_type(SV name, Type * t, int line_number) {
     if (get_type_by_name(&name)) {
         type_resolver_error(line_number, "Tried to redefine type '%.*s'\n", SV_prnt(name));
     }
 
-    Type *t = type_alloc(T_struct);
     t->name = name;
-    dyn_array_push_p(&dyn_structs, t);
-
-    Symbol *s = alloc_symbol(SYM_type, name);
-    s->name = name;
-    s->type = t;
-
-    type_resolver_push_symbol(s, line_number);
-}
-
-void push_record(SV name, int line_number) {
-    if (get_type_by_name(&name)) {
-        type_resolver_error(line_number, "Tried to redefine type '%.*s'\n", SV_prnt(name));
-    }
-
-    Type *t = type_alloc(T_record);
-    t->name = name;
-    dyn_array_push_p(&dyn_structs, t);
-
-    Symbol *s = alloc_symbol(SYM_type, name);
-    s->name = name;
-    s->type = t;
-
-    type_resolver_push_symbol(s, line_number);
-}
-
-void push_enum(SV name, int line_number) {
-    if (get_type_by_name(&name)) {
-        type_resolver_error(line_number, "Tried to redefine type '%.*s'\n", SV_prnt(name));
-    }
-
-    Type *t = type_alloc(T_enum);
-    t->name = name;
-    t->storage_size = 8;
-    dyn_array_push_p(&dyn_enums, t);
+    dyn_array_push_p(&named_types, t);
 
     Symbol *s = alloc_symbol(SYM_type, name);
     s->name = name;
@@ -127,15 +80,22 @@ void type_lookup_visitor(AST_node *n, void *arg) {
     switch (n->kind) {
         case AST_struct:
             if (n->_struct.is_record)
-                push_record(n->_struct.name, n->line_number);
+                push_named_type(n->_struct.name, type_alloc(T_record), n->line_number);
             else
-                push_struct(n->_struct.name, n->line_number);
+                push_named_type(n->_struct.name, type_alloc(T_struct), n->line_number);
             break;
         
-        case AST_enum:
-            push_enum(n->_enum.name, n->line_number);
+        case AST_enum: {
+            Type * t =  type_alloc(T_enum);
+            t->storage_size = 8;
+            push_named_type(n->_enum.name, t, n->line_number);
             break;
-        
+        }
+
+        case AST_union:
+            push_named_type(n->_union.name, type_alloc(T_union), n->line_number);
+            break;
+
         default:
             ast_visit_children(n, type_lookup_visitor, arg);
             break;
@@ -143,13 +103,16 @@ void type_lookup_visitor(AST_node *n, void *arg) {
 }
 
 typedef struct {
+    Type *current_enum;
+    Dyn_array enum_members;   // DynArray<EnumMember>
+} EnumResolverState;
+
+typedef struct {
     Type *current_struct;
     Dyn_array struct_members; // DynArray<TypeMember>
-    Type *current_enum;
-    Dyn_array enum_members;   // DanArray<EnumMember>
-} TypeResolverState;
+} StructResolverState;
 
-void copy_struct_members(TypeResolverState *trs){
+void copy_struct_members(StructResolverState *trs){
     size_t size = trs->struct_members.count * sizeof(TypeMember);
     trs->current_struct->_struct.members = malloc(size);
     memcpy(trs->current_struct->_struct.members, trs->struct_members.data, size);
@@ -157,31 +120,40 @@ void copy_struct_members(TypeResolverState *trs){
     calculate_storage_size(trs->current_struct);
 }
 
-void copy_enum_members(TypeResolverState *trs){
+void copy_enum_members(EnumResolverState *trs){
     size_t size = trs->enum_members.count * sizeof(EnumMember);
     trs->current_enum->_enum.members = malloc(size);
     memcpy(trs->current_enum->_enum.members, trs->enum_members.data, size);
     trs->current_enum->_enum.num_members = trs->enum_members.count;
 }
 
-void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
+void type_resolver_visitor(AST_node *n, void *);
+
+void type_resolver_enum_visitor(AST_node *n, EnumResolverState *trs) {
     switch (n->kind) {
-        case AST_struct: {
-            TypeResolverState trs_1;
-            dyn_array_init(&trs_1.struct_members, sizeof(TypeMember), 8);
-            n->type = get_type_by_name(&n->_struct.name);
-            ASSERT(n->type, "The type name should exist because it should have been found in the lookup pass.\n");
-            trs_1.current_struct = n->type;
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, &trs_1);
-            copy_struct_members(&trs_1);
+        case AST_enum_member: {
+            ASSERT(trs->current_enum, "Encountered %s outside of enum.\n", ast_kind_name(n->kind));
+            EnumMember *member = dyn_array_push(&trs->enum_members);
+            member->name = n->_enum_member.name;
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
+            member->value = n->_enum_member.value;
+            n->type = &builtin_i64;
             break;
         }
+    
+        default:
+            NOT_IMPLEMENTED("type_resolver_enum_visitor() is not implemented for %s.\n", ast_kind_name(n->kind));
+            break;
+    }
+}
 
+void type_resolver_struct_visitor(AST_node *n, StructResolverState *trs) {
+    switch (n->kind) {
         case AST_member_def: {
             ASSERT(trs->current_struct, "Encountered %s outside of struct.\n", ast_kind_name(n->kind));
             TypeMember *member = dyn_array_push(&trs->struct_members);
             member->name = n->struct_member_def.name;
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
             if (n->struct_member_def._typedef) {
                 if (!n->struct_member_def._typedef->type) type_resolver_error(n->line_number, "The type for struct member '%.*s' could not be resolved.\n", SV_prnt(member->name));
                 n->type = n->struct_member_def._typedef->type;
@@ -193,36 +165,45 @@ void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
             break;
         }
 
+        default:
+            NOT_IMPLEMENTED("type_resolver_struct_visitor() is not implemented for %s.\n", ast_kind_name(n->kind));
+            break;
+    }
+}
+
+void type_resolver_visitor(AST_node *n, void *arg) {
+    switch (n->kind) {
+        case AST_struct: {
+            StructResolverState trs_1;
+            dyn_array_init(&trs_1.struct_members, sizeof(TypeMember), 8);
+            n->type = get_type_by_name(&n->_struct.name);
+            ASSERT(n->type, "The type name '%.*s' should exist because it should have been found in the lookup pass.\n", SV_prnt(n->_struct.name));
+            trs_1.current_struct = n->type;
+            ast_visit_children(n, (AstVisitor)type_resolver_struct_visitor, &trs_1);
+            copy_struct_members(&trs_1);
+            break;
+        }
+
         case AST_enum: {
-            TypeResolverState trs_1;
+            EnumResolverState trs_1;
             dyn_array_init(&trs_1.enum_members, sizeof(EnumMember), 8);
             n->type = get_type_by_name(&n->_enum.name);
             ASSERT(n->type, "The type name should exist because it should have been found in the lookup pass.\n");
             trs_1.current_enum = n->type;
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, &trs_1);
+            ast_visit_children(n, (AstVisitor)type_resolver_enum_visitor, &trs_1);
             copy_enum_members(&trs_1);
             break;
         }
 
-        case AST_enum_member: {
-            ASSERT(trs->current_enum, "Encountered %s outside of enum.\n", ast_kind_name(n->kind));
-            EnumMember *member = dyn_array_push(&trs->enum_members);
-            member->name = n->_enum_member.name;
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
-            member->value = n->_enum_member.value;
-            n->type = &builtin_i64;
-            break;
-        }
-
         case AST_typename: {
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
             n->type = get_type_by_name(&n->_typename.name);
             if (!n->type) type_resolver_error(n->line_number, "The typename '%.*s' could not be resolved.\n", SV_prnt(n->_typename.name));
             break;
         }
 
         case AST_function_type: {
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
 
             size_t num_arguments = ast_count_chain(n->_function_type.function_args);
             Type**args = malloc(sizeof(Type*) * num_arguments);
@@ -237,36 +218,33 @@ void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
         }
 
         case AST_type_ref:
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
             n->type = get_ref_type_for(n->_type_ref.body->type);
             break;
 
         case AST_type_array:
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
             n->type = get_array_type(n->_type_array.body->type, n->_type_array.n_elements);
             break;
 
         case AST_type_slice: {
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
             n->type = get_sclice_type(n->_type_slice.body->type);
             break;
         }
 
         default:
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
             break;
             
     }
 }
 
-TypeResolverState trs;
-
 void run_type_resolver(AST_node *root) {
     type_lookup_visitor(root, nullptr);
-    type_resolver_visitor(root, &trs);
+    type_resolver_visitor(root, nullptr);
 }
 
 void type_resolver_init() {
-    dyn_array_init(&dyn_structs, sizeof(void*), 32);
-    dyn_array_init(&dyn_enums, sizeof(void*), 32);
+    dyn_array_init(&named_types, sizeof(void*), 32);
 }

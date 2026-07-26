@@ -18,6 +18,7 @@ typedef enum {
     T_slice,
     T_struct,
     T_record,
+    T_union,
     T_enum,
     T_any, // 'any' works like the 'void' in C's void* for now, just with a better name.
 } TypeKind;
@@ -144,4 +145,3 @@ struct AST_node_s *make_cast(Type *to, Type *from);
 int64_t get_max_enum_value (Type *t);
 int64_t get_min_enum_value (Type *t);
 EnumMember *get_enum_member_by_value(Type *t, int64_t value);
-
