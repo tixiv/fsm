@@ -580,7 +580,9 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
 
         case AST_member_access: {
             Type *t = n->member_access.body->type;
-            if (is_reference_kind(t) && (is_struct_kind(dereferenced_type(t)) || is_record_kind(dereferenced_type(t)))) {
+            if (is_reference_kind(t) && (is_struct_kind(dereferenced_type(t))
+                                      || is_record_kind(dereferenced_type(t))
+                                      || is_union_kind(dereferenced_type(t)))) {
                 ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
                 push_opcode(OP_member_access, nullptr, n->member_access.offset);
             }
@@ -597,7 +599,10 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             if (is_enum_kind(n->type)) {
                 push_opcode(OP_push_literal, nullptr, n->namespace_access.enum_value);
             }
-            else NOT_IMPLEMENTED("Generating IL for namespace acces for type %s is not implemented yet", get_type_name_r(buf, n->type))
+            else if (is_enumerator_kind(n->type)) {
+                push_opcode(OP_push_literal, nullptr, n->namespace_access.enum_value);
+            }
+            else NOT_IMPLEMENTED("Generating IL for namespace acces for type %s is not implemented yet\n", get_type_name_r(buf, n->type))
             break;
 
         case AST_builder_string:
@@ -698,6 +703,8 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         case AST_type_slice:
         case AST_enum:
         case AST_enum_member:
+        case AST_union:
+        case AST_union_member_def:
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             break;
         default:

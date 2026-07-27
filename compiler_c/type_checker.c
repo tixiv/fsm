@@ -839,6 +839,15 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                 n->type = t;
                 n->addressable = false;
             }
+            else if (t->kind == T_union) {
+                if (!get_union_member_value (t, &n->namespace_access.name, &n->namespace_access.enum_value))
+                {
+                    type_checker_error(n->line_number, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->namespace_access.name),
+                        get_type_name_r(buf_1, t));
+                }
+                n->type = get_enumerator_type_for(t);
+                n->addressable = false;
+            }
             else NOT_IMPLEMENTED("Namespace access is not implemented yet for typ %s.\n", get_type_name_r(buf_1, t));
             break;
         }

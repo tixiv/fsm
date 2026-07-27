@@ -249,6 +249,7 @@ typedef struct AST_node_s {
         struct {
             struct AST_node_s *body;
             SV name;
+            SV enumerator_name;
         } _union;
 
         struct {

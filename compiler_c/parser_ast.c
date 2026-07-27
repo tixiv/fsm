@@ -799,6 +799,14 @@ static AST_node *parse_union() {
     ast_union->_union.name = CT->value;
     MOVE_NEXT();
 
+    if (CT->kind == TOK_keyword_enum) {
+        MOVE_NEXT();
+    
+        expect_token(TOK_identifier);
+        ast_union->_union.enumerator_name = CT->value;
+        MOVE_NEXT();
+    }
+
     take_expected(TOK_lbrace);
 
     // Members
@@ -846,7 +854,24 @@ static AST_node *parse_union() {
                         MOVE_NEXT();
                     }
                 }
-                else NOT_IMPLEMENTED("unnamed structs in unions are not implemented yet.\n");
+                else if (CT->kind == TOK_lbrace) {
+                    AST_node *ast_struct = ast_alloc(AST_struct, CT->line_number);
+                    parse_struct_body(ast_struct);
+                    
+                    member->union_member_def._typedef = ast_struct;
+
+                    if (latest) {
+                        latest->next = member;
+                    } else {
+                        ast_union->_union.body = member;
+                    }
+                    latest = member;
+
+                    if (CT->kind == TOK_semicolon || CT->kind == TOK_komma) {
+                        MOVE_NEXT();
+                    }
+                }
+                else NOT_IMPLEMENTED("not implemented yet.\n");
             }
             else {
                 parser_error(CT->line_number, "Expected '}' or struct member definition but got %s",

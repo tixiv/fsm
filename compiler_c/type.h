@@ -19,6 +19,7 @@ typedef enum {
     T_struct,
     T_record,
     T_union,
+    T_enumerator,
     T_enum,
     T_any, // 'any' works like the 'void' in C's void* for now, just with a better name.
 } TypeKind;
@@ -83,7 +84,12 @@ typedef struct Type_s {
         struct {
             int num_members;
             UnionMember *members;
+            SV enumarator_name;
         } _union;
+
+        struct {
+            struct Type_s *target_type;
+        } enumerator;
     };
 } Type;
 
@@ -119,6 +125,7 @@ bool is_struct_kind(Type *t);
 bool is_record_kind(Type *t);
 bool is_union_kind(Type *t);
 bool is_enum_kind(Type *t);
+bool is_enumerator_kind(Type *t);
 bool is_reference_kind(Type *t);
 bool is_function_kind(Type *t);
 bool is_function_reference(Type *t);
@@ -133,6 +140,7 @@ size_t get_member_offset(Type *_struct, size_t index);
 Type *get_member_type_and_offset_by_name(Type *_struct, SV *member_name, size_t *out_offset);
 
 bool get_enum_member_value (Type *t, SV *member_name, int64_t *enum_value);
+bool get_union_member_value (Type *t, SV *member_name, int64_t *enum_value);
 
 size_t get_storage_size(Type *t);
 void calculate_storage_size(Type *t);
@@ -140,6 +148,7 @@ void calculate_storage_size(Type *t);
 size_t get_function_arguments_size(Type *t);
 
 Type *get_ref_type_for(Type *t);
+Type *get_enumerator_type_for(Type *t);
 
 Type *get_array_type(Type *element_type, size_t n_elements);
 Type *get_sclice_type(Type *element_type);

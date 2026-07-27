@@ -137,6 +137,7 @@ void copy_union_members(UnionResolverState *trs){
     trs->current_union->_union.members = malloc(size);
     memcpy(trs->current_union->_union.members, trs->union_members.data, size);
     trs->current_union->_union.num_members = trs->union_members.count;
+    calculate_storage_size(trs->current_union);
 }
 
 void type_resolver_visitor(AST_node *n, void *);
@@ -249,6 +250,7 @@ void type_resolver_visitor(AST_node *n, void *arg) {
             UnionResolverState trs_1;
             dyn_array_init(&trs_1.union_members, sizeof(UnionMember), 8);
             n->type = get_type_by_name(&n->_union.name);
+            n->type->_union.enumarator_name = n->_union.enumerator_name;
             ASSERT(n->type, "The type name should exist because it should have been found in the lookup pass.\n");
             trs_1.current_union = n->type;
             ast_visit_children(n, (AstVisitor)type_resolver_union_visitor, &trs_1);

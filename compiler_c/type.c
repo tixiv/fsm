@@ -85,6 +85,9 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
         case T_reference:
             sb_printf(&sb, "%s &", get_type_name_r(child_print_buf, type->reference.target_type));
             break;
+        case T_enumerator:
+            sb_printf(&sb, "%s::enumerator", get_type_name_r(child_print_buf, type->enumerator.target_type));
+            break;
         case T_array:
             print_array_type(&sb, type);
             break;
@@ -161,6 +164,10 @@ bool is_union_kind(Type *t) {
 
 bool is_enum_kind(Type *t) {
     return t->kind == T_enum;
+}
+
+bool is_enumerator_kind(Type *t) {
+    return t->kind == T_enumerator;
 }
 
 bool is_reference_kind(Type *t) {
@@ -274,14 +281,33 @@ Type *get_member_type_and_offset_by_name(Type *t, SV *member_name, size_t *out_o
     }
     else if (t->kind == T_union) {
         size_t offset = 0;
+        if (t->_union.enumarator_name.begin) {
+            if (sv_equal(&t->_union.enumarator_name, member_name)) {
+                if (out_offset) *out_offset = 0;
+                return get_enumerator_type_for(t);
+            }
+            offset += 8;
+        }
         for (int i = 0; i < t->_union.num_members; i++) {
             UnionMember *member = &t->_union.members[i];
+
+            if (member->name.begin == nullptr) {
+                if (is_struct_kind(member->type)) {
+                    Type *mt = get_member_type_and_offset_by_name(member->type, member_name, out_offset);
+                    if (mt) {
+                        if (out_offset) *out_offset += offset;
+                        return mt;
+                    }
+                }
+                else NOT_IMPLEMENTED("Unnanmed things in unions but structs are not implemented yet.\n")
+
+                offset += member->type->storage_size;
+            }
 
             if (sv_equal(&member->name, member_name)) {
                 if (out_offset) *out_offset = offset;
                 return member->type;
             }
-            // offset += member->type->storage_size;
         }
     }
 
@@ -300,25 +326,56 @@ bool get_enum_member_value (Type *t, SV *member_name, int64_t *enum_value) {
     return false;
 }
 
-void calculate_storage_size(Type *_struct) {
+bool get_union_member_value (Type *t, SV *member_name, int64_t *enum_value) {
+    for (int i = 0; i < t->_union.num_members; i++) {
+        UnionMember *member = &t->_union.members[i];
+
+        if (sv_equal(&member->name, member_name)) {
+            if (enum_value) *enum_value = member->value;
+            return true;
+        }
+    }
+    return false;
+}
+
+void calculate_storage_size(Type *container) {
     char buf[1024];
-    if (is_struct_kind(_struct)) {
+    if (is_struct_kind(container)) {
         size_t offset = 0;
-        for (int i = 0; i < _struct->_struct.num_members; i++) {
-            StructMember *member = &_struct->_struct.members[i];
+        for (int i = 0; i < container->_struct.num_members; i++) {
+            StructMember *member = &container->_struct.members[i];
             offset += member->type->storage_size;
         }
-        _struct->storage_size = offset;
+        container->storage_size = offset;
     }
-    else if (is_record_kind(_struct)) {
+    else if (is_record_kind(container)) {
         size_t offset = 0;
-        for (int i = 0; i < _struct->_struct.num_members; i++) {
-            StructMember *member = &_struct->_struct.members[i];
+        for (int i = 0; i < container->_struct.num_members; i++) {
+            StructMember *member = &container->_struct.members[i];
             offset += member->type->storage_size;
         }
-        _struct->storage_size = offset;
+        container->storage_size = offset;
     }
-    else NOT_IMPLEMENTED("calculate_storage_size() for %s is not implemented.\n", get_type_name_r(buf, _struct));
+    else if (is_union_kind(container)) {
+        size_t offset = 0;
+        if (container->_union.enumarator_name.begin) offset += 8;
+        size_t max_member_size = 0;
+        for (int i = 0; i < container->_union.num_members; i++) {
+            UnionMember *member = &container->_union.members[i];
+            size_t sz = member->type->storage_size;
+            if (member->name.begin == nullptr) {
+                offset += sz;
+            }
+            else {
+                if (sz > max_member_size) max_member_size = sz;
+            }
+
+        }
+        container->storage_size = offset + max_member_size;
+        printf("Size %lu\n", container->storage_size);
+
+    }
+    else NOT_IMPLEMENTED("calculate_storage_size() for %s is not implemented.\n", get_type_name_r(buf, container));
 }
 
 size_t get_function_arguments_size(Type *t) {
@@ -355,6 +412,28 @@ Type *get_ref_type_for(Type *t) {
     Type *ref = make_ref_type_for(t);
     dyn_array_push_p(&ref_types, ref);
     return ref;
+}
+
+static Type *make_enumerator_type_for(Type *t) {
+    Type *enumerator = type_alloc(T_enumerator);
+    enumerator->enumerator.target_type = t;
+    enumerator->storage_size = 8;
+    return enumerator;
+}
+
+Dyn_array enumerator_types;
+
+Type *get_enumerator_type_for(Type *t) {
+    if (enumerator_types.capacity == 0)
+        dyn_array_init(&enumerator_types, sizeof(Type*), 16);
+
+    for (int i = 0; i < enumerator_types.count; i++) {
+        Type *enumerator = ((Type**)enumerator_types.data)[i];
+        if (enumerator->enumerator.target_type == t) return enumerator;
+    }
+    Type *enumerator = make_enumerator_type_for(t);
+    dyn_array_push_p(&enumerator_types, enumerator);
+    return enumerator;
 }
 
 static Type *make_array_type(Type *element_type, size_t n_elements) {
