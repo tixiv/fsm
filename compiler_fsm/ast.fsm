@@ -1,0 +1,672 @@
+
+import * from "compiler_fsm/tokenizer";
+
+fn NOT_IMPLEMENTED(s: u8[]) {
+    puts(s); exit(1);
+}
+
+struct Type {
+}
+
+enum SymbolKind {
+    SYM_global,
+    SYM_local,
+    SYM_arg,
+    SYM_type,
+}
+
+struct Symbol {
+    name: u8[];
+    kind: SymbolKind;
+    type: Type&;
+
+    size; // stack frame size for functions
+    offset; // stack offset for args and local vars
+}
+
+
+enum AstKind {
+    AST_program,
+    AST_function,
+    AST_arg_list,
+    AST_scope,
+    AST_var_decl,
+    AST_arg_decl,
+    AST_number,
+    AST_bool,
+    AST_null,
+    AST_string,
+    AST_char_constant,
+    AST_symbol,
+    AST_binary,
+    AST_variadic_operator,
+    AST_unary,
+    AST_call,
+    AST_return,
+    AST_if,
+    AST_while,
+    AST_for,
+    AST_cast,
+    AST_array_access,
+    AST_array_len,
+    AST_dereference,
+    AST_reference,
+    AST_struct,
+    AST_member_def,
+    AST_enum,
+    AST_enum_member,
+    AST_typename,
+    AST_type_ref,
+    AST_type_array,
+    AST_type_slice,
+    AST_function_type,
+    AST_member_access,
+    AST_namespace_access,
+    AST_array_to_slice,
+    AST_plus_plus,
+    AST_minus_minus,
+    AST_builder_string,
+}
+
+struct VariadicOperatorMember {
+    token_kind: TokenKind;
+    right: AST_node&;
+}
+
+union AST_node enum kind {
+    struct {
+        next : AST_node&;
+        location: Location;
+        type: Type&;
+        addressable: bool;
+        result_used: bool;
+    }
+
+    struct AST_binary {
+        left: AST_node&;
+        right: AST_node&;
+        token_kind: TokenKind;
+    }
+
+    struct AST_variadic_operator {
+        left: AST_node&;
+        num_members;
+        members: VariadicOperatorMember[];
+    }
+
+    struct AST_function {
+        args: AST_node&;
+        body: AST_node&;
+        ret_typedecl: AST_node&;
+        symbol: Symbol&;
+        name: u8[];
+    }
+
+    struct AST_arg_list       { body: AST_node&; }
+    struct AST_scope          { body: AST_node&; }
+    struct AST_program        { body: AST_node&; }
+    struct AST_array_to_slice { body: AST_node&; }
+    struct AST_dereference    { body: AST_node&; }
+    struct AST_reference      { body: AST_node&; }
+    struct AST_type_ref       { body: AST_node&; }
+
+    struct AST_call {
+        target: AST_node&;
+        args: AST_node&;
+    }
+
+    struct AST_return {
+        body: AST_node&;
+        implicit: bool;
+    }
+
+    struct AST_var_decl {
+        initializer: AST_node&;
+        _typedecl: AST_node&;
+        symbol: Symbol&;
+        name: u8[];
+        initializer_operator: TokenKind;
+    }
+
+    struct AST_arg_decl {
+        _typedecl: AST_node&;
+        symbol: Symbol&;
+        name: u8[];
+    }
+
+    struct AST_symbol {
+        name: u8[];
+        symbol: Symbol&;
+    }
+
+    struct AST_number {
+        value: u8[];
+    }
+
+    struct AST_bool {
+        value: bool;
+    }
+
+    struct AST_string {
+        value: u8[];
+    }
+
+    struct AST_if {
+        condition: AST_node&;
+        if_clause: AST_node&;
+        else_clause: AST_node&;
+    }
+
+    struct AST_while {
+        condition: AST_node&;
+        body: AST_node&;
+    }
+
+    struct AST_for {
+        initializer:AST_node&;
+        condition: AST_node&;
+        post_action: AST_node&;
+        body: AST_node&;
+        result: AST_node&;
+    }
+
+    struct AST_cast {
+        body: AST_node&;
+        right_type: Type&; // the left type is the type of the AST node
+    }
+
+    struct AST_array_access {
+        array: AST_node&;
+        index: AST_node&;
+    }
+
+    struct AST_unary {
+        body: AST_node&;
+        token_kind: TokenKind;
+    }
+
+    struct AST_plus_plus {
+        body: AST_node&;
+        postfix: bool;
+    }
+
+    struct AST_minus_minus {
+        body: AST_node&;
+        postfix: bool;
+    }
+
+    struct AST_struct {
+        body: AST_node&;
+        name: u8[];
+    }
+
+    struct AST_member_def {
+        _typedef: AST_node&;
+        name: u8[];
+    }
+
+    struct AST_member_access {
+        body: AST_node&;
+        name: u8[];
+        offset;                
+    }
+
+    struct AST_namespace_access {
+        body: AST_node&;
+        name: u8[];
+        enum_value;
+    }
+
+    struct AST_enum {
+        body: AST_node&;
+        name: u8[];
+    }
+
+    struct AST_enum_member {
+        name: u8[];
+        value;
+    }
+
+    struct AST_array_len {
+        len;
+    }
+
+    struct AST_typename {
+        name: u8[];
+    }
+
+    struct AST_function_type {
+        function_args: AST_node&;
+        function_ret: AST_node&;
+    }
+
+    struct AST_type_array {
+        body: AST_node&;
+        n_elements;
+    }
+
+    struct AST_type_slice {
+        body: AST_node&;
+    }
+
+    struct AST_builder_string {
+        var_decl_sb: AST_node&;
+        var_decl_arr: AST_node&;
+        body: AST_node&;
+    }
+}
+
+struct AST_Node_Allocator {
+    buf: AST_node[1000];
+    alloc: AST_node[];
+}
+
+fn ast_alloc(allocator: AST_Node_Allocator&, kind, location: Location) : AST_node& {
+    if (!allocator.alloc.len) {
+        $"Error: out of AST nodes.\n"
+        exit(1);
+    }
+    let node => allocator.alloc.begin;
+    allocator.alloc++;
+
+    node.kind = kind;
+    node.location = location;
+
+    return node;
+}
+
+fn get_last_in_chain(n: AST_node&) : AST_node& {
+    while (n.next) n => n.next;
+    return n;
+}
+
+fn ast_count_chain(n: AST_node&) : i64 {
+    let num = 0;
+    while (n) {
+        num++;
+        n => n.next;
+    }
+    return num;
+}
+
+/*
+fn ast_link_to_chain(chain_p: AST_node& &, n: AST_node&) : void {
+    if (!*chain_p) {
+        *chain_p = n;
+    }
+    else {
+        get_last_in_chain(*chain_p).next = n;
+    }
+}
+*/
+
+fn slicecopy(target: u8[], source: u8[]) {
+    while (target.len && source.len) {
+        target.begin = source.begin;
+        target++ source++
+    }
+}
+
+
+fn ast_insert_node(allocator: AST_Node_Allocator&, at: AST_node&, new_node: AST_node&) : void {
+    // We overwrite the old node with the new one.
+    // make a copy first.
+    let at_copy => ast_alloc(allocator, at.kind, at.location);
+    slicecopy(at_copy, at);
+
+    at_copy.next => null; // zero chain pointer in case it was used
+
+    new_node.location = at.location;
+    new_node.next => at.next;
+    new_node.result_used = at.result_used;
+
+         if (new_node.kind == AST_node::AST_cast) {          new_node.AST_cast.body => at_copy; }
+    else if (new_node.kind == AST_node::AST_dereference) {   new_node.AST_dereference.body => at_copy; }
+    else if (new_node.kind == AST_node::AST_reference) {     new_node.AST_reference.body => at_copy; }
+    else if (new_node.kind == AST_node::AST_array_to_slice) {new_node.AST_array_to_slice.body => at_copy; }
+    else if (new_node.kind == AST_node::AST_call) {          new_node.AST_call.args => at_copy; }
+    else NOT_IMPLEMENTED($"Inserting AST node of kind {new_node.kind.name} is not implemented yet.\n");
+
+    // overwrite the old node with the new one that has the old
+    // ones copy linked
+    slicecopy(at, new_node);
+}
+
+/*
+fn ast_remove_node(n: AST_node&) : void {
+    AST_node *child = nullptr;
+    switch (n.kind) {        
+        case AST_dereference:
+            child = n.deref.body;
+            break;
+        default:
+            NOT_IMPLEMENTED("Removing AST node of kind %s is not implemented yet.\n", ast_kind_name(n.kind));
+    }
+
+    ASSERT(child.next == nullptr, "Can't remove node when child is linked in a chain.\n")
+    AST_node *saved_next = n.next;
+
+    // just overwrite this node with the contents of the child. This will effectively move
+    // The child to where the old node was.
+    memcpy(n, child, sizeof(AST_node));
+
+    // restore the next pointer in case it is used
+    n.next = saved_next;
+}
+
+void ast_visit_chain(n: AST_node&, void (*visit)(AST_node *, void *arg), void *arg) {
+    while (n) {
+        visit(n, arg);
+        n = n.next;
+    }
+}
+
+void visit_non_null(n: AST_node&, void (*visit)(AST_node *, void *arg), void *arg) {
+    if (n) visit(n, arg);
+}
+
+void ast_visit_children(n: AST_node&, void (*visit)(AST_node *, void *arg), void *arg)
+{
+    switch (n.kind) {
+        case AST_program:
+            ast_visit_chain(n.program.body, visit, arg);
+            break;
+        case AST_scope:
+            ast_visit_chain(n.scope.body, visit, arg);
+            break;
+        case AST_arg_list:
+            ast_visit_chain(n.arg_list.body, visit, arg);
+            break;
+        case AST_function:
+            visit_non_null(n.fun.args, visit, arg);
+            visit_non_null(n.fun.ret_typedecl, visit, arg);
+            ast_visit_chain(n.fun.body, visit, arg);            
+            break;
+        case AST_return:
+            visit_non_null(n.ret.body, visit, arg);
+            break;
+        case AST_var_decl:
+            visit_non_null(n.var_decl._typedecl, visit, arg);
+            visit_non_null(n.var_decl.initializer, visit, arg);
+            break;
+        case AST_arg_decl:
+            visit_non_null(n.arg_decl._typedecl, visit, arg);
+            break;
+        case AST_if:
+            visit_non_null(n._if.condition, visit, arg);
+            visit_non_null(n._if.if_clause, visit, arg);
+            visit_non_null(n._if.else_clause, visit, arg);
+            break;
+        case AST_while:
+            visit_non_null(n._while.condition, visit, arg);
+            visit_non_null(n._while.body, visit, arg);
+            break;
+        case AST_for:
+            visit_non_null(n._for.initializer, visit, arg);
+            visit_non_null(n._for.condition, visit, arg);
+            visit_non_null(n._for.post_action, visit, arg);
+            visit_non_null(n._for.body, visit, arg);
+            visit_non_null(n._for.result, visit, arg);
+            break;
+        case AST_binary:
+            visit_non_null(n.binary.left, visit, arg);
+            visit_non_null(n.binary.right, visit, arg);
+            break;
+        case AST_unary:
+            visit_non_null(n.unary.body, visit, arg);
+            break;
+        case AST_call:
+            visit_non_null(n.call.target, visit, arg);
+            ast_visit_chain(n.call.args, visit, arg);
+            break;
+        case AST_cast:
+            visit_non_null(n.AST_cast.body, visit, arg);
+            break;
+        case AST_array_to_slice:
+            visit_non_null(n._array_to_slice.body, visit, arg);
+            break;
+        case AST_array_access:
+            visit_non_null(n._array.array, visit, arg);
+            visit_non_null(n._array.index, visit, arg);
+            break;
+        case AST_dereference:
+            visit_non_null(n.deref.body, visit, arg);
+            break;
+        case AST_reference:
+            visit_non_null(n.reference.body, visit, arg);
+            break;
+        case AST_plus_plus:
+            visit_non_null(n.plus_plus.body, visit, arg);
+            break;
+        case AST_minus_minus:
+            visit_non_null(n.minus_minus.body, visit, arg);
+            break;
+        case AST_struct:
+            ast_visit_chain(n._struct.body, visit, arg);
+            break;
+        case AST_enum:
+            ast_visit_chain(n._enum.body, visit, arg);
+            break;
+        case AST_union:
+            ast_visit_chain(n._union.body, visit, arg);
+            break;
+        case AST_member_def:
+            visit_non_null(n.struct_member_def._typedef, visit, arg);
+            break;
+        case AST_union_member_def:
+            visit_non_null(n.union_member_def._typedef, visit, arg);
+            break;
+        case AST_member_access:
+            visit_non_null(n.member_access.body, visit, arg);
+            break;
+        case AST_namespace_access:
+            visit_non_null(n.namespace_access.body, visit, arg);
+            break;
+        case AST_typename:
+            break;
+        case AST_type_ref:
+            visit_non_null(n._type_ref.body, visit, arg);
+            break;
+        case AST_type_array:
+            visit_non_null(n._type_array.body, visit, arg);
+            break;
+        case AST_type_slice:
+            visit_non_null(n._type_slice.body, visit, arg);
+            break;
+        case AST_variadic_operator:
+            visit_non_null(n.variadic_operator.left, visit, arg);
+            for (int i = 0; i < n.variadic_operator.num_members; i++) {
+                visit_non_null(n.variadic_operator.members[i].right, visit, arg);
+            }
+            break;
+        case AST_builder_string:
+            visit_non_null(n.builder_string.var_decl_sb, visit, arg);
+            visit_non_null(n.builder_string.var_decl_arr, visit, arg);
+            ast_visit_chain(n.builder_string.body, visit, arg);
+            break;
+        case AST_function_type:
+            ast_visit_chain(n._function_type.function_args, visit, arg);
+            visit_non_null(n._function_type.function_ret, visit, arg);
+            break;
+
+        case AST_enum_member:
+        case AST_symbol:
+        case AST_number:
+        case AST_bool:
+        case AST_null:
+        case AST_string:
+        case AST_char_constant:
+        case AST_array_len:
+            break;
+
+        default:
+            NOT_IMPLEMENTED("Visiting %s is not implemented yet.\n", ast_kind_name(n.kind));
+            break;
+    }
+}
+
+
+static void print_symbol(Symbol *s) {
+    if(!s)
+        printf("(null symbol)");
+    else
+        printf("(%s '%.*s')", symbol_kind_name(s.kind), SV_prnt(s.name));
+}
+
+static void ast_dump_visitor (n: AST_node&, uint64_t spaces) {
+    const char *spc = "                                                              " // Yeah, these are my spaces
+                      "                                                              ";
+
+    const char *kind_name = ast_kind_name(n.kind);
+
+    char buf[1024];
+
+    switch (n.kind) {
+        case AST_program:
+        case AST_scope:
+        case AST_arg_list:
+        case AST_return:
+        case AST_while:
+        case AST_for:
+            printf("%.*s%s \n", (int)spaces, spc, kind_name);
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_builder_string:
+        case AST_type_ref:
+        case AST_type_array:
+        case AST_type_slice:
+        case AST_dereference:
+        case AST_reference:
+        case AST_plus_plus:
+        case AST_minus_minus:
+        case AST_array_access:
+        case AST_array_len:
+        case AST_array_to_slice:
+        case AST_function_type:
+        case AST_null:
+            printf("%.*s%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_struct:
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n._struct.name), get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_member_def:
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n.struct_member_def.name), get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_member_access:
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n.member_access.name), get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_enum:
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n._enum.name), get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_enum_member:
+            printf("%.*s%s '%.*s' %ld (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n._enum_member.name), n._enum_member.value, get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_union:
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n._union.name), get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_union_member_def:
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n.union_member_def.name), get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_namespace_access:
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n.namespace_access.name), get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_typename:
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n._typename.name), get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_function:
+            printf("%.*s%s '%.*s', (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n.fun.name), get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_var_decl:
+            printf("%.*s%s '%.*s' ", (int)spaces, spc, kind_name, SV_prnt(n.var_decl.name));
+            print_symbol(n.var_decl.symbol);
+            printf("\n");
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_arg_decl:
+            printf("%.*s%s '%.*s' ", (int)spaces, spc, kind_name, SV_prnt(n.arg_decl.name));
+            print_symbol(n.arg_decl.symbol);
+            printf("\n");
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_number:
+            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n.number.value), get_type_name_r(buf, n.type));
+            break;
+        case AST_bool:
+            printf("%.*s%s '%d' (%s)\n", (int)spaces, spc, kind_name, n.boolean.value, get_type_name_r(buf, n.type));
+            break;
+        case AST_string:
+        case AST_char_constant:
+            printf("%.*s%s \"%.*s\" (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n.str.value), get_type_name_r(buf, n.type));
+            break;
+        case AST_if:
+            printf("%.*s%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf, n.type));
+            if (n._if.condition) {
+                printf("%.*s  Condition:\n", (int)spaces, spc);
+                ast_dump_visitor(n._if.condition, spaces + 4);
+            }
+            if (n._if.if_clause) {
+                printf("%.*s  If clause:\n", (int)spaces, spc);
+                ast_dump_visitor(n._if.if_clause, spaces + 4);
+            }
+            if (n._if.else_clause) {
+                printf("%.*s  Else clause:\n", (int)spaces, spc);
+                ast_dump_visitor(n._if.else_clause, spaces + 4);
+            }
+            break;
+        case AST_binary:
+            printf("%.*s%s %s (%s)\n", (int)spaces, spc, kind_name, token_kind_name(n.binary.token_kind), get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_unary:
+            printf("%.*s%s %s (%s)\n", (int)spaces, spc, kind_name, token_kind_name(n.unary.token_kind), get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_variadic_operator:
+            printf("%.*s%s %s (%s)\n", (int)spaces, spc, kind_name, token_kind_name(n.variadic_operator.members[0].token_kind), get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_symbol:
+            printf("%.*s%s '%.*s' ", (int)spaces, spc, kind_name, SV_prnt(n.symbol.name));
+            print_symbol(n.symbol.symbol);
+            printf(" (%s)\n", get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_call:
+            printf("%.*s%s ", (int)spaces, spc, kind_name);
+            printf("(%s)\n", get_type_name_r(buf, n.type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_cast: {
+            char buf_1[1024], buf_2[1024];
+            printf("%.*s%s '%s' <- '%s'\n", (int)spaces, spc, kind_name,
+                get_type_name_r(buf_1, n.type),
+                get_type_name_r(buf_2, n.AST_cast.right_type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        }
+        default:
+            NOT_IMPLEMENTED("Dumping %s is not implemented yet.\n", ast_kind_name(n.kind));
+            break;
+    }
+}
+
+void ast_dump_tree (AST_node *root) {
+    if (!root) {
+        printf("ast_dump_tree: 'null' root node\n");
+        return;
+    }
+
+    ast_dump_visitor(root, 0);
+}
+*/
