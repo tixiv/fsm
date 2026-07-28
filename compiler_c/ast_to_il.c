@@ -262,7 +262,7 @@ static void gen_cast(AST_node *n, IL_gen *gen, bool result_used) {
         ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
         // Just put no cast for now, let's fix potential problems later
     }
-    else if (to == &builtin_u8_slice && is_record_kind(from)) {
+    else if (to == &builtin_u8_slice && (is_struct_kind(from) || is_record_kind(from) || is_union_kind(from))) {
         push_opcode(OP_push_literal, nullptr, get_storage_size(from));
         ast_visit_children(n, (AstVisitor)gen_address_visitor, gen);
     }
@@ -587,6 +587,10 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
                 push_opcode(OP_member_access, nullptr, n->member_access.offset);
             }
             else if (is_enum_kind(t)) {
+                ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+                push_opcode_tp(OP_get_enum_member_name, nullptr, t);
+            }
+            else if (is_enumerator_kind(t)) {
                 ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
                 push_opcode_tp(OP_get_enum_member_name, nullptr, t);
             }

@@ -230,7 +230,7 @@ bool is_castable_to(Type *to, Type *from, const char **out_warn) {
             return true;
         }
     }
-    if (to == &builtin_u8_slice && is_record_kind(from)) return true;
+    if (to == &builtin_u8_slice && (is_record_kind(from) || is_struct_kind(from) || is_union_kind(from))) return true;
 
     return false;
 }
@@ -546,23 +546,51 @@ size_t get_stack_offset_for(Type *t) {
 
 int64_t get_max_enum_value (Type *t) {
     int64_t max = -0x8000000000000000;
-    for (size_t i = 0; i < t->_enum.num_members; i++) {
-        if (t->_enum.members[i].value > max) max = t->_enum.members[i].value;
+ 
+    if (is_enum_kind(t)) {
+        for (size_t i = 0; i < t->_enum.num_members; i++) {
+            if (t->_enum.members[i].value > max) max = t->_enum.members[i].value;
+        }
     }
+    else if (is_enumerator_kind(t) && is_union_kind(t->enumerator.target_type)) {
+        Type *u = t->enumerator.target_type;
+        for (size_t i = 0; i < u->_union.num_members; i++) {
+            if (u->_union.members[i].value > max) max = u->_union.members[i].value;
+        }
+    } else NOT_IMPLEMENTED("get_max_enum_value")
     return max;
 }
 
 int64_t get_min_enum_value (Type *t) {
     int64_t min = 0x7fffffffffffffff;
-    for (size_t i = 0; i < t->_enum.num_members; i++) {
-        if (t->_enum.members[i].value < min) min = t->_enum.members[i].value;
+
+    if (is_enum_kind(t)) {
+        for (size_t i = 0; i < t->_enum.num_members; i++) {
+            if (t->_enum.members[i].value < min) min = t->_enum.members[i].value;
+        }
     }
+    else if (is_enumerator_kind(t) && is_union_kind(t->enumerator.target_type)) {
+        Type *u = t->enumerator.target_type;
+        for (size_t i = 0; i < u->_union.num_members; i++) {
+            if (u->_union.members[i].value < min) min = u->_union.members[i].value;
+        }
+    } else NOT_IMPLEMENTED("get_min_enum_value")
+
     return min;
 }
 
-EnumMember *get_enum_member_by_value(Type *t, int64_t value) {
-    for (size_t i = 0; i < t->_enum.num_members; i++) {
-        if (t->_enum.members[i].value == value) return &t->_enum.members[i];
+SV *get_enum_member_name_by_value(Type *t, int64_t value) {
+    if (is_enum_kind(t)) {
+        for (size_t i = 0; i < t->_enum.num_members; i++) {
+            if (t->_enum.members[i].value == value) return &t->_enum.members[i].name;
+        }
     }
+    else if (is_enumerator_kind(t) && is_union_kind(t->enumerator.target_type)) {
+        Type *u = t->enumerator.target_type;
+        for (size_t i = 0; i < u->_union.num_members; i++) {
+            if (u->_union.members[i].value == value) return &u->_union.members[i].name;
+        }
+    } else NOT_IMPLEMENTED("get_enum_member_name_by_value")
+
     return nullptr;
 }

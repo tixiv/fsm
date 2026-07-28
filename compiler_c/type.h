@@ -165,4 +165,4 @@ struct AST_node_s *make_cast(Type *to, Type *from);
 
 int64_t get_max_enum_value (Type *t);
 int64_t get_min_enum_value (Type *t);
-EnumMember *get_enum_member_by_value(Type *t, int64_t value);
+SV *get_enum_member_name_by_value(Type *t, int64_t value);

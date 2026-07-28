@@ -543,11 +543,12 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file, "\t" "pop rax\n");
                 break;
 
-            case OP_get_enum_member_name:
+            case OP_get_enum_member_name: {
+                SV name = is_enum_kind(op->type) ? op->type->name : op->type->enumerator.target_type->name;
                 fprintf(file, "rept 1 {\n");
                 fprintf(file, "local fail\n");
                 fprintf(file, "local done\n");
-                fprintf(file, "\t" "mov rbx, enum_names_%.*s\n", SV_prnt(op->type->name));
+                fprintf(file, "\t" "mov rbx, enum_names_%.*s\n", SV_prnt(name));
                 fprintf(file, "\t" "pop rax\n");
                 fprintf(file, "\t" "sub rax, %lu\n", get_min_enum_value(op->type));
                 fprintf(file, "\t" "jl fail\n");
@@ -565,7 +566,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file, "done:\n");
                 fprintf(file, "}\n");
                 break;
-
+            }
             default:
                 fprintf(stderr, "%s:%d Generating %s opcode is not implemented yet.\n", __FILE__, __LINE__, opcode_name(op->kind));
                 exit(EXIT_FAILURE);
@@ -618,16 +619,22 @@ void output_asm(const char *asm_file_name) {
 
     for (int i = 0; i < enum_types_with_names.count; i++) {
         Type *t = ((Type**)enum_types_with_names.data)[i];
-        ASSERT(is_enum_kind(t), "Tried to generate member names for something that is not an enum.\n");
+        ASSERT(is_enum_kind(t) || is_enumerator_kind(t), "Tried to generate member names for something that is not an enum.\n");
+
+        SV name;
+        if (is_enum_kind(t)) name = t->name;
+        else if (is_enumerator_kind(t)) name = t->enumerator.target_type->name;
+        else NOT_IMPLEMENTED("Generating IL for enums");
+        
         fprintf(file, "align 8\n");
-        fprintf(file, "enum_names_%.*s:\n", SV_prnt(t->name));
+        fprintf(file, "enum_names_%.*s:\n", SV_prnt(name));
         int64_t max_enum_value = get_max_enum_value(t);
         int64_t min_enum_value = get_min_enum_value(t);
         for (int j = min_enum_value; j <= max_enum_value; j++) {
-            EnumMember *member = get_enum_member_by_value(t, j);
-            if (member) {
-                fprintf(file, "dq enum_names_%.*s_%.*s\n", SV_prnt(t->name), SV_prnt(member->name));
-                fprintf(file, "dq %lu\n", member->name.len);
+            SV *member_name = get_enum_member_name_by_value(t, j);
+            if (member_name) {
+                fprintf(file, "dq enum_names_%.*s_%.*s\n", SV_prnt(name), SV_prnt(*member_name));
+                fprintf(file, "dq %lu\n", member_name->len);
             }
             else {
                 fprintf(file, "dq 0\n");
@@ -635,10 +642,20 @@ void output_asm(const char *asm_file_name) {
             }
         }
 
-        for (int j = 0; j < t->_enum.num_members; j++) {
-            fprintf(file, "enum_names_%.*s_%.*s: db \"%.*s\"\n", SV_prnt(t->name),
-                    SV_prnt(t->_enum.members[j].name), SV_prnt(t->_enum.members[j].name));
+        if (is_enum_kind(t)) {
+            for (int j = 0; j < t->_enum.num_members; j++) {
+                fprintf(file, "enum_names_%.*s_%.*s: db \"%.*s\"\n", SV_prnt(t->name),
+                        SV_prnt(t->_enum.members[j].name), SV_prnt(t->_enum.members[j].name));
+            }
         }
+        else if (is_enumerator_kind(t) && is_union_kind(t->enumerator.target_type)) {
+            Type *u = t->enumerator.target_type;
+            for (int j = 0; j < u->_union.num_members; j++) {
+                fprintf(file, "enum_names_%.*s_%.*s: db \"%.*s\"\n", SV_prnt(u->name),
+                        SV_prnt(u->_union.members[j].name), SV_prnt(u->_union.members[j].name));
+            }
+        }
+        else NOT_IMPLEMENTED("Generating member names is not implemented for this type.\n")
     }
 
     fclose(file);

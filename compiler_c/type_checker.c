@@ -176,7 +176,11 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
         }
     }
 
-    if (is_slice_type(target_type) && is_record_kind(n->type)) {
+    if ((target_type == &builtin_u8_slice) && (
+            (is_struct_kind(n->type) && !is_slice_type(n->type))
+            || is_record_kind(n->type)
+            || is_union_kind(n->type)))
+    {
         ast_insert_node(n, make_cast(target_type, n->type));
         return;
     }
@@ -201,8 +205,8 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
 
     if (n->type == target_type) return;
 
-    if (is_integer_kind(target_type) && is_enum_kind(n->type)) return;
-    if (is_enum_kind(target_type) && is_integer_kind(n->type)) return;
+    if (is_integer_kind(target_type) && (is_enum_kind(n->type) || is_enumerator_kind(n->type))) return;
+    if ((is_enum_kind(target_type) || is_enumerator_kind(target_type)) && is_integer_kind(n->type)) return;
 
 
     if (is_function_reference(target_type) && is_function_reference(n->type)) {
@@ -243,17 +247,23 @@ void type_propagate_binary_operator(AST_node *n) {
             type_checker_error(n->line_number, "Operator %s requires a reference type on the left side. Have '%s' and '%s'.\n",
                 token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
         }
-        if (!is_reference_kind(n->binary.right->type)) {
-            if (!n->binary.right->addressable) type_checker_error(n->line_number, "Operator %s requires either another reference or something addressable on the right side. Have '%s' and '%s'.\n",
-                token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
-            insert_take_reference(n->binary.right);
+
+        if (n->binary.right->type == &builtin_null) {
         }
+        else
+        {
+            if (!is_reference_kind(n->binary.right->type)) {
+                if (!n->binary.right->addressable) type_checker_error(n->line_number, "Operator %s requires either another reference or something addressable on the right side. Have '%s' and '%s'.\n",
+                    token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
+                insert_take_reference(n->binary.right);
+            }
 
-        Type *any_ref = get_ref_type_for(&builtin_any);
+            Type *any_ref = get_ref_type_for(&builtin_any);
 
-        if (n->binary.left->type != n->binary.right->type && n->binary.left->type != any_ref && n->binary.right->type != any_ref) {
-            type_checker_error(n->line_number, "Operator %s requires the type on the right side to be referenceable by the left type. Have '%s' and '%s'.\n",
-                token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
+            if (n->binary.left->type != n->binary.right->type && n->binary.left->type != any_ref && n->binary.right->type != any_ref) {
+                type_checker_error(n->line_number, "Operator %s requires the type on the right side to be referenceable by the left type. Have '%s' and '%s'.\n",
+                    token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
+            }
         }
         
         n->type = n->binary.right->type;
@@ -810,7 +820,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                             SV_prnt(n->member_access.name));
                 }
             }
-            else if (is_enum_kind(container)) {
+            else if (is_enum_kind(container) || is_enumerator_kind(container)) {
                 if(sv_compare_cstr(&n->member_access.name, "name")) {
                     n->addressable = false;
                     n->type = &builtin_u8_slice;

@@ -874,7 +874,7 @@ static AST_node *parse_union() {
                 else NOT_IMPLEMENTED("not implemented yet.\n");
             }
             else {
-                parser_error(CT->line_number, "Expected '}' or struct member definition but got %s",
+                parser_error(CT->line_number, "Expected '}' or union member definition but got %s",
                     token_kind_name(CT->kind));
             }
         }
