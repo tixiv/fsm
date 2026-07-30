@@ -422,51 +422,41 @@ fn parse_primary(parser: Parser&) : AST_node&
     return n;
 }
 
-/*
-
-#define NUM_PRIOS 8
-#define NUM_MAX_OPERATORS_IN_PRIO 4
-
-const uint8_t operator_table[NUM_PRIOS][NUM_MAX_OPERATORS_IN_PRIO] =  {
-    { TokenKind::TOK_equal_assign, TokenKind::TOK_bind_ref, 0, 0},
-    { TokenKind::TOK_boolean_or, 0, 0, 0},
-    { TokenKind::TOK_boolean_and, 0, 0, 0},
-    { TokenKind::TOK_greater, TokenKind::TOK_lower, TokenKind::TOK_greater_equal, TokenKind::TOK_lower_equal},
-    { TokenKind::TOK_equal, TokenKind::TOK_unequal, TokenKind::TOK_or_equal_to, TokenKind::TOK_and_not_equal_to},
-    { TokenKind::TOK_plus, TokenKind::TOK_minus, 0, 0},
-    { TokenKind::TOK_asterisk, TokenKind::TOK_slash, TokenKind::TOK_percent, 0},
-    { TokenKind::TOK_up_arrow, 0, 0, 0},
-};
-
-fn bool is_in_prio(int op, int prio) {
-    for (int i = 0; i < NUM_MAX_OPERATORS_IN_PRIO; i++) {
-        if (operator_table[prio][i] == op) return true;
-    }
-    return false;
+fn is_in_prio(op: TokenKind, prio) : bool {
+    return if (prio == 0) op == TokenKind::TOK_equal_assign |== TokenKind::TOK_bind_ref
+      else if (prio == 1) op == TokenKind::TOK_boolean_or
+      else if (prio == 2) op == TokenKind::TOK_boolean_and
+      else if (prio == 3) op == TokenKind::TOK_greater |== TokenKind::TOK_lower |== TokenKind::TOK_greater_equal |== TokenKind::TOK_lower_equal
+      else if (prio == 4) op == TokenKind::TOK_equal |== TokenKind::TOK_unequal |== TokenKind::TOK_or_equal_to |== TokenKind::TOK_and_not_equal_to
+      else if (prio == 5) op == TokenKind::TOK_plus |== TokenKind::TOK_minus
+      else if (prio == 6) op == TokenKind::TOK_asterisk |== TokenKind::TOK_slash |== TokenKind::TOK_percent
+      else if (prio == 7) op == TokenKind::TOK_up_arrow
+      else false
 }
 
-bool is_comparison_operator(int op) {
-    return op == TokenKind::TOK_greater || op == TokenKind::TOK_lower || op == TokenKind::TOK_greater_equal || op == TokenKind::TOK_lower_equal;
+fn is_comparison_operator(op: TokenKind) : bool {
+    return op == TokenKind::TOK_greater || op == TokenKind::TOK_lower || op == TokenKind::TOK_greater_equal || op == TokenKind::TOK_lower_equal
 }
 
-fn bool is_chainable(int left, int right) {
+fn is_chainable(left: TokenKind, right: TokenKind) : bool {
     return (is_comparison_operator(left) && is_comparison_operator(right))
-    || ((left == TokenKind::TOK_equal || left == TokenKind::TOK_or_equal_to) && right == TokenKind::TOK_or_equal_to)
-    || ((left == TokenKind::TOK_unequal || left == TokenKind::TOK_and_not_equal_to) && right == TokenKind::TOK_and_not_equal_to);
+    || ((left == TokenKind::TOK_equal |== TokenKind::TOK_or_equal_to) && right == TokenKind::TOK_or_equal_to)
+    || ((left == TokenKind::TOK_unequal |== TokenKind::TOK_and_not_equal_to) && right == TokenKind::TOK_and_not_equal_to);
 }
 
-fn AST_node& parse_binary_operators(int prio) {
-    if (prio == NUM_PRIOS) return parse_primary(parser);
+fn parse_binary_operators(parser: Parser&, prio) : AST_node& {
+    if (prio == 8) return parse_primary(parser);
     
-    let left = parse_binary_operators(prio + 1);
+    let left => parse_binary_operators(parser, prio + 1);
 
-    AST_node& last => null;
+    let last: AST_node& => null;
     while (is_in_prio(parser.CT.kind, prio)) {
         if (!last) {
             if (parser.CT.kind == TokenKind::TOK_or_equal_to) parser_error(parser, "Operator '|==' requires initial '=='.");
             if (parser.CT.kind == TokenKind::TOK_and_not_equal_to) parser_error(parser, "Operator '&!=' requires initial '!='.");
         }
 
+        /*
         if (last && is_chainable(last.binary.token_kind, parser.CT.kind)) {
             Dyn_array members;
             #define MEMBERS ((VariadicOperatorMember*)members.data)
@@ -480,21 +470,22 @@ fn AST_node& parse_binary_operators(int prio) {
                 member = dyn_array_push(&members);
                 member.token_kind = parser.CT.kind;
                 MOVE_NEXT(parser);
-                member.right = parse_binary_operators(prio + 1);
+                member.right => parse_binary_operators(parser, prio + 1);
             }
 
             last.variadic_operator.members = members.data;
             last.variadic_operator.num_members = members.count;
-            left = last;
+            left => last;
             last => null;
         }
         else
+        */
         {
             let n => ast_alloc(parser.allocator, AST_node::AST_binary, parser.CT.location);
-            n.binary.left = left;
-            n.binary.token_kind = parser.CT.kind;
+            n.AST_binary.left => left;
+            n.AST_binary.token_kind = parser.CT.kind;
             MOVE_NEXT(parser);
-            n.binary.right = parse_binary_operators(prio + 1);
+            n.AST_binary.right => parse_binary_operators(parser, prio + 1);
 
             left => n;
             last => n;
@@ -505,14 +496,11 @@ fn AST_node& parse_binary_operators(int prio) {
 }
 
 fn parse_operators(parser: Parser&) : AST_node& {
-    return parse_binary_operators(0);
+    return parse_binary_operators(parser, 0);
 }
 
-*/
-
 fn parse_expression(parser: Parser&) : AST_node& {
-    // return parse_operators();
-    return parse_primary(parser);
+    return parse_operators(parser);
 }
 
 fn parse_statement(parser: Parser&) : AST_node&
@@ -566,7 +554,6 @@ fn parse_statement(parser: Parser&) : AST_node&
 
 fn parse_scope_body(parser: Parser&) : AST_node& {
     let ast_scope => ast_alloc(parser.allocator, AST_node::AST_scope, parser.CT.location);
-    let ast_last: AST_node& => null;
 
     take_expected(parser, TokenKind::TOK_lbrace);
 
@@ -583,13 +570,7 @@ fn parse_scope_body(parser: Parser&) : AST_node& {
                 parser_error(parser, "Couldn't parse statement")
             }
 
-            if (!ast_last) {
-                ast_scope.AST_scope.body => n;
-                ast_last => n;
-            } else {
-                ast_last.next => n;
-                ast_last => n;
-            }
+            ast_link_to_chain(&ast_scope.AST_scope.body, n);
 
             if (parser.CT.kind != TokenKind::TOK_semicolon) {
                 if (false) parser_error(parser, "missing ';'");
@@ -907,8 +888,6 @@ fn parse_program(tokens: Token[], allocator: AST_Node_Allocator&) : AST_node& {
     parser.allocator => allocator;
 
     let root => ast_alloc(parser.allocator, AST_node::AST_program, parser.CT.location);
-    let last: AST_node& => null;
-
 
     while (parser.CT.kind != TokenKind::TOK_eof) {
         /* if (parser.CT.kind == TokenKind::TOK_keyword_import) {
@@ -921,40 +900,19 @@ fn parse_program(tokens: Token[], allocator: AST_Node_Allocator&) : AST_node& {
             take_expected(parser, TokenKind::TOK_semicolon);
         }
         else */ if (parser.CT.kind == TokenKind::TOK_keyword_fn) {
-            let fun => parse_function(parser);
-            if (last) 
-                last.next => fun
-            else
-                root.AST_program.body => fun
-            last => fun;
+            ast_link_to_chain(&root.AST_program.body, parse_function(parser));
         }
         /* else if (parser.CT.kind == TokenKind::TOK_keyword_struct || parser.CT.kind == TokenKind::TOK_keyword_record) {
-            let n => parse_struct();
-            if (last) 
-                last.next => n
-            else
-                root.AST_program.body => n
-            last => n;
+            ast_link_to_chain(&root.AST_program.body, parse_struct(parser));
         }
         else if (parser.CT.kind == TokenKind::TOK_keyword_union) {
-            let n => parse_union();
-            if (last) 
-                last.next => n
-            else
-                root.AST_program.body => n
-            last => n;
+            ast_link_to_chain(&root.AST_program.body, parse_union(parser));
         }
         else if (parser.CT.kind == TokenKind::TOK_keyword_enum) {
-            let n => parse_enum();
-            if (last) 
-                last.next => n
-            else
-                root.AST_program.body => n
-            last => n;
+            ast_link_to_chain(&root.AST_program.body, parse_enum(parser));
         }
         */
-        else if (parser.CT.kind == TokenKind::TOK_eof) {
-        } else {
+        else {
             parser_error(parser, $"Expected top level definition or EOF but got {parser.CT.kind.name}");
         }
     }
