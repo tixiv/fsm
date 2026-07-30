@@ -615,7 +615,7 @@ fn ast_dump_visitor (n: AST_node&, spaces: i64&) : void {
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_number) {
-        $"{spc}{n.kind.name} '{n.AST_number}' ({get_type_name(n.type)})\n";
+        $"{spc}{n.kind.name} '{n.AST_number.value}' ({get_type_name(n.type)})\n";
     }
     else if (n.kind == AST_node::AST_bool) {
         $"{spc}{n.kind.name} '{n.AST_bool.value}' ({get_type_name(n.type)})\n";

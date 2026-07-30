@@ -147,89 +147,75 @@ fn try_parse_typedecl(parser: Parser&) : AST_node& {
     return null;
 }
 
-/*
-
-fn AST_node& parse_if(parser: Parser&) {
-    debug_log_parser("Entering %s\n", __func__);
-
-    let n =>> ast_alloc(parser.allocator, AST_node::AST_if, parser.CT.location);
+fn parse_if(parser: Parser&) :AST_node& {
+    let n => ast_alloc(parser.allocator, AST_node::AST_if, parser.CT.location);
     MOVE_NEXT(parser);
 
     if (parser.CT.kind != TokenKind::TOK_lparen) {
-        parser_error(parser, "Expected '(' but got {parser.CT.kind.name}",
-            token_kind_name(parser.CT.kind));
+        parser_error(parser, $"Expected '(' but got {parser.CT.kind.name}");
     }
     MOVE_NEXT(parser);
 
-    n._if.condition => parse_expression(parser);
+    n.AST_if.condition => parse_expression(parser);
 
     if (parser.CT.kind != TokenKind::TOK_rparen) {
-        parser_error(parser, "Expected ')' but got {parser.CT.kind.name}",
-            token_kind_name(parser.CT.kind));
+        parser_error(parser, $"Expected ')' but got {parser.CT.kind.name}");
     }
     MOVE_NEXT(parser);
 
-    n._if.if_clause => parse_statement(parser);
+    n.AST_if.if_clause => parse_statement(parser);
 
     if (parser.CT.kind == TokenKind::TOK_keyword_else) {
         MOVE_NEXT(parser);
 
-        n._if.else_clause => parse_statement(parser);
+        n.AST_if.else_clause => parse_statement(parser);
     }
 
-    debug_log_parser("Leaving %s\n", __func__);
     return n;
 }
 
-fn AST_node& parse_while(parser: Parser&) {
-    debug_log_parser("Entering %s\n", __func__);
-    let n =>> ast_alloc(parser.allocator, AST_node::AST_while, parser.CT.location);
+fn parse_while(parser: Parser&) :AST_node& {
+    let n => ast_alloc(parser.allocator, AST_node::AST_while, parser.CT.location);
     MOVE_NEXT(parser);
 
     if (parser.CT.kind != TokenKind::TOK_lparen) {
-        parser_error(parser, "Expected '(' but got {parser.CT.kind.name}",
-            token_kind_name(parser.CT.kind));
+        parser_error(parser, $"Expected '(' but got {parser.CT.kind.name}");
     }
     MOVE_NEXT(parser);
 
-    n._while.condition => parse_expression(parser);
+    n.AST_while.condition => parse_expression(parser);
 
     if (parser.CT.kind != TokenKind::TOK_rparen) {
-        parser_error(parser, "Expected ')' but got {parser.CT.kind.name}",
-            token_kind_name(parser.CT.kind));
+        parser_error(parser, $"Expected ')' but got {parser.CT.kind.name}");
     }
     MOVE_NEXT(parser);
 
-    n._while.body => parse_statement(parser);
-
-    debug_log_parser("Leaving %s\n", __func__);
+    n.AST_while.body => parse_statement(parser);
 
     return n;
 }
 
-fn AST_node& parse_for(parser: Parser&) {
-    debug_log_parser("Entering %s\n", __func__);
-    let n =>> ast_alloc(parser.allocator, AST_node::AST_for, parser.CT.location);
+fn parse_for(parser: Parser&) :AST_node& {
+    let n => ast_alloc(parser.allocator, AST_node::AST_for, parser.CT.location);
     MOVE_NEXT(parser);
 
     take_expected(parser, TokenKind::TOK_lparen);
-    if (parser.CT.kind != TokenKind::TOK_semicolon) n._for.initializer => parse_statement(parser);
+    if (parser.CT.kind != TokenKind::TOK_semicolon) n.AST_for.initializer => parse_statement(parser);
     take_expected(parser, TokenKind::TOK_semicolon);
-    if (parser.CT.kind != TokenKind::TOK_semicolon) n._for.condition => parse_expression(parser);
+    if (parser.CT.kind != TokenKind::TOK_semicolon) n.AST_for.condition => parse_expression(parser);
     take_expected(parser, TokenKind::TOK_semicolon);
-    if (parser.CT.kind != TokenKind::TOK_rparen) n._for.post_action => parse_statement(parser);
+    if (parser.CT.kind != TokenKind::TOK_rparen) n.AST_for.post_action => parse_statement(parser);
     if (parser.CT.kind == TokenKind::TOK_semicolon) {
         MOVE_NEXT(parser);
-        n._for.result => parse_expression(parser);
+        n.AST_for.result => parse_expression(parser);
     }
     take_expected(parser, TokenKind::TOK_rparen);
-    n._for.body => parse_statement(parser);
-
-    debug_log_parser("Leaving %s\n", __func__);
+    n.AST_for.body => parse_statement(parser);
 
     return n;
 }
 
+/*
 fn AST_node& parse_builder_string(parser: Parser&) {
     let builder => ast_alloc(parser.allocator, AST_node::AST_builder_string, parser.CT.location);
 
@@ -258,7 +244,6 @@ fn AST_node& parse_builder_string(parser: Parser&) {
     MOVE_NEXT(parser);
     return builder;
 }
-
 */
 
 fn parse_call_arguments(parser: Parser&) : AST_node& {
@@ -333,58 +318,59 @@ fn parse_primary(parser: Parser&) : AST_node&
         n.AST_string.value = parser.CT.value;
         MOVE_NEXT(parser);
     }
-    /*
-    else if (parser.CT.kind == TokenKind::TOK_builder_string_begin) {
-        n = parse_builder_string();
-    }
     else if (parser.CT.kind == TokenKind::TOK_char_constant) {
         n => ast_alloc(parser.allocator, AST_node::AST_char_constant, parser.CT.location);
-        n.str.value = parser.CT.value;
+        n.AST_char_constant.value = parser.CT.value;
         MOVE_NEXT(parser);
     }
+    /*
+    else if (parser.CT.kind == TokenKind::TOK_builder_string_begin) {
+        n => parse_builder_string();
+    }
+    */
     else if (parser.CT.kind == TokenKind::TOK_ampersand) {
         n => ast_alloc(parser.allocator, AST_node::AST_reference, parser.CT.location);
         MOVE_NEXT(parser);
-        n.reference.body => parse_primary();
+        n.AST_reference.body => parse_primary(parser);
     }
     else if (parser.CT.kind == TokenKind::TOK_exclam || parser.CT.kind == TokenKind::TOK_minus) {
         n => ast_alloc(parser.allocator, AST_node::AST_unary, parser.CT.location);
-        n.unary.token_kind = parser.CT.kind;
+        n.AST_unary.token_kind = parser.CT.kind;
         MOVE_NEXT(parser);
-        n.unary.body => parse_primary();
+        n.AST_unary.body => parse_primary(parser);
     }
     else if (parser.CT.kind == TokenKind::TOK_plus_plus) {
         n => ast_alloc(parser.allocator, AST_node::AST_plus_plus, parser.CT.location);
         MOVE_NEXT(parser);
-        n.plus_plus.body => parse_primary();
+        n.AST_plus_plus.body => parse_primary(parser);
     }
     else if (parser.CT.kind == TokenKind::TOK_minus_minus) {
         n => ast_alloc(parser.allocator, AST_node::AST_minus_minus, parser.CT.location);
         MOVE_NEXT(parser);
-        n.minus_minus.body => parse_primary();
+        n.AST_minus_minus.body => parse_primary(parser);
     }
     else if (parser.CT.kind == TokenKind::TOK_identifier) {
         n => ast_alloc(parser.allocator, AST_node::AST_symbol, parser.CT.location);
-        n.symbol.name = parser.CT.value;
+        n.AST_symbol.name = parser.CT.value;
         MOVE_NEXT(parser);
 
-        while (parser.CT.kind == TokenKind::TOK_lparen || parser.CT.kind == TokenKind::TOK_lbracket
-               || parser.CT.kind == TokenKind::TOK_dot || parser.CT.kind == TokenKind::TOK_colon_colon)
+        while (parser.CT.kind == TokenKind::TOK_lparen |== TokenKind::TOK_lbracket
+                             |== TokenKind::TOK_dot    |== TokenKind::TOK_colon_colon)
         {
             if (parser.CT.kind == TokenKind::TOK_lparen) {
                 let ast_call => ast_alloc(parser.allocator, AST_node::AST_call, parser.CT.location);
-                ast_call.call.target => n;
-                ast_call.call.args = parse_call_arguments();
+                ast_call.AST_call.target => n;
+                ast_call.AST_call.args => parse_call_arguments(parser);
                 n => ast_call;
             }
             else if (parser.CT.kind == TokenKind::TOK_lbracket) {
                 let ast_arr => ast_alloc(parser.allocator, AST_node::AST_array_access, parser.CT.location);
                 MOVE_NEXT(parser);
-                ast_arr._array.array => n;
-                ast_arr._array.index => parse_expression(parser);
+                ast_arr.AST_array_access.array => n;
+                ast_arr.AST_array_access.index => parse_expression(parser);
 
                 let ast_deref => ast_alloc(parser.allocator, AST_node::AST_dereference, parser.CT.location);
-                ast_deref.deref.body => ast_arr;
+                ast_deref.AST_dereference.body => ast_arr;
                 
                 n => ast_deref;
                 take_expected(parser, TokenKind::TOK_rbracket);
@@ -393,8 +379,8 @@ fn parse_primary(parser: Parser&) : AST_node&
                 let ast_member_access => ast_alloc(parser.allocator, AST_node::AST_member_access, parser.CT.location);
                 MOVE_NEXT(parser);
                 expect_token(parser, TokenKind::TOK_identifier);
-                ast_member_access.member_access.body => n;
-                ast_member_access.member_access.name = parser.CT.value;
+                ast_member_access.AST_member_access.body => n;
+                ast_member_access.AST_member_access.name = parser.CT.value;
                 n => ast_member_access;
                 MOVE_NEXT(parser);
             }
@@ -402,8 +388,8 @@ fn parse_primary(parser: Parser&) : AST_node&
                 let ast_namespace_access => ast_alloc(parser.allocator, AST_node::AST_namespace_access, parser.CT.location);
                 MOVE_NEXT(parser);
                 expect_token(parser, TokenKind::TOK_identifier);
-                ast_namespace_access.namespace_access.body => n;
-                ast_namespace_access.namespace_access.name = parser.CT.value;
+                ast_namespace_access.AST_namespace_access.body => n;
+                ast_namespace_access.AST_namespace_access.name = parser.CT.value;
                 MOVE_NEXT(parser);
                 n => ast_namespace_access;
             }
@@ -415,21 +401,19 @@ fn parse_primary(parser: Parser&) : AST_node&
 
         if (parser.CT.kind != TokenKind::TOK_rparen)
         {
-            parser_error(parser, "Expected ')' but got {parser.CT.kind.name}",
-                token_kind_name(parser.CT.kind));
+            parser_error(parser, $"Expected ')' but got {parser.CT.kind.name}");
         }
         MOVE_NEXT(parser);
     }
     else if (parser.CT.kind == TokenKind::TOK_keyword_if) {
-        n = parse_if();
+        n => parse_if(parser);
     }
     else if (parser.CT.kind == TokenKind::TOK_keyword_while) {
-        n = parse_while();
+        n => parse_while(parser);
     }
     else if (parser.CT.kind == TokenKind::TOK_keyword_for) {
-        n = parse_for();
+        n => parse_for(parser);
     }
-    */
     else {
         parser_error(parser, $"Expected expression but got {parser.CT.kind.name}");
     }
@@ -472,7 +456,7 @@ fn bool is_chainable(int left, int right) {
 }
 
 fn AST_node& parse_binary_operators(int prio) {
-    if (prio == NUM_PRIOS) return parse_primary();
+    if (prio == NUM_PRIOS) return parse_primary(parser);
     
     let left = parse_binary_operators(prio + 1);
 
