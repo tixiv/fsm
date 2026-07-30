@@ -1,0 +1,978 @@
+
+import * from "compiler_fsm/ast";
+
+struct Parser {
+    tokens: Token[];
+    CT: Token&;
+    allocator: AST_Node_Allocator&;
+}
+
+fn parser_error(parser: Parser&, s: u8[]) {
+    write(2, $"[FSM Parser] {parser.CT.location} Error: {s}\n");
+    exit(1);
+}
+
+fn ASSERT(condition: bool, s: u8[]) {
+    if (!condition) {
+        $"Assertion failed: {s}";
+        exit(1);
+    }
+}
+
+fn MOVE_NEXT(parser: Parser&) {
+    parser.tokens++;
+    parser.CT => parser.tokens.begin;
+}
+
+fn expect_token(parser: Parser&, tok: TokenKind) {
+    if (parser.CT.kind != tok) {
+        parser_error(parser, $"Expected {tok.name} but got {parser.CT.kind.name}");
+    }
+}
+
+fn take_expected(parser: Parser&, tok: TokenKind) {
+    expect_token(parser, tok);
+    MOVE_NEXT(parser);
+}
+
+/*
+
+fn link_arr(parser: Parser&, parent: AST_node&, child: AST_node&) {
+    switch (parent.kind) {
+        case AST_node::AST_type_array: parent._type_array.body => child; break;
+        case AST_node::AST_type_slice: parent._type_slice.body => child; break;
+        default: NOT_IMPLEMENTED("Linking to %s is not implemented yet.\n", ast_kind_name(parent.kind));
+    }
+}
+
+*/
+
+fn parse_typedecl_postifx(inner: AST_node&) : AST_node& {
+    /*
+    if (parser.CT.kind == TokenKind::TOK_ampersand) {
+        let ast_ref => ast_alloc(parser.allocator, AST_node::AST_node::AST_type_ref, parser.CT.location);
+        MOVE_NEXT(parser);
+        ast_ref._type_ref.body => inner;
+        return parse_typedecl_postifx(ast_ref);
+    } else if (parser.CT.kind == TokenKind::TOK_lbracket) {
+        
+        AST_node& first => null;
+        AST_node& latest => null;
+
+        while (parser.CT.kind == TokenKind::TOK_lbracket) {
+            int location = parser.CT.location;
+            MOVE_NEXT(parser);
+            if (parser.CT.kind == TokenKind::TOK_number) {
+                let ast_array => ast_alloc(parser.allocator, AST_node::AST_node::AST_type_array, location);
+                ast_array._type_array.n_elements = strtoul(parser.CT.value.begin, 0, 0);
+                MOVE_NEXT(parser);
+                take_expected(parser, TokenKind::TOK_rbracket);
+
+                if (!first) {
+                    first => ast_array;
+                }
+                if (latest) {
+                    link_arr(latest, ast_array);
+                }
+                latest => ast_array;
+            }
+            else if (parser.CT.kind == TokenKind::TOK_rbracket) {
+                let ast_slice => ast_alloc(parser.allocator, AST_node::AST_node::AST_type_slice, location);
+                take_expected(parser, TokenKind::TOK_rbracket);
+
+                if (!first) {
+                    first => ast_slice;
+                }
+                if (latest) {
+                    link_arr(latest, ast_slice);
+                }
+                latest => ast_slice;
+            }
+            else {
+                parser_error(parser, "Expected array size or ']'.\n");
+            }
+        }
+        
+        link_arr(latest, inner);
+        return parse_typedecl_postifx(first);
+    }
+*/
+    return inner;
+}
+
+fn parse_typedecl(parser: Parser&) : AST_node& {
+    if (parser.CT.kind == TokenKind::TOK_keyword_fn) {
+        let ast_fn_type => ast_alloc(parser.allocator, AST_node::AST_function_type, parser.CT.location);
+        MOVE_NEXT(parser);
+
+        take_expected(parser, TokenKind::TOK_lparen);
+
+        while (parser.CT.kind != TokenKind::TOK_rparen) {
+            let arg => parse_typedecl(parser);
+            if (!arg) parser_error(parser, $"Expected function argument type or ')' but have {parser.CT.kind.name}");
+
+            ast_link_to_chain(&ast_fn_type.AST_function_type.function_args, arg);
+            if (parser.CT.kind == TokenKind::TOK_komma){
+                MOVE_NEXT(parser);
+            }
+            else {
+                parser_error(parser, $"Expected ',' or ')' but have {parser.CT.kind.name}");
+            }
+        }
+        MOVE_NEXT(parser);
+
+        take_expected(parser, TokenKind::TOK_colon);
+
+        ast_fn_type.AST_function_type.function_ret => parse_typedecl(parser);
+        return ast_fn_type;
+    }
+    else if (parser.CT.kind == TokenKind::TOK_identifier) {
+        let ast_type => ast_alloc(parser.allocator, AST_node::AST_typename, parser.CT.location);
+        ast_type.AST_typename.name = parser.CT.value;
+        MOVE_NEXT(parser);
+        return parse_typedecl_postifx(ast_type);
+    }
+    
+    return null;
+}
+
+fn try_parse_typedecl(parser: Parser&) : AST_node& {
+    if(parser.CT.kind == TokenKind::TOK_colon) {
+        MOVE_NEXT(parser);
+        let n => parse_typedecl(parser);
+        if (!n)
+            parser_error(parser, $"Expected typename but have {parser.CT.kind.name}");
+        return n;
+    }
+    return null;
+}
+
+/*
+
+fn AST_node& parse_if(parser: Parser&) {
+    debug_log_parser("Entering %s\n", __func__);
+
+    let n =>> ast_alloc(parser.allocator, AST_node::AST_if, parser.CT.location);
+    MOVE_NEXT(parser);
+
+    if (parser.CT.kind != TokenKind::TOK_lparen) {
+        parser_error(parser, "Expected '(' but got {parser.CT.kind.name}",
+            token_kind_name(parser.CT.kind));
+    }
+    MOVE_NEXT(parser);
+
+    n._if.condition => parse_expression(parser);
+
+    if (parser.CT.kind != TokenKind::TOK_rparen) {
+        parser_error(parser, "Expected ')' but got {parser.CT.kind.name}",
+            token_kind_name(parser.CT.kind));
+    }
+    MOVE_NEXT(parser);
+
+    n._if.if_clause => parse_statement(parser);
+
+    if (parser.CT.kind == TokenKind::TOK_keyword_else) {
+        MOVE_NEXT(parser);
+
+        n._if.else_clause => parse_statement(parser);
+    }
+
+    debug_log_parser("Leaving %s\n", __func__);
+    return n;
+}
+
+fn AST_node& parse_while(parser: Parser&) {
+    debug_log_parser("Entering %s\n", __func__);
+    let n =>> ast_alloc(parser.allocator, AST_node::AST_while, parser.CT.location);
+    MOVE_NEXT(parser);
+
+    if (parser.CT.kind != TokenKind::TOK_lparen) {
+        parser_error(parser, "Expected '(' but got {parser.CT.kind.name}",
+            token_kind_name(parser.CT.kind));
+    }
+    MOVE_NEXT(parser);
+
+    n._while.condition => parse_expression(parser);
+
+    if (parser.CT.kind != TokenKind::TOK_rparen) {
+        parser_error(parser, "Expected ')' but got {parser.CT.kind.name}",
+            token_kind_name(parser.CT.kind));
+    }
+    MOVE_NEXT(parser);
+
+    n._while.body => parse_statement(parser);
+
+    debug_log_parser("Leaving %s\n", __func__);
+
+    return n;
+}
+
+fn AST_node& parse_for(parser: Parser&) {
+    debug_log_parser("Entering %s\n", __func__);
+    let n =>> ast_alloc(parser.allocator, AST_node::AST_for, parser.CT.location);
+    MOVE_NEXT(parser);
+
+    take_expected(parser, TokenKind::TOK_lparen);
+    if (parser.CT.kind != TokenKind::TOK_semicolon) n._for.initializer => parse_statement(parser);
+    take_expected(parser, TokenKind::TOK_semicolon);
+    if (parser.CT.kind != TokenKind::TOK_semicolon) n._for.condition => parse_expression(parser);
+    take_expected(parser, TokenKind::TOK_semicolon);
+    if (parser.CT.kind != TokenKind::TOK_rparen) n._for.post_action => parse_statement(parser);
+    if (parser.CT.kind == TokenKind::TOK_semicolon) {
+        MOVE_NEXT(parser);
+        n._for.result => parse_expression(parser);
+    }
+    take_expected(parser, TokenKind::TOK_rparen);
+    n._for.body => parse_statement(parser);
+
+    debug_log_parser("Leaving %s\n", __func__);
+
+    return n;
+}
+
+fn AST_node& parse_builder_string(parser: Parser&) {
+    let builder => ast_alloc(parser.allocator, AST_node::AST_builder_string, parser.CT.location);
+
+    builder.builder_string.var_decl_sb => ast_alloc(parser.allocator, AST_node::AST_var_decl, parser.CT.location);
+    builder.builder_string.var_decl_sb.var_decl._typedecl => ast_alloc(parser.allocator, AST_node::AST_typename, parser.CT.location);
+    builder.builder_string.var_decl_sb.var_decl._typedecl._typename.name = mkSV("StringBuilder");
+
+    builder.builder_string.var_decl_arr => ast_alloc(parser.allocator, AST_node::AST_var_decl, parser.CT.location);
+    builder.builder_string.var_decl_arr.var_decl._typedecl => ast_alloc(parser.allocator, AST_node::AST_type_array, parser.CT.location);
+    builder.builder_string.var_decl_arr.var_decl._typedecl._type_array.n_elements = 1024;
+    builder.builder_string.var_decl_arr.var_decl._typedecl._type_array.body => ast_alloc(parser.allocator, AST_node::AST_typename, parser.CT.location);
+    builder.builder_string.var_decl_arr.var_decl._typedecl._type_array.body._typename.name = mkSV("u8");
+
+    MOVE_NEXT(parser);
+
+    while (parser.CT.kind != TokenKind::TOK_builder_string_end) {
+        if (parser.CT.kind == TokenKind::TOK_string) {
+            let ast_str => ast_alloc(parser.allocator, AST_node::AST_string, parser.CT.location);
+            ast_str.str.value = parser.CT.value;
+            ast_link_to_chain(&builder.builder_string.body, ast_str);
+            MOVE_NEXT(parser);
+        } else {
+            ast_link_to_chain(&builder.builder_string.body, parse_expression(parser));
+        }
+    }
+    MOVE_NEXT(parser);
+    return builder;
+}
+
+*/
+
+fn parse_call_arguments(parser: Parser&) : AST_node& {
+    MOVE_NEXT(parser);
+
+    let first: AST_node& => null;
+    let last: AST_node& => null;
+
+    while (parser.CT.kind != TokenKind::TOK_rparen) {
+        first => parse_expression(parser);
+        last => first;
+
+        while (parser.CT.kind == TokenKind::TOK_komma) {
+            MOVE_NEXT(parser);
+            let n=> parse_expression(parser); 
+            last.next => n;
+            last => n;
+        }
+    }
+    MOVE_NEXT(parser);
+
+    return first;
+}
+
+/*
+
+fn AST_node& parse_postfix_operators(AST_node& n) {
+    if (parser.CT.kind == TokenKind::TOK_plus_plus) {
+        let  plus_plus => ast_alloc(parser.allocator, AST_node::AST_plus_plus, parser.CT.location);
+        plus_plus.plus_plus.body => n;
+        plus_plus.plus_plus.postfix = true;
+        MOVE_NEXT(parser);
+        return plus_plus;
+    }
+    else if (parser.CT.kind == TokenKind::TOK_minus_minus) {
+        let  minus_minus => ast_alloc(parser.allocator, AST_node::AST_minus_minus, parser.CT.location);
+        minus_minus.minus_minus.body => n;
+        minus_minus.minus_minus.postfix = true;
+        MOVE_NEXT(parser);
+        return minus_minus;
+    }
+    return n;
+}
+
+*/
+
+fn parse_primary(parser: Parser&) : AST_node&
+{
+    let n: AST_node& => null;
+
+    if (parser.CT.kind == TokenKind::TOK_number) {
+        n => ast_alloc(parser.allocator, AST_node::AST_number, parser.CT.location);
+        n.AST_number.value = parser.CT.value;
+        MOVE_NEXT(parser);
+    }
+    else if (parser.CT.kind == TokenKind::TOK_keyword_true) {
+        n => ast_alloc(parser.allocator, AST_node::AST_bool, parser.CT.location);
+        n.AST_bool.value = true;
+        MOVE_NEXT(parser);
+    }
+    else if (parser.CT.kind == TokenKind::TOK_keyword_false) {
+        n => ast_alloc(parser.allocator, AST_node::AST_bool, parser.CT.location);
+        n.AST_bool.value = false;
+        MOVE_NEXT(parser);
+    }
+    else if (parser.CT.kind == TokenKind::TOK_keyword_null) {
+        n => ast_alloc(parser.allocator, AST_node::AST_null, parser.CT.location);
+        MOVE_NEXT(parser);
+    }
+    else if (parser.CT.kind == TokenKind::TOK_string) {
+        n => ast_alloc(parser.allocator, AST_node::AST_string, parser.CT.location);
+        n.AST_string.value = parser.CT.value;
+        MOVE_NEXT(parser);
+    }
+    /*
+    else if (parser.CT.kind == TokenKind::TOK_builder_string_begin) {
+        n = parse_builder_string();
+    }
+    else if (parser.CT.kind == TokenKind::TOK_char_constant) {
+        n => ast_alloc(parser.allocator, AST_node::AST_char_constant, parser.CT.location);
+        n.str.value = parser.CT.value;
+        MOVE_NEXT(parser);
+    }
+    else if (parser.CT.kind == TokenKind::TOK_ampersand) {
+        n => ast_alloc(parser.allocator, AST_node::AST_reference, parser.CT.location);
+        MOVE_NEXT(parser);
+        n.reference.body => parse_primary();
+    }
+    else if (parser.CT.kind == TokenKind::TOK_exclam || parser.CT.kind == TokenKind::TOK_minus) {
+        n => ast_alloc(parser.allocator, AST_node::AST_unary, parser.CT.location);
+        n.unary.token_kind = parser.CT.kind;
+        MOVE_NEXT(parser);
+        n.unary.body => parse_primary();
+    }
+    else if (parser.CT.kind == TokenKind::TOK_plus_plus) {
+        n => ast_alloc(parser.allocator, AST_node::AST_plus_plus, parser.CT.location);
+        MOVE_NEXT(parser);
+        n.plus_plus.body => parse_primary();
+    }
+    else if (parser.CT.kind == TokenKind::TOK_minus_minus) {
+        n => ast_alloc(parser.allocator, AST_node::AST_minus_minus, parser.CT.location);
+        MOVE_NEXT(parser);
+        n.minus_minus.body => parse_primary();
+    }
+    else if (parser.CT.kind == TokenKind::TOK_identifier) {
+        n => ast_alloc(parser.allocator, AST_node::AST_symbol, parser.CT.location);
+        n.symbol.name = parser.CT.value;
+        MOVE_NEXT(parser);
+
+        while (parser.CT.kind == TokenKind::TOK_lparen || parser.CT.kind == TokenKind::TOK_lbracket
+               || parser.CT.kind == TokenKind::TOK_dot || parser.CT.kind == TokenKind::TOK_colon_colon)
+        {
+            if (parser.CT.kind == TokenKind::TOK_lparen) {
+                let ast_call => ast_alloc(parser.allocator, AST_node::AST_call, parser.CT.location);
+                ast_call.call.target => n;
+                ast_call.call.args = parse_call_arguments();
+                n => ast_call;
+            }
+            else if (parser.CT.kind == TokenKind::TOK_lbracket) {
+                let ast_arr => ast_alloc(parser.allocator, AST_node::AST_array_access, parser.CT.location);
+                MOVE_NEXT(parser);
+                ast_arr._array.array => n;
+                ast_arr._array.index => parse_expression(parser);
+
+                let ast_deref => ast_alloc(parser.allocator, AST_node::AST_dereference, parser.CT.location);
+                ast_deref.deref.body => ast_arr;
+                
+                n => ast_deref;
+                take_expected(parser, TokenKind::TOK_rbracket);
+            } 
+            if (parser.CT.kind == TokenKind::TOK_dot) {
+                let ast_member_access => ast_alloc(parser.allocator, AST_node::AST_member_access, parser.CT.location);
+                MOVE_NEXT(parser);
+                expect_token(parser, TokenKind::TOK_identifier);
+                ast_member_access.member_access.body => n;
+                ast_member_access.member_access.name = parser.CT.value;
+                n => ast_member_access;
+                MOVE_NEXT(parser);
+            }
+            if (parser.CT.kind == TokenKind::TOK_colon_colon) {
+                let ast_namespace_access => ast_alloc(parser.allocator, AST_node::AST_namespace_access, parser.CT.location);
+                MOVE_NEXT(parser);
+                expect_token(parser, TokenKind::TOK_identifier);
+                ast_namespace_access.namespace_access.body => n;
+                ast_namespace_access.namespace_access.name = parser.CT.value;
+                MOVE_NEXT(parser);
+                n => ast_namespace_access;
+            }
+        }
+    }
+    else if (parser.CT.kind == TokenKind::TOK_lparen) {
+        MOVE_NEXT(parser);
+        n => parse_expression(parser);
+
+        if (parser.CT.kind != TokenKind::TOK_rparen)
+        {
+            parser_error(parser, "Expected ')' but got {parser.CT.kind.name}",
+                token_kind_name(parser.CT.kind));
+        }
+        MOVE_NEXT(parser);
+    }
+    else if (parser.CT.kind == TokenKind::TOK_keyword_if) {
+        n = parse_if();
+    }
+    else if (parser.CT.kind == TokenKind::TOK_keyword_while) {
+        n = parse_while();
+    }
+    else if (parser.CT.kind == TokenKind::TOK_keyword_for) {
+        n = parse_for();
+    }
+    */
+    else {
+        parser_error(parser, $"Expected expression but got {parser.CT.kind.name}");
+    }
+
+    // n => parse_postfix_operators(n);
+    return n;
+}
+
+/*
+
+#define NUM_PRIOS 8
+#define NUM_MAX_OPERATORS_IN_PRIO 4
+
+const uint8_t operator_table[NUM_PRIOS][NUM_MAX_OPERATORS_IN_PRIO] =  {
+    { TokenKind::TOK_equal_assign, TokenKind::TOK_bind_ref, 0, 0},
+    { TokenKind::TOK_boolean_or, 0, 0, 0},
+    { TokenKind::TOK_boolean_and, 0, 0, 0},
+    { TokenKind::TOK_greater, TokenKind::TOK_lower, TokenKind::TOK_greater_equal, TokenKind::TOK_lower_equal},
+    { TokenKind::TOK_equal, TokenKind::TOK_unequal, TokenKind::TOK_or_equal_to, TokenKind::TOK_and_not_equal_to},
+    { TokenKind::TOK_plus, TokenKind::TOK_minus, 0, 0},
+    { TokenKind::TOK_asterisk, TokenKind::TOK_slash, TokenKind::TOK_percent, 0},
+    { TokenKind::TOK_up_arrow, 0, 0, 0},
+};
+
+fn bool is_in_prio(int op, int prio) {
+    for (int i = 0; i < NUM_MAX_OPERATORS_IN_PRIO; i++) {
+        if (operator_table[prio][i] == op) return true;
+    }
+    return false;
+}
+
+bool is_comparison_operator(int op) {
+    return op == TokenKind::TOK_greater || op == TokenKind::TOK_lower || op == TokenKind::TOK_greater_equal || op == TokenKind::TOK_lower_equal;
+}
+
+fn bool is_chainable(int left, int right) {
+    return (is_comparison_operator(left) && is_comparison_operator(right))
+    || ((left == TokenKind::TOK_equal || left == TokenKind::TOK_or_equal_to) && right == TokenKind::TOK_or_equal_to)
+    || ((left == TokenKind::TOK_unequal || left == TokenKind::TOK_and_not_equal_to) && right == TokenKind::TOK_and_not_equal_to);
+}
+
+fn AST_node& parse_binary_operators(int prio) {
+    if (prio == NUM_PRIOS) return parse_primary();
+    
+    let left = parse_binary_operators(prio + 1);
+
+    AST_node& last => null;
+    while (is_in_prio(parser.CT.kind, prio)) {
+        if (!last) {
+            if (parser.CT.kind == TokenKind::TOK_or_equal_to) parser_error(parser, "Operator '|==' requires initial '=='.");
+            if (parser.CT.kind == TokenKind::TOK_and_not_equal_to) parser_error(parser, "Operator '&!=' requires initial '!='.");
+        }
+
+        if (last && is_chainable(last.binary.token_kind, parser.CT.kind)) {
+            Dyn_array members;
+            #define MEMBERS ((VariadicOperatorMember*)members.data)
+            dyn_array_init(&members, sizeof(VariadicOperatorMember), 16);
+            VariadicOperatorMember *member = dyn_array_push(&members);
+            member.token_kind = last.binary.token_kind;
+            member.right = last.binary.right;
+            last.kind = AST_variadic_operator;
+            
+            while (is_chainable(MEMBERS[members.count-1].token_kind, parser.CT.kind)) {
+                member = dyn_array_push(&members);
+                member.token_kind = parser.CT.kind;
+                MOVE_NEXT(parser);
+                member.right = parse_binary_operators(prio + 1);
+            }
+
+            last.variadic_operator.members = members.data;
+            last.variadic_operator.num_members = members.count;
+            left = last;
+            last => null;
+        }
+        else
+        {
+            let n => ast_alloc(parser.allocator, AST_node::AST_binary, parser.CT.location);
+            n.binary.left = left;
+            n.binary.token_kind = parser.CT.kind;
+            MOVE_NEXT(parser);
+            n.binary.right = parse_binary_operators(prio + 1);
+
+            left => n;
+            last => n;
+        }
+    }
+
+    return left;
+}
+
+fn parse_operators(parser: Parser&) : AST_node& {
+    return parse_binary_operators(0);
+}
+
+*/
+
+fn parse_expression(parser: Parser&) : AST_node& {
+    // return parse_operators();
+    return parse_primary(parser);
+}
+
+fn parse_statement(parser: Parser&) : AST_node&
+{
+    let n: AST_node& => null;
+
+    if (parser.CT.kind == TokenKind::TOK_keyword_return) {
+        n => ast_alloc(parser.allocator, AST_node::AST_return, parser.CT.location);
+        MOVE_NEXT(parser);
+
+        if (parser.CT.kind != TokenKind::TOK_semicolon)
+        {
+            n.AST_return.body => parse_expression(parser);
+        }
+    }
+    else if (parser.CT.kind == TokenKind::TOK_keyword_let) {
+        n => ast_alloc(parser.allocator, AST_node::AST_var_decl, parser.CT.location);
+        MOVE_NEXT(parser);
+        
+        if (parser.CT.kind != TokenKind::TOK_identifier) {
+            parser_error(parser, $"Expected identifier, but got {parser.CT.kind.name}");
+        }
+        n.AST_var_decl.name = parser.CT.value;
+        MOVE_NEXT(parser);
+
+        n.AST_var_decl._typedecl => try_parse_typedecl(parser);
+
+        if (parser.CT.kind == TokenKind::TOK_equal_assign || parser.CT.kind == TokenKind::TOK_bind_ref) {
+            n.AST_var_decl.initializer_operator = parser.CT.kind;
+            MOVE_NEXT(parser);
+            n.AST_var_decl.initializer => parse_expression(parser);
+        }
+        else if (parser.CT.kind == TokenKind::TOK_semicolon) {
+            // just declaring the variable without assigning it
+        } else {
+            parser_error(parser, $"Expected '=' or ';', but got {parser.CT.kind.name}");
+        }
+    }
+    else if (parser.CT.kind == TokenKind::TOK_lbrace) {
+        n => parse_scope_body(parser);
+    }
+    else if (parser.CT.kind == TokenKind::TOK_semicolon) {
+        n => null;
+    }
+    else {
+        n => parse_expression(parser);
+    }
+
+    return n;
+}
+
+fn parse_scope_body(parser: Parser&) : AST_node& {
+    let ast_scope => ast_alloc(parser.allocator, AST_node::AST_scope, parser.CT.location);
+    let ast_last: AST_node& => null;
+
+    take_expected(parser, TokenKind::TOK_lbrace);
+
+    while(parser.CT.kind != TokenKind::TOK_rbrace) {
+        if (parser.CT.kind == TokenKind::TOK_eof) {
+            parser_error(parser, "encountered EOF while parsing block");
+        }
+        else if (parser.CT.kind == TokenKind::TOK_semicolon) {
+            MOVE_NEXT(parser);
+        }
+        else {
+            let n => parse_statement(parser);
+            if (!n) {
+                parser_error(parser, "Couldn't parse statement")
+            }
+
+            if (!ast_last) {
+                ast_scope.AST_scope.body => n;
+                ast_last => n;
+            } else {
+                ast_last.next => n;
+                ast_last => n;
+            }
+
+            if (parser.CT.kind != TokenKind::TOK_semicolon) {
+                if (false) parser_error(parser, "missing ';'");
+            }
+        }
+    }
+
+    MOVE_NEXT(parser);
+
+    return ast_scope;
+}
+
+fn insert_implicit_return(parser: Parser&, scope: AST_node&) {
+    ASSERT(scope.kind == AST_node::AST_scope, "Tried to insert return in something that is not a scope\n");
+    if (!scope.AST_scope.body) { // empty function
+        let ast_return => ast_alloc(parser.allocator, AST_node::AST_return, scope.location);
+        ast_return.AST_return.implicit = true;
+        scope.AST_scope.body => ast_return;
+    }
+    else {
+        let last => get_last_in_chain(scope.AST_scope.body);
+        if (last.kind != AST_node::AST_return) {
+            let ast_return => ast_alloc(parser.allocator, AST_node::AST_return, last.location);
+            ast_return.AST_return.implicit = true;
+            last.next => ast_return;
+        }
+    }
+}
+
+fn parse_function(parser: Parser&) : AST_node& {
+    expect_token(parser, TokenKind::TOK_keyword_fn);
+    let ast_fn => ast_alloc(parser.allocator, AST_node::AST_function, parser.CT.location);
+    MOVE_NEXT(parser);
+
+    expect_token(parser, TokenKind::TOK_identifier);
+    ast_fn.AST_function.name = parser.CT.value;
+    MOVE_NEXT(parser);
+
+    take_expected(parser, TokenKind::TOK_lparen);
+
+    // Function arguments
+    {
+        let ast_arglist => ast_alloc(parser.allocator, AST_node::AST_arg_list, parser.CT.location);
+        ast_fn.AST_function.args => ast_arglist;
+
+        let latest_arg: AST_node& => null;
+
+        while (parser.CT.kind != TokenKind::TOK_rparen) {
+            if (parser.CT.kind == TokenKind::TOK_rparen) {
+            }
+            else if(parser.CT.kind == TokenKind::TOK_identifier) {
+                let ast_arg => ast_alloc(parser.allocator, AST_node::AST_arg_decl, parser.CT.location);
+                ast_arg.AST_arg_decl.name = parser.CT.value;
+                MOVE_NEXT(parser);
+
+                ast_arg.AST_arg_decl._typedecl => try_parse_typedecl(parser);
+                
+                if (latest_arg) {
+                    latest_arg.next => ast_arg;
+                } else {
+                    ast_arglist.AST_arg_list.body => ast_arg;
+                }
+                latest_arg => ast_arg;
+
+                if(parser.CT.kind == TokenKind::TOK_komma) {
+                    MOVE_NEXT(parser);
+                }
+            }
+            else {
+                parser_error(parser, $"Expected ')' or function argument but got {parser.CT.kind.name}")
+            }
+        }
+    }
+
+    MOVE_NEXT(parser);
+
+    ast_fn.AST_function.ret_typedecl => try_parse_typedecl(parser);
+
+    expect_token(parser, TokenKind::TOK_lbrace);
+    ast_fn.AST_function.body => parse_scope_body(parser);
+
+    insert_implicit_return(parser, ast_fn.AST_function.body);
+
+    return ast_fn;
+}
+
+/*
+
+fn parse_struct_body(AST_node& ast_struct) {
+    debug_log_parser("Entering %s\n", __func__);
+    take_expected(parser, TokenKind::TOK_lbrace);
+
+    // Members
+    {
+        AST_node& latest => null;
+
+        while (1) {
+            if (parser.CT.kind == TokenKind::TOK_rbrace) {
+                MOVE_NEXT(parser);
+                break;
+            }
+            else if(parser.CT.kind == TokenKind::TOK_identifier) {
+                let member => ast_alloc(parser.allocator, AST_node::AST_member_def, parser.CT.location);
+                member.struct_member_def.name = parser.CT.value;
+                MOVE_NEXT(parser);
+                member.struct_member_def._typedef => try_parse_typedecl(parser);
+
+                if (latest) {
+                    latest.next = member;
+                } else {
+                    ast_struct._struct.body => member;
+                }
+                latest = member;
+
+                take_expected(parser, TokenKind::TOK_semicolon);
+            }
+            else {
+                parser_error(parser, "Expected '}' or struct member definition but got {parser.CT.kind.name}",
+                    token_kind_name(parser.CT.kind));
+            }
+        }
+    }
+
+    debug_log_parser("Leaving %s\n", __func__);
+}
+
+fn AST_node& parse_struct(parser: Parser&) {
+    debug_log_parser("Entering %s\n", __func__);
+
+    let ast_struct => ast_alloc(parser.allocator, AST_node::AST_struct, parser.CT.location);
+
+    if (parser.CT.kind == TokenKind::TOK_keyword_struct) {
+    }
+    else if (parser.CT.kind == TokenKind::TOK_keyword_record) {
+        ast_struct._struct.is_record = true;
+    }
+    else ASSERT(false, "Need to have struct or record here.\n");
+
+    MOVE_NEXT(parser);
+
+    expect_token(parser, TokenKind::TOK_identifier);
+    ast_struct._struct.name = parser.CT.value;
+    MOVE_NEXT(parser);
+
+    parse_struct_body(ast_struct);
+
+    debug_log_parser("Leaving %s\n", __func__);
+    return ast_struct;
+}
+
+
+fn AST_node& parse_union(parser: Parser&) {
+    debug_log_parser("Entering %s\n", __func__);
+
+    expect_token(parser, TokenKind::TOK_keyword_union);
+    let ast_union => ast_alloc(parser.allocator, AST_node::AST_union, parser.CT.location);
+    MOVE_NEXT(parser);
+
+    expect_token(parser, TokenKind::TOK_identifier);
+    ast_union._union.name = parser.CT.value;
+    MOVE_NEXT(parser);
+
+    if (parser.CT.kind == TokenKind::TOK_keyword_enum) {
+        MOVE_NEXT(parser);
+    
+        expect_token(parser, TokenKind::TOK_identifier);
+        ast_union._union.enumerator_name = parser.CT.value;
+        MOVE_NEXT(parser);
+    }
+
+    take_expected(parser, TokenKind::TOK_lbrace);
+
+    // Members
+    {
+        AST_node& latest => null;
+        int64_t latest_value = 0;
+
+        while (1) {
+            if (parser.CT.kind == TokenKind::TOK_rbrace) {
+                MOVE_NEXT(parser);
+                break;
+            }
+            else if(parser.CT.kind == TokenKind::TOK_keyword_struct) {
+                let member => ast_alloc(parser.allocator, AST_node::AST_union_member_def, parser.CT.location);
+                MOVE_NEXT(parser);
+
+                if (parser.CT.kind == TokenKind::TOK_identifier) {
+                    member.union_member_def.name = parser.CT.value;
+                    MOVE_NEXT(parser);
+                    if (parser.CT.kind == TokenKind::TOK_equal_assign) {
+                        MOVE_NEXT(parser);
+                        bool neg = parser.CT.kind == TokenKind::TOK_minus;
+                        if (neg) MOVE_NEXT(parser);
+                        expect_token(parser, TokenKind::TOK_number);
+                        latest_value = strtoul(parser.CT.value.begin, nullptr, 0);
+                        if (neg) latest_value = -latest_value;
+                        MOVE_NEXT(parser);
+                    }
+                    member.union_member_def.enum_value = latest_value++;
+
+                    let ast_struct => ast_alloc(parser.allocator, AST_node::AST_struct, parser.CT.location);
+                    ast_struct._struct.name = member.union_member_def.name;
+                    parse_struct_body(ast_struct);
+                    
+                    member.union_member_def._typedef => ast_struct;
+
+                    if (latest) {
+                        latest.next = member;
+                    } else {
+                        ast_union._union.body => member;
+                    }
+                    latest = member;
+
+                    if (parser.CT.kind == TokenKind::TOK_semicolon || parser.CT.kind == TokenKind::TOK_komma) {
+                        MOVE_NEXT(parser);
+                    }
+                }
+                else if (parser.CT.kind == TokenKind::TOK_lbrace) {
+                    let ast_struct => ast_alloc(parser.allocator, AST_node::AST_struct, parser.CT.location);
+                    parse_struct_body(ast_struct);
+                    
+                    member.union_member_def._typedef => ast_struct;
+
+                    if (latest) {
+                        latest.next = member;
+                    } else {
+                        ast_union._union.body => member;
+                    }
+                    latest = member;
+
+                    if (parser.CT.kind == TokenKind::TOK_semicolon || parser.CT.kind == TokenKind::TOK_komma) {
+                        MOVE_NEXT(parser);
+                    }
+                }
+                else NOT_IMPLEMENTED("not implemented yet.\n");
+            }
+            else {
+                parser_error(parser, "Expected '}' or union member definition but got {parser.CT.kind.name}",
+                    token_kind_name(parser.CT.kind));
+            }
+        }
+    }
+
+    debug_log_parser("Leaving %s\n", __func__);
+    return ast_union;
+}
+
+
+fn AST_node& parse_enum(parser: Parser&) {
+    debug_log_parser("Entering %s\n", __func__);
+
+    expect_token(parser, TokenKind::TOK_keyword_enum);
+    let ast_enum => ast_alloc(parser.allocator, AST_node::AST_enum, parser.CT.location);
+    MOVE_NEXT(parser);
+
+    expect_token(parser, TokenKind::TOK_identifier);
+    ast_enum._enum.name = parser.CT.value;
+    MOVE_NEXT(parser);
+
+    take_expected(parser, TokenKind::TOK_lbrace);
+
+    // Members
+    {
+        AST_node& latest => null;
+        int64_t latest_value = 0;
+
+        while (1) {
+            if (parser.CT.kind == TokenKind::TOK_rbrace) {
+                MOVE_NEXT(parser);
+                break;
+            }
+            else if(parser.CT.kind == TokenKind::TOK_identifier) {
+                let member => ast_alloc(parser.allocator, AST_node::AST_enum_member, parser.CT.location);
+                member._enum_member.name = parser.CT.value;
+                MOVE_NEXT(parser);
+                if (parser.CT.kind == TokenKind::TOK_equal_assign) {
+                    MOVE_NEXT(parser);
+                    bool neg = parser.CT.kind == TokenKind::TOK_minus;
+                    if (neg) MOVE_NEXT(parser);
+                    expect_token(parser, TokenKind::TOK_number);
+                    latest_value = strtoul(parser.CT.value.begin, nullptr, 0);
+                    if (neg) latest_value = -latest_value;
+                    MOVE_NEXT(parser);
+                }
+                member._enum_member.value = latest_value++;
+
+                if (latest) {
+                    latest.next = member;
+                } else {
+                    ast_enum._enum.body => member;
+                }
+                latest = member;
+
+                if (parser.CT.kind == TokenKind::TOK_semicolon || parser.CT.kind == TokenKind::TOK_komma) {
+                    MOVE_NEXT(parser);
+                }
+            }
+            else {
+                parser_error(parser, "Expected '}' or struct member definition but got {parser.CT.kind.name}",
+                    token_kind_name(parser.CT.kind));
+            }
+        }
+    }
+
+    debug_log_parser("Leaving %s\n", __func__);
+    return ast_enum;
+}
+
+*/
+
+fn parse_program(tokens: Token[], allocator: AST_Node_Allocator&) : AST_node& {
+    let parser: Parser;
+    parser.tokens = tokens;
+    parser.CT => tokens.begin;
+    parser.allocator => allocator;
+
+    let root => ast_alloc(parser.allocator, AST_node::AST_program, parser.CT.location);
+    let last: AST_node& => null;
+
+
+    while (parser.CT.kind != TokenKind::TOK_eof) {
+        /* if (parser.CT.kind == TokenKind::TOK_keyword_import) {
+            MOVE_NEXT(parser);
+            take_expected(parser, TokenKind::TOK_asterisk);
+            take_expected(parser, TokenKind::TOK_identifier); // from
+            expect_token(parser, TokenKind::TOK_string);
+            if (!resolve_import(parser.CT.value)) parser_error(parser, "Couldn't resolve import '%.*s'.\n", SV_prnt(parser.CT.value));
+            MOVE_NEXT(parser);
+            take_expected(parser, TokenKind::TOK_semicolon);
+        }
+        else */ if (parser.CT.kind == TokenKind::TOK_keyword_fn) {
+            let fun => parse_function(parser);
+            if (last) 
+                last.next => fun
+            else
+                root.AST_program.body => fun
+            last => fun;
+        }
+        /* else if (parser.CT.kind == TokenKind::TOK_keyword_struct || parser.CT.kind == TokenKind::TOK_keyword_record) {
+            let n => parse_struct();
+            if (last) 
+                last.next => n
+            else
+                root.AST_program.body => n
+            last => n;
+        }
+        else if (parser.CT.kind == TokenKind::TOK_keyword_union) {
+            let n => parse_union();
+            if (last) 
+                last.next => n
+            else
+                root.AST_program.body => n
+            last => n;
+        }
+        else if (parser.CT.kind == TokenKind::TOK_keyword_enum) {
+            let n => parse_enum();
+            if (last) 
+                last.next => n
+            else
+                root.AST_program.body => n
+            last => n;
+        }
+        */
+        else if (parser.CT.kind == TokenKind::TOK_eof) {
+        } else {
+            parser_error(parser, $"Expected top level definition or EOF but got {parser.CT.kind.name}");
+        }
+    }
+    return root;
+}

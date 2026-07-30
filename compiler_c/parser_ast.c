@@ -372,6 +372,11 @@ static AST_node *parse_primary()
         MOVE_NEXT();
         n->reference.body = parse_primary();
     }
+    else if (CT->kind == TOK_asterisk) {
+        n = ast_alloc(AST_dereference, CT->line_number);
+        MOVE_NEXT();
+        n->deref.body = parse_primary();
+    }
     else if (CT->kind == TOK_exclam || CT->kind == TOK_minus) {
         n = ast_alloc(AST_unary, CT->line_number);
         n->unary.token_kind = CT->kind;

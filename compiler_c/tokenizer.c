@@ -345,22 +345,6 @@ void tokenize_fsm (Tokenizer *tok) {
             sv_pop(code);  sv_pop(code);
             push_token(TOK_colon_colon, nullptr, tok->line_number);
         }
-        else if (':' == c) {
-            sv_pop(code);
-            push_token(TOK_colon, nullptr, tok->line_number);
-        }
-        else if (';' == c) {
-            sv_pop(code);
-            push_token(TOK_semicolon, nullptr, tok->line_number);
-        }
-        else if ('.' == c) {
-            sv_pop(code);
-            push_token(TOK_dot, nullptr, tok->line_number);
-        }
-        else if (',' == c) {
-            sv_pop(code);
-            push_token(TOK_komma, nullptr, tok->line_number);
-        }
         else if (sv_starts_with(code, "++")) {
             sv_pop(code);  sv_pop(code);
             push_token(TOK_plus_plus, nullptr, tok->line_number);
@@ -368,22 +352,6 @@ void tokenize_fsm (Tokenizer *tok) {
         else if (sv_starts_with(code, "--")) {
             sv_pop(code);  sv_pop(code);
             push_token(TOK_minus_minus, nullptr, tok->line_number);
-        }
-        else if ('+' == c) {
-            sv_pop(code);
-            push_token(TOK_plus, nullptr, tok->line_number);
-        }
-        else if ('-' == c) {
-            sv_pop(code);
-            push_token(TOK_minus, nullptr, tok->line_number);
-        }
-        else if ('*' == c) {
-            sv_pop(code);
-            push_token(TOK_asterisk, nullptr, tok->line_number);
-        }
-        else if ('^' == c) {
-            sv_pop(code);
-            push_token(TOK_up_arrow, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "//")) {
             while(code->len && *code->begin != '\n')
@@ -397,14 +365,6 @@ void tokenize_fsm (Tokenizer *tok) {
         }
         else if (sv_starts_with(code, "*/")) {
             tokenizer_error(tok->line_number, "Encountered '*/' outside of comment.\n");
-        }
-        else if ('/' == c) {
-            sv_pop(code);
-            push_token(TOK_slash, nullptr, tok->line_number);
-        }
-        else if ('%' == c) {
-            sv_pop(code);
-            push_token(TOK_percent, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "=>")) {
             sv_pop(code);  sv_pop(code);
@@ -441,6 +401,46 @@ void tokenize_fsm (Tokenizer *tok) {
         else if (sv_starts_with(code, "||")) {
             sv_pop(code);  sv_pop(code);
             push_token(TOK_boolean_or, nullptr, tok->line_number);
+        }
+        else if ('+' == c) {
+            sv_pop(code);
+            push_token(TOK_plus, nullptr, tok->line_number);
+        }
+        else if ('-' == c) {
+            sv_pop(code);
+            push_token(TOK_minus, nullptr, tok->line_number);
+        }
+        else if ('*' == c) {
+            sv_pop(code);
+            push_token(TOK_asterisk, nullptr, tok->line_number);
+        }
+        else if ('/' == c) {
+            sv_pop(code);
+            push_token(TOK_slash, nullptr, tok->line_number);
+        }
+        else if ('%' == c) {
+            sv_pop(code);
+            push_token(TOK_percent, nullptr, tok->line_number);
+        }
+        else if ('^' == c) {
+            sv_pop(code);
+            push_token(TOK_up_arrow, nullptr, tok->line_number);
+        }
+        else if (':' == c) {
+            sv_pop(code);
+            push_token(TOK_colon, nullptr, tok->line_number);
+        }
+        else if (';' == c) {
+            sv_pop(code);
+            push_token(TOK_semicolon, nullptr, tok->line_number);
+        }
+        else if ('.' == c) {
+            sv_pop(code);
+            push_token(TOK_dot, nullptr, tok->line_number);
+        }
+        else if (',' == c) {
+            sv_pop(code);
+            push_token(TOK_komma, nullptr, tok->line_number);
         }
         else if (c == '>') {
             sv_pop(code);

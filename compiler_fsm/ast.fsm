@@ -151,6 +151,10 @@ union AST_node enum kind {
         value: u8[];
     }
 
+    struct AST_char_constant {
+        value: u8[];
+    }
+
     struct AST_if {
         condition: AST_node&;
         if_clause: AST_node&;
@@ -205,6 +209,18 @@ union AST_node enum kind {
         name: u8[];
     }
 
+    struct AST_union {
+        body: AST_node&;
+        name: u8[];
+        enumerator_name: u8[];
+    }
+
+    struct AST_union_member_def {
+        _typedef: AST_node&;
+        name: u8[];
+        enum_value;
+    }
+
     struct AST_member_access {
         body: AST_node&;
         name: u8[];
@@ -254,10 +270,13 @@ union AST_node enum kind {
         var_decl_arr: AST_node&;
         body: AST_node&;
     }
+
+    struct AST_null {
+    }
 }
 
 struct AST_Node_Allocator {
-    buf: AST_node[1000];
+    buf: AST_node[5000];
     alloc: AST_node[];
 }
 
@@ -289,16 +308,14 @@ fn ast_count_chain(n: AST_node&) : i64 {
     return num;
 }
 
-/*
 fn ast_link_to_chain(chain_p: AST_node& &, n: AST_node&) : void {
     if (!*chain_p) {
-        *chain_p = n;
+        *chain_p => n;
     }
     else {
-        get_last_in_chain(*chain_p).next = n;
+        get_last_in_chain(*chain_p).next => n;
     }
 }
-*/
 
 fn slicecopy(target: u8[], source: u8[]) {
     while (target.len && source.len) {
@@ -354,319 +371,315 @@ fn ast_remove_node(n: AST_node&) : void {
     n.next = saved_next;
 }
 
-void ast_visit_chain(n: AST_node&, void (*visit)(AST_node *, void *arg), void *arg) {
+*/
+
+fn ast_visit_chain(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&) {
     while (n) {
         visit(n, arg);
-        n = n.next;
+        n => n.next;
     }
 }
 
-void visit_non_null(n: AST_node&, void (*visit)(AST_node *, void *arg), void *arg) {
+fn visit_non_null(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&) {
     if (n) visit(n, arg);
 }
 
-void ast_visit_children(n: AST_node&, void (*visit)(AST_node *, void *arg), void *arg)
+fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
 {
-    switch (n.kind) {
-        case AST_program:
-            ast_visit_chain(n.program.body, visit, arg);
-            break;
-        case AST_scope:
-            ast_visit_chain(n.scope.body, visit, arg);
-            break;
-        case AST_arg_list:
-            ast_visit_chain(n.arg_list.body, visit, arg);
-            break;
-        case AST_function:
-            visit_non_null(n.fun.args, visit, arg);
-            visit_non_null(n.fun.ret_typedecl, visit, arg);
-            ast_visit_chain(n.fun.body, visit, arg);            
-            break;
-        case AST_return:
-            visit_non_null(n.ret.body, visit, arg);
-            break;
-        case AST_var_decl:
-            visit_non_null(n.var_decl._typedecl, visit, arg);
-            visit_non_null(n.var_decl.initializer, visit, arg);
-            break;
-        case AST_arg_decl:
-            visit_non_null(n.arg_decl._typedecl, visit, arg);
-            break;
-        case AST_if:
-            visit_non_null(n._if.condition, visit, arg);
-            visit_non_null(n._if.if_clause, visit, arg);
-            visit_non_null(n._if.else_clause, visit, arg);
-            break;
-        case AST_while:
-            visit_non_null(n._while.condition, visit, arg);
-            visit_non_null(n._while.body, visit, arg);
-            break;
-        case AST_for:
-            visit_non_null(n._for.initializer, visit, arg);
-            visit_non_null(n._for.condition, visit, arg);
-            visit_non_null(n._for.post_action, visit, arg);
-            visit_non_null(n._for.body, visit, arg);
-            visit_non_null(n._for.result, visit, arg);
-            break;
-        case AST_binary:
-            visit_non_null(n.binary.left, visit, arg);
-            visit_non_null(n.binary.right, visit, arg);
-            break;
-        case AST_unary:
-            visit_non_null(n.unary.body, visit, arg);
-            break;
-        case AST_call:
-            visit_non_null(n.call.target, visit, arg);
-            ast_visit_chain(n.call.args, visit, arg);
-            break;
-        case AST_cast:
-            visit_non_null(n.AST_cast.body, visit, arg);
-            break;
-        case AST_array_to_slice:
-            visit_non_null(n._array_to_slice.body, visit, arg);
-            break;
-        case AST_array_access:
-            visit_non_null(n._array.array, visit, arg);
-            visit_non_null(n._array.index, visit, arg);
-            break;
-        case AST_dereference:
-            visit_non_null(n.deref.body, visit, arg);
-            break;
-        case AST_reference:
-            visit_non_null(n.reference.body, visit, arg);
-            break;
-        case AST_plus_plus:
-            visit_non_null(n.plus_plus.body, visit, arg);
-            break;
-        case AST_minus_minus:
-            visit_non_null(n.minus_minus.body, visit, arg);
-            break;
-        case AST_struct:
-            ast_visit_chain(n._struct.body, visit, arg);
-            break;
-        case AST_enum:
-            ast_visit_chain(n._enum.body, visit, arg);
-            break;
-        case AST_union:
-            ast_visit_chain(n._union.body, visit, arg);
-            break;
-        case AST_member_def:
-            visit_non_null(n.struct_member_def._typedef, visit, arg);
-            break;
-        case AST_union_member_def:
-            visit_non_null(n.union_member_def._typedef, visit, arg);
-            break;
-        case AST_member_access:
-            visit_non_null(n.member_access.body, visit, arg);
-            break;
-        case AST_namespace_access:
-            visit_non_null(n.namespace_access.body, visit, arg);
-            break;
-        case AST_typename:
-            break;
-        case AST_type_ref:
-            visit_non_null(n._type_ref.body, visit, arg);
-            break;
-        case AST_type_array:
-            visit_non_null(n._type_array.body, visit, arg);
-            break;
-        case AST_type_slice:
-            visit_non_null(n._type_slice.body, visit, arg);
-            break;
-        case AST_variadic_operator:
-            visit_non_null(n.variadic_operator.left, visit, arg);
-            for (int i = 0; i < n.variadic_operator.num_members; i++) {
-                visit_non_null(n.variadic_operator.members[i].right, visit, arg);
-            }
-            break;
-        case AST_builder_string:
-            visit_non_null(n.builder_string.var_decl_sb, visit, arg);
-            visit_non_null(n.builder_string.var_decl_arr, visit, arg);
-            ast_visit_chain(n.builder_string.body, visit, arg);
-            break;
-        case AST_function_type:
-            ast_visit_chain(n._function_type.function_args, visit, arg);
-            visit_non_null(n._function_type.function_ret, visit, arg);
-            break;
-
-        case AST_enum_member:
-        case AST_symbol:
-        case AST_number:
-        case AST_bool:
-        case AST_null:
-        case AST_string:
-        case AST_char_constant:
-        case AST_array_len:
-            break;
-
-        default:
-            NOT_IMPLEMENTED("Visiting %s is not implemented yet.\n", ast_kind_name(n.kind));
-            break;
+    if (n.kind == AST_node::AST_program) {
+        ast_visit_chain(n.AST_program.body, visit, arg);
     }
-}
-
-
-static void print_symbol(Symbol *s) {
-    if(!s)
-        printf("(null symbol)");
-    else
-        printf("(%s '%.*s')", symbol_kind_name(s.kind), SV_prnt(s.name));
-}
-
-static void ast_dump_visitor (n: AST_node&, uint64_t spaces) {
-    const char *spc = "                                                              " // Yeah, these are my spaces
-                      "                                                              ";
-
-    const char *kind_name = ast_kind_name(n.kind);
-
-    char buf[1024];
-
-    switch (n.kind) {
-        case AST_program:
-        case AST_scope:
-        case AST_arg_list:
-        case AST_return:
-        case AST_while:
-        case AST_for:
-            printf("%.*s%s \n", (int)spaces, spc, kind_name);
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_builder_string:
-        case AST_type_ref:
-        case AST_type_array:
-        case AST_type_slice:
-        case AST_dereference:
-        case AST_reference:
-        case AST_plus_plus:
-        case AST_minus_minus:
-        case AST_array_access:
-        case AST_array_len:
-        case AST_array_to_slice:
-        case AST_function_type:
-        case AST_null:
-            printf("%.*s%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_struct:
-            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n._struct.name), get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_member_def:
-            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n.struct_member_def.name), get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_member_access:
-            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n.member_access.name), get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_enum:
-            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n._enum.name), get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_enum_member:
-            printf("%.*s%s '%.*s' %ld (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n._enum_member.name), n._enum_member.value, get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_union:
-            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n._union.name), get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_union_member_def:
-            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n.union_member_def.name), get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_namespace_access:
-            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n.namespace_access.name), get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_typename:
-            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n._typename.name), get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_function:
-            printf("%.*s%s '%.*s', (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n.fun.name), get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_var_decl:
-            printf("%.*s%s '%.*s' ", (int)spaces, spc, kind_name, SV_prnt(n.var_decl.name));
-            print_symbol(n.var_decl.symbol);
-            printf("\n");
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_arg_decl:
-            printf("%.*s%s '%.*s' ", (int)spaces, spc, kind_name, SV_prnt(n.arg_decl.name));
-            print_symbol(n.arg_decl.symbol);
-            printf("\n");
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_number:
-            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n.number.value), get_type_name_r(buf, n.type));
-            break;
-        case AST_bool:
-            printf("%.*s%s '%d' (%s)\n", (int)spaces, spc, kind_name, n.boolean.value, get_type_name_r(buf, n.type));
-            break;
-        case AST_string:
-        case AST_char_constant:
-            printf("%.*s%s \"%.*s\" (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n.str.value), get_type_name_r(buf, n.type));
-            break;
-        case AST_if:
-            printf("%.*s%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf, n.type));
-            if (n._if.condition) {
-                printf("%.*s  Condition:\n", (int)spaces, spc);
-                ast_dump_visitor(n._if.condition, spaces + 4);
-            }
-            if (n._if.if_clause) {
-                printf("%.*s  If clause:\n", (int)spaces, spc);
-                ast_dump_visitor(n._if.if_clause, spaces + 4);
-            }
-            if (n._if.else_clause) {
-                printf("%.*s  Else clause:\n", (int)spaces, spc);
-                ast_dump_visitor(n._if.else_clause, spaces + 4);
-            }
-            break;
-        case AST_binary:
-            printf("%.*s%s %s (%s)\n", (int)spaces, spc, kind_name, token_kind_name(n.binary.token_kind), get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_unary:
-            printf("%.*s%s %s (%s)\n", (int)spaces, spc, kind_name, token_kind_name(n.unary.token_kind), get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_variadic_operator:
-            printf("%.*s%s %s (%s)\n", (int)spaces, spc, kind_name, token_kind_name(n.variadic_operator.members[0].token_kind), get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_symbol:
-            printf("%.*s%s '%.*s' ", (int)spaces, spc, kind_name, SV_prnt(n.symbol.name));
-            print_symbol(n.symbol.symbol);
-            printf(" (%s)\n", get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_call:
-            printf("%.*s%s ", (int)spaces, spc, kind_name);
-            printf("(%s)\n", get_type_name_r(buf, n.type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
-        case AST_cast: {
-            char buf_1[1024], buf_2[1024];
-            printf("%.*s%s '%s' <- '%s'\n", (int)spaces, spc, kind_name,
-                get_type_name_r(buf_1, n.type),
-                get_type_name_r(buf_2, n.AST_cast.right_type));
-            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
-            break;
+    else if (n.kind == AST_node::AST_scope) {
+        ast_visit_chain(n.AST_scope.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_arg_list) {
+        ast_visit_chain(n.AST_arg_list.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_function) {
+        visit_non_null(n.AST_function.args, visit, arg);
+        visit_non_null(n.AST_function.ret_typedecl, visit, arg);
+        ast_visit_chain(n.AST_function.body, visit, arg);            
+    }
+    else if (n.kind == AST_node::AST_return) {
+        visit_non_null(n.AST_return.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_var_decl) {
+        visit_non_null(n.AST_var_decl._typedecl, visit, arg);
+        visit_non_null(n.AST_var_decl.initializer, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_arg_decl) {
+        visit_non_null(n.AST_arg_decl._typedecl, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_if) {
+        visit_non_null(n.AST_if.condition, visit, arg);
+        visit_non_null(n.AST_if.if_clause, visit, arg);
+        visit_non_null(n.AST_if.else_clause, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_while) {
+        visit_non_null(n.AST_while.condition, visit, arg);
+        visit_non_null(n.AST_while.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_for) {
+        visit_non_null(n.AST_for.initializer, visit, arg);
+        visit_non_null(n.AST_for.condition, visit, arg);
+        visit_non_null(n.AST_for.post_action, visit, arg);
+        visit_non_null(n.AST_for.body, visit, arg);
+        visit_non_null(n.AST_for.result, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_binary) {
+        visit_non_null(n.AST_binary.left, visit, arg);
+        visit_non_null(n.AST_binary.right, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_unary) {
+        visit_non_null(n.AST_unary.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_call) {
+        visit_non_null(n.AST_call.target, visit, arg);
+        ast_visit_chain(n.AST_call.args, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_cast) {
+        visit_non_null(n.AST_cast.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_array_access) {
+        visit_non_null(n.AST_array_access.array, visit, arg);
+        visit_non_null(n.AST_array_access.index, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_dereference) {
+        visit_non_null(n.AST_dereference.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_reference) {
+        visit_non_null(n.AST_reference.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_plus_plus) {
+        visit_non_null(n.AST_plus_plus.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_minus_minus) {
+        visit_non_null(n.AST_minus_minus.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_struct) {
+        ast_visit_chain(n.AST_struct.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_enum) {
+        ast_visit_chain(n.AST_enum.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_union) {
+        ast_visit_chain(n.AST_union.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_member_def) {
+        visit_non_null(n.AST_member_def._typedef, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_union_member_def) {
+        visit_non_null(n.AST_union_member_def._typedef, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_member_access) {
+        visit_non_null(n.AST_member_access.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_namespace_access) {
+        visit_non_null(n.AST_namespace_access.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_type_ref) {
+        visit_non_null(n.AST_type_ref.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_type_array) {
+        visit_non_null(n.AST_type_array.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_type_slice) {
+        visit_non_null(n.AST_type_slice.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_variadic_operator) {
+        visit_non_null(n.AST_variadic_operator.left, visit, arg);
+        for (let i = 0; i < n.AST_variadic_operator.num_members; i++) {
+            visit_non_null(n.AST_variadic_operator.members[i].right, visit, arg);
         }
-        default:
-            NOT_IMPLEMENTED("Dumping %s is not implemented yet.\n", ast_kind_name(n.kind));
-            break;
+    }
+    else if (n.kind == AST_node::AST_builder_string) {
+        visit_non_null(n.AST_builder_string.var_decl_sb, visit, arg);
+        visit_non_null(n.AST_builder_string.var_decl_arr, visit, arg);
+        ast_visit_chain(n.AST_builder_string.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_function_type) {
+        ast_visit_chain(n.AST_function_type.function_args, visit, arg);
+        visit_non_null(n.AST_function_type.function_ret, visit, arg);
+    }
+    else if (n.kind  == AST_node::AST_enum_member
+                    |== AST_node::AST_symbol
+                    |== AST_node::AST_number
+                    |== AST_node::AST_bool
+                    |== AST_node::AST_null
+                    |== AST_node::AST_string
+                    |== AST_node::AST_char_constant
+                    |== AST_node::AST_array_len
+                    |== AST_node::AST_typename
+    ) {
+        // no child nodes to visit
+    }
+    else {
+        NOT_IMPLEMENTED($"Visiting {n.kind.name} is not implemented yet.\n");
     }
 }
 
-void ast_dump_tree (AST_node *root) {
+fn print_symbol(s: Symbol&) : void {
+    if(!s)
+        $"(null symbol)"
+    else
+        $"({s.kind.name} '{s.name}')"
+}
+
+fn get_type_name(t: Type&) {
+    return "";
+}
+
+fn ast_dump_visitor (n: AST_node&, spaces: i64&) : void {
+     // Yeah, these are my spaces
+    let spc = "                                                                                                        ";
+    spc.len = spaces;
+    let child_spaces = spaces + 4;
+
+    if (n.kind == AST_node::AST_program
+              |== AST_node::AST_scope
+              |== AST_node::AST_arg_list
+              |== AST_node::AST_return
+              |== AST_node::AST_while
+              |== AST_node::AST_for)
+    {
+        $"{spc}{n.kind.name} \n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_builder_string
+                   |== AST_node::AST_type_ref
+                   |== AST_node::AST_type_array
+                   |== AST_node::AST_type_slice
+                   |== AST_node::AST_dereference
+                   |== AST_node::AST_reference
+                   |== AST_node::AST_plus_plus
+                   |== AST_node::AST_minus_minus
+                   |== AST_node::AST_array_access
+                   |== AST_node::AST_array_len
+                   |== AST_node::AST_array_to_slice
+                   |== AST_node::AST_function_type
+                   |== AST_node::AST_null)
+    {
+        $"{spc}{n.kind.name} ({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_struct) {
+        $"{spc}{n.kind.name} '{n.AST_struct.name}' ({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_member_def) {
+        $"{spc}{n.kind.name} '{n.AST_member_def.name}' ({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_member_access) {
+        $"{spc}{n.kind.name} '{n.AST_member_access.name}' ({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_enum) {
+        $"{spc}{n.kind.name} '{n.AST_enum.name}' ({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_enum_member) {
+        $"{spc}{n.kind.name} '{n.AST_enum_member.name}' {n.AST_enum_member.value} ({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_union) {
+        $"{spc}{n.kind.name} '{n.AST_union.name}' ({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_union_member_def) {
+        $"{spc}{n.kind.name} '{n.AST_union_member_def.name}' ({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_namespace_access) {
+        $"{spc}{n.kind.name} '{n.AST_namespace_access.name}' ({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_typename) {
+        $"{spc}{n.kind.name} '{n.AST_typename.name}' ({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_function) {
+        $"{spc}{n.kind.name} '{n.AST_function.name}', ({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_var_decl) {
+        $"{spc}{n.kind.name} '{n.AST_var_decl.name}' ";
+        print_symbol(n.AST_var_decl.symbol);
+        $"\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_arg_decl) {
+        $"{spc}{n.kind.name} '{n.AST_arg_decl.name}' ";
+        print_symbol(n.AST_arg_decl.symbol);
+        $"\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_number) {
+        $"{spc}{n.kind.name} '{n.AST_number}' ({get_type_name(n.type)})\n";
+    }
+    else if (n.kind == AST_node::AST_bool) {
+        $"{spc}{n.kind.name} '{n.AST_bool.value}' ({get_type_name(n.type)})\n";
+    }
+    else if (n.kind == AST_node::AST_string) {
+        $"{spc}{n.kind.name} \"{n.AST_string.value}\" ({get_type_name(n.type)})\n";
+    }
+    else if (n.kind == AST_node::AST_char_constant) {
+        $"{spc}{n.kind.name} \"{n.AST_char_constant.value}\" ({get_type_name(n.type)})\n";
+    }
+    else if (n.kind == AST_node::AST_if) {
+        $"{spc}{n.kind.name} ({get_type_name(n.type)})\n";
+        if (n.AST_if.condition) {
+            $"{spc}  Condition:\n";
+            ast_dump_visitor(n.AST_if.condition, child_spaces);
+        }
+        if (n.AST_if.if_clause) {
+            $"{spc}  If clause:\n";
+            ast_dump_visitor(n.AST_if.if_clause, child_spaces);
+        }
+        if (n.AST_if.else_clause) {
+            $"{spc}  Else clause:\n";
+            ast_dump_visitor(n.AST_if.else_clause, child_spaces);
+        }
+    }
+    else if (n.kind == AST_node::AST_binary) {
+        $"{spc}{n.kind.name} {n.AST_binary.token_kind.name} ({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_unary) {
+        $"{spc}{n.kind.name} {n.AST_unary.token_kind.name} ({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_variadic_operator) {
+        $"{spc}{n.kind.name} {n.AST_variadic_operator.members[0].token_kind.name} ({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_symbol) {
+        $"{spc}{n.kind.name} '{n.AST_symbol.name}' ";
+        print_symbol(n.AST_symbol.symbol);
+        $" ({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_call) {
+        $"{spc}{n.kind.name} ";
+        $"({get_type_name(n.type)})\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_cast) {
+        $"{spc}{n.kind.name} '{get_type_name(n.type)}' <- '{get_type_name(n.AST_cast.right_type)}'\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else {
+        NOT_IMPLEMENTED($"Dumping {n.kind.name} is not implemented yet.\n");
+    }
+}
+
+fn ast_dump_tree (root: AST_node&) {
     if (!root) {
-        printf("ast_dump_tree: 'null' root node\n");
+        $"ast_dump_tree: 'null' root node\n";
         return;
     }
 
-    ast_dump_visitor(root, 0);
+    let num_spaces = 0;
+
+    ast_dump_visitor(root, num_spaces);
 }
-*/

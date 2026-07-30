@@ -62,7 +62,9 @@ int main (int argc, char **argv) {
     ast_to_il_init();
     
     for (int i = 0; i < modules.count; i++) {
-        ast_to_il(((Module*)modules.data)[i].ast);
+        Module *module = &((Module*)modules.data)[i];
+        current_filename = module->filename;
+        ast_to_il(module->ast);
     }
     
     if (debug_opcodes)

@@ -17,6 +17,7 @@ struct AST_node_s;
 typedef struct {
     Dyn_array tokens_dyn;
     struct AST_node_s *ast;
+    char filename[1024];
 } Module;
 
 extern Module *current_module;

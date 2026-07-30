@@ -1,0 +1,23 @@
+
+import * from "compiler_fsm/parser";
+
+
+fn main () {
+    let tokenizer: Tokenizer;
+
+    tokenizer.code = read_file ("foo.fsm");
+    tokenizer.location.line = 1;
+
+    tokenize_fsm(tokenizer);
+    dump_tokens(tokenizer);
+
+    let tokens: Token[] = tokenizer.tokens;
+    tokens.len = tokenizer.num_tokens;
+
+    let allocator: AST_Node_Allocator;
+    allocator.alloc = allocator.buf;
+
+    let root => parse_program(tokens, allocator)
+
+    ast_dump_tree(root);
+}

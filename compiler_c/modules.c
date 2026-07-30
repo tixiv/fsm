@@ -60,6 +60,8 @@ const char *debug_ast;
 
 void compile_module(const char *filename) {
     current_module = dyn_array_push(&modules);
+    memset(current_module->filename, 0,1024);
+    strncpy(current_module->filename, filename, 1023);
 
     current_filename = filename;
     SV input;

@@ -372,7 +372,6 @@ void calculate_storage_size(Type *container) {
 
         }
         container->storage_size = offset + max_member_size;
-        printf("Size %lu\n", container->storage_size);
 
     }
     else NOT_IMPLEMENTED("calculate_storage_size() for %s is not implemented.\n", get_type_name_r(buf, container));

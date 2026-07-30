@@ -15,7 +15,7 @@ static void il_gen_error(int line_number, const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "[FSM IL Gen] Line %d Error: ", line_number);
+    fprintf(stderr, "[FSM IL Gen] %s:%d Error: ", current_filename, line_number);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
 
@@ -27,7 +27,7 @@ static void il_gen_warning(int line_number, const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "[FSM IL Gen] Line %d Warning: ", line_number);
+    fprintf(stderr, "[FSM IL Gen] %s:%d Warning: ", current_filename, line_number);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
 
@@ -542,10 +542,13 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             push_opcode(OP_push_char_literal, &n->str.value, 0);
             break;
 
-        case AST_dereference:
+        case AST_dereference: {
+            size_t size = get_storage_size(n->type);
+            if (size > 16) il_gen_error(n->line_number, "Can't dereference something with storage size > 16. Have %lu.", size);
             ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
-            push_opcode_sz(OP_load, nullptr, 0, get_storage_size(n->type));
+            push_opcode_sz(OP_load, nullptr, 0, size);
             break;
+        }
 
         case AST_reference:
             ast_visit_children(n, (AstVisitor)gen_address_visitor, gen);

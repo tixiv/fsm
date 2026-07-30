@@ -1,50 +1,60 @@
 
 import * from "std";
 
-enum NodeKind {
+enum OperatorKind {
     Add,
-    Sub,
-    Mul,
-    Div,
-    Number,
 }
 
-struct TreeNode {
-    kind: NodeKind;
-    value: i64;
-    left: TreeNode&;
-    right: TreeNode&;
+union TreeNode enum kind {
+    struct {
+        value: i64;
+    }
+
+    struct Number {
+        num_value: i64;
+    }
+
+    struct BinaryOperator {
+        left: TreeNode&;
+        right: TreeNode&;
+    }
 }
 
 fn init_number (n: TreeNode&, v) {
-    n.kind = NodeKind::Number;
-    n.value = v;
+    n.kind = TreeNode::Number;
+    n.Number.num_value = v;
 }
 
-fn init_operator (n: TreeNode&, kind: NodeKind, left: TreeNode&, right: TreeNode&) {
-    n.kind = kind
-    n.left => left;
-    n.right => right;
+fn init_operator (n: TreeNode&, op: OperatorKind, left: TreeNode&, right: TreeNode&) {
+    n.kind = TreeNode::BinaryOperator;
+    n.BinaryOperator.left => left;
+    n.BinaryOperator.right => right;
 }
 
-fn visit_children (n: TreeNode&, visit: fn (TreeNode&) : void ) {
-    if (n.kind == NodeKind::Add |== NodeKind::Sub |== NodeKind::Mul |== NodeKind::Div) {
-        visit(n.left)
-        visit(n.right)
+fn visit_children (n: TreeNode&, visit: fn (TreeNode&, any&) : void, arg: any&) {
+    if (n.kind == TreeNode::BinaryOperator) {
+        visit(n.BinaryOperator.left, arg)
+        visit(n.BinaryOperator.right, arg)
     }
-    else if (n.kind == NodeKind::Number)
-    {}
+    else if (n.kind == TreeNode::Number)
+    {
+    }
     else $"Visiting {n.kind.name} is not implemented yet.\n"
 }
 
-fn tree_visitor(n: TreeNode&) : void {
-    if (n.kind == NodeKind::Add) {
-        visit_children(n, tree_visitor)
-        let a = n.left.value
-        let b = n.right.value
+fn tree_visitor(n: TreeNode&, foo: i64&) : void {
+    // $"level: {foo}\n"
+    if (n.kind == TreeNode::BinaryOperator) {
+        // $"Binary\n"
+        let f = foo + 1;
+        visit_children(n, tree_visitor, f)
+        let a = n.BinaryOperator.left.value
+        let b = n.BinaryOperator.right.value
         n.value = a + b
         $"+\n={n.value}\n"
     } else {
+        // $"Number\n"
+        n.value = n.Number.num_value;
         print (n.value)
     }
 }
@@ -57,9 +67,10 @@ fn main () {
     let c: TreeNode;
     init_number(&c, 13370000);
     let add_1: TreeNode;
-    init_operator(&add_1, NodeKind::Add, &a, &b);
+    init_operator(&add_1, OperatorKind::Add, &a, &b);
     let add_2: TreeNode;
-    init_operator(&add_2, NodeKind::Add, &add_1, &c);
+    init_operator(&add_2, OperatorKind::Add, &add_1, &c);
 
-    tree_visitor(&add_2)
+    let f = 0;
+    tree_visitor(&add_2, f)
 }
