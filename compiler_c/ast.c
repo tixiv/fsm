@@ -243,6 +243,10 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             ast_visit_chain(n->_function_type.function_args, visit, arg);
             visit_non_null(n->_function_type.function_ret, visit, arg);
             break;
+        case AST_user_cast:
+            visit_non_null(n->user_cast.typedecl, visit, arg);
+            visit_non_null(n->user_cast.body, visit, arg);
+            break;
 
         case AST_enum_member:
         case AST_symbol:

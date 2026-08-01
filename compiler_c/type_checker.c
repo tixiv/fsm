@@ -617,6 +617,11 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             n->addressable = n->_cast.body->addressable;
             break;
 
+        case AST_user_cast:
+            n->type = n->user_cast.typedecl->type;
+            n->addressable = n->_cast.body->addressable;
+            break;
+
         case AST_return:
             ASSERT(prop->current_function_symbol, "Encountered 'return' without active function symbol\n")
             Type *ret_type;
@@ -754,8 +759,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             Type * original_type = n->plus_plus.body->type;
             auto_dereference(n->plus_plus.body);
             if (is_slice_type(n->plus_plus.body->type)) {
-                if (n->result_used) type_checker_error(n->line_number, "Operator '++' on slice type argument has no value which can be used.\n");
-                n->type = &builtin_void;
+                n->type = n->plus_plus.body->type->_struct.members[0].type;
             }
             else if (is_integer_kind(n->plus_plus.body->type)) {
                 n->type = n->plus_plus.body->type;
@@ -782,6 +786,14 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
         case AST_member_access: {
             ASSERT(n->member_access.body->type, "Unresolved type encountered in member access.\n");
             Type *container = n->member_access.body->type;
+            if (sv_compare_cstr(&n->member_access.name, "sizeof")) {
+                n->kind = AST_array_len;
+                n->array_len.len = container->storage_size;
+                n->addressable = false;
+                n->type = &builtin_i64;
+                break;
+            }
+
             if (is_reference_kind(container)) container = dereferenced_type(container);
             
             if (is_struct_kind(container) || is_record_kind(container) || is_union_kind(container)) {

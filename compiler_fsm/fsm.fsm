@@ -1,5 +1,6 @@
 
 import * from "compiler_fsm/parser";
+import * from "compiler_fsm/il_gen";
 
 
 fn main () {
@@ -15,9 +16,12 @@ fn main () {
     tokens.len = tokenizer.num_tokens;
 
     let allocator: AST_Node_Allocator;
-    allocator.alloc = allocator.buf;
+    AST_Node_Allocator_init(allocator);
 
     let root => parse_program(tokens, allocator)
 
     ast_dump_tree(root);
+
+    run_il_gen(root);
+
 }

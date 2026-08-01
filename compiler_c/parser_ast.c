@@ -405,6 +405,13 @@ static AST_node *parse_primary()
         MOVE_NEXT();
         n->minus_minus.body = parse_primary();
     }
+    else if (CT->kind == TOK_lower) {
+        n = ast_alloc(AST_user_cast, CT->line_number);
+        MOVE_NEXT();
+        n->user_cast.typedecl = parse_typedecl();
+        take_expected(TOK_greater);
+        n->user_cast.body = parse_primary();
+    }
     else if (CT->kind == TOK_identifier) {
         n = ast_alloc(AST_symbol, CT->line_number);
         n->symbol.name = CT->value;

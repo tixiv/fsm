@@ -15,6 +15,9 @@ fn open (filename: u8[], flags) {
 fn read_file (filename: u8[]) : u8[]
 {
     let O_RDONLY = 0
+    let PROT_READ = 0x1
+    let MAP_PRIVATE = 0x02
+
     let fd = open (filename, O_RDONLY)
 
     let s: u8[];
@@ -25,7 +28,7 @@ fn read_file (filename: u8[]) : u8[]
 
         let size = fsize(fd)
         
-        s.begin => mmap(size, fd)
+        s.begin => mmap(null, size, PROT_READ, MAP_PRIVATE, fd, 0)
         s.len = size;
 
         puts("Read bytes: ") print(s.len)
@@ -37,6 +40,14 @@ fn read_file (filename: u8[]) : u8[]
     }
 
     return s;
+}
+
+fn mmap_anonymous(reserve_size) : any & {
+    let PROT_READ = 0x1;
+    let PROT_WRITE = 0x2;
+    let MAP_PRIVATE = 0x02;
+    let MAP_ANONYMOUS = 0x20;
+    return mmap(null, reserve_size, bitor(PROT_READ, PROT_WRITE), bitor(MAP_PRIVATE, MAP_ANONYMOUS), -1, 0);
 }
 
 fn is_whitespace(c: i32) { return c == ' ' ||  c == '\t' || c == '\r' }
@@ -194,4 +205,9 @@ fn sb_puti(sb: StringBuilder&, num) {
             sb_putc(sb, digit + '0')
         }
     }
+}
+
+fn NOT_IMPLEMENTED(location: u8[], what:u8[]) {
+    $"{location}: {what} is not implemented yet.\n"
+    exit(1);
 }

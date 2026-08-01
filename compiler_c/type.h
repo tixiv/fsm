@@ -61,11 +61,6 @@ typedef struct Type_s {
         } _array;
 
         struct {
-            struct Type_s *element_type;
-            size_t capacity;
-        } slice;
-
-        struct {
             int num_arguments;
             struct Type_s **argument_types;
             struct Type_s *return_type;

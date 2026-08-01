@@ -53,6 +53,7 @@ typedef struct {
     X(AST_while) \
     X(AST_for) \
     X(AST_cast) \
+    X(AST_user_cast) \
     X(AST_array_access) \
     X(AST_array_len) \
     X(AST_dereference) \
@@ -192,6 +193,11 @@ typedef struct AST_node_s {
             struct AST_node_s *body;
             Type *right_type; // the left type is the type of the AST node
         } _cast;
+
+        struct {
+            struct AST_node_s *body;
+            struct AST_node_s *typedecl; // target type decl
+        } user_cast;
 
         struct {
             struct AST_node_s *body;

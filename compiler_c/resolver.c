@@ -61,11 +61,12 @@ void init_builtin_functions() {
     declare_builtin_fn(mkSV("socket"), &builtin_i64, 3, (Type*[]){&builtin_i64, &builtin_i64, &builtin_i64});
     declare_builtin_fn(mkSV("connect"), &builtin_i64, 2, (Type*[]){&builtin_i64, &builtin_u8_slice});
 
+    // mmap(addr: any&, lenght: i64, prot: u64, flags: u64, fd: i64, offset: i64) : any &
+    declare_builtin_fn(mkSV("mmap"), get_ref_type_for(&builtin_any), 6, (Type*[]){get_ref_type_for(&builtin_any), &builtin_i64, &builtin_u64, &builtin_u64, &builtin_i64, &builtin_i64});
 
     declare_builtin_fn(mkSV("print"), &builtin_void, 1, (Type*[]){&builtin_i64});
     declare_builtin_fn(mkSV("putc"), &builtin_void, 1, (Type*[]){&builtin_u8});
     declare_builtin_fn(mkSV("puts"), &builtin_void, 1, (Type*[]){&builtin_u8_slice});
-    declare_builtin_fn(mkSV("mmap"), &builtin_u8_reference, 2, (Type*[]){&builtin_i64, &builtin_i64});// mmap(lenght: i64, fd: i64) : u8 &
     declare_builtin_fn(mkSV("fsize"), &builtin_i64, 1, (Type*[]){&builtin_i64});// fsize(fd: i64) : i64
 
     // TODO: These should act like operators actually, and not like builtin functions, because we can then better handle different types of arguments
@@ -214,6 +215,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_type_array:
         case AST_type_slice:
         case AST_builder_string:
+        case AST_user_cast:
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             break;
 

@@ -128,14 +128,17 @@ fn_connect: ; connect (fd: i64, addr: u8[]) : i64
     syscall
     ret
 
-fn_mmap: ; mmap(lenght: i64, fd: i64) : u8 &
+          ;mmap(lenght: i64, fd: i64) : u8 &
+   
+
+fn_mmap: ; mmap(addr: any&, lenght: i64, prot: u64, flags: u64, fd: i64, offset: i64) : any &
    mov     rax, SYS_MMAP
-   xor     rdi, rdi          ; addr = NULL
-   mov     rsi, [rsp+16]     ; length
-   mov     rdx, PROT_READ
-   mov     r10, MAP_PRIVATE
-   mov     r8,  [rsp+8]      ; fd
-   xor     r9, r9            ; offset = 0
+   mov     rdi, [rsp+48]     ; addr
+   mov     rsi, [rsp+40]     ; length
+   mov     rdx, [rsp+32]     ; prot
+   mov     r10, [rsp+24]     ; flags
+   mov     r8,  [rsp+16]     ; fd
+   mov     r9,  [rsp+8]      ; offset
    syscall
    ret
 

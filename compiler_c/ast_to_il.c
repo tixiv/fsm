@@ -225,11 +225,20 @@ static void gen_variadic_operators(AST_node *n, IL_gen *gen, bool result_used) {
 }
 
 static void gen_cast(AST_node *n, IL_gen *gen, bool result_used) {
-    ASSERT(n->kind == AST_cast, "gen_cast() called on wrong kind of AST node\n");
     char buf_1[1024], buf_2[1024];
 
     Type *to = n->type;
-    Type *from = n->_cast.right_type;
+    Type *from;
+
+    if (n->kind == AST_cast) {
+        from = n->_cast.right_type;
+    }
+    else if (n->kind == AST_user_cast) {
+        from = n->user_cast.body->type;
+    }
+    else {
+        NOT_IMPLEMENTED("gen_cast is not implemented for %s\n", ast_kind_name(n->kind));
+    }
     
     if (!result_used) {
         il_gen_error(n->line_number, "Cast with unused result is not supported.\n");
@@ -265,6 +274,9 @@ static void gen_cast(AST_node *n, IL_gen *gen, bool result_used) {
     else if (to == &builtin_u8_slice && (is_struct_kind(from) || is_record_kind(from) || is_union_kind(from))) {
         push_opcode(OP_push_literal, nullptr, get_storage_size(from));
         ast_visit_children(n, (AstVisitor)gen_address_visitor, gen);
+    }
+    else if (is_integer_kind(to) && is_reference_kind(from) && n->kind) {
+        ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
     }
     else {
         NOT_IMPLEMENTED("Generating IL for cast to '%s' from '%s' is not implemented yet.\n",
@@ -342,7 +354,8 @@ static void gen_plus_plus(AST_node *n, IL_gen *gen, bool result_used) {
     }
     else if (is_slice_type(n->plus_plus.body->type)) {
         size_t size = get_slice_element_type(n->plus_plus.body->type)->storage_size;
-        push_opcode_sz(OP_slice_plus_plus, nullptr, 0, size);
+        push_opcode_sz(OP_slice_plus_plus, nullptr,
+            result_used ? (n->plus_plus.postfix + 1) : 0, size);
     }
     else NOT_IMPLEMENTED("AST_plus_plus is not implemented for anything that is not an integer or a slice.\n")
 }
@@ -518,6 +531,7 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             gen_for(n, gen, true);
             break;
 
+        case AST_user_cast:
         case AST_cast:
             gen_cast(n, gen, true);
             break;
@@ -614,6 +628,10 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
 
         case AST_builder_string:
             gen_builder_string(n, gen);
+            break;
+        
+        case AST_typename:
+            // Nothing to be done
             break;
 
         default:

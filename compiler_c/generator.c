@@ -445,11 +445,20 @@ void output_asm(const char *asm_file_name) {
 
             case OP_slice_plus_plus:
                 fprintf(file, "\t" "pop rbx\n");
+                if (op->u64_value == 2) { // post increment: push value first
+                    fprintf(file, "\t" "mov rax, [rbx]\n");
+                    fprintf(file, "\t" "push rax\n");
+                }
                 fprintf(file, "\t" "cmp QWORD [rbx+8], 0\n");
+                fprintf(file, "\t" "\n");
                 fprintf(file, "\t" "jle @f\n");
                 fprintf(file, "\t" "add QWORD [rbx], %lu\n", op->size);
                 fprintf(file, "\t" "dec QWORD [rbx+8]\n");
                 fprintf(file,"@@:\n");
+                if (op->u64_value == 1) { // pre increment: push value after
+                    fprintf(file, "\t" "mov rax, [rbx]\n");
+                    fprintf(file, "\t" "push rax\n");
+                }
                 break;
 
             case OP_sign_extend:
