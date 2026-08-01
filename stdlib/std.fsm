@@ -47,7 +47,11 @@ fn mmap_anonymous(reserve_size) : any & {
     let PROT_WRITE = 0x2;
     let MAP_PRIVATE = 0x02;
     let MAP_ANONYMOUS = 0x20;
-    return mmap(null, reserve_size, bitor(PROT_READ, PROT_WRITE), bitor(MAP_PRIVATE, MAP_ANONYMOUS), -1, 0);
+    let ref => mmap(null, reserve_size, bitor(PROT_READ, PROT_WRITE), bitor(MAP_PRIVATE, MAP_ANONYMOUS), -1, 0);
+    if (<i64>ref < 0) {
+        $"{__LOCATION__} Runtime Error: mmap_anonymous() failed: {strerror(<i64>ref)}\n";
+    }
+    return ref;
 }
 
 fn is_whitespace(c: i32) { return c == ' ' ||  c == '\t' || c == '\r' }

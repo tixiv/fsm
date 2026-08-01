@@ -414,6 +414,14 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         }
+        case AST_user_cast: {
+            char buf_1[1024], buf_2[1024];
+            printf("%.*s%s '%s' <- '%s'\n", (int)spaces, spc, kind_name,
+                get_type_name_r(buf_1, n->type),
+                get_type_name_r(buf_2, n->user_cast.body->type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        }
         default:
             NOT_IMPLEMENTED("Dumping %s is not implemented yet.\n", ast_kind_name(n->kind));
             break;
