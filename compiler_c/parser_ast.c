@@ -40,6 +40,13 @@ void parser_error(int line_number, const char * fmt, ...) {
     va_end(args);
 }
 
+static SV make_location_string(int line_number) {
+    char *buf = malloc(1024);
+    int out_len = 0;
+    snprintf(buf, 1024, "%s:%d%n", current_filename, line_number, &out_len);
+    return (SV){buf, out_len};
+}
+
 static Token *current_token;
 
 #define CT current_token
@@ -357,6 +364,11 @@ static AST_node *parse_primary()
     else if (CT->kind == TOK_string) {
         n = ast_alloc(AST_string, CT->line_number);
         n->str.value = CT->value;
+        MOVE_NEXT();
+    }
+    else if (CT->kind == TOK_magic_location) {
+        n = ast_alloc(AST_string, CT->line_number);
+        n->str.value = make_location_string(CT->line_number);
         MOVE_NEXT();
     }
     else if (CT->kind == TOK_builder_string_begin) {

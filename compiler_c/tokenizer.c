@@ -242,6 +242,9 @@ void handle_word(SV *word, int line_number) {
     else if (sv_compare_cstr(word, "fsm_debug")) {
         push_token(TOK_keyword_fsm_debug, nullptr, line_number);
     }
+    else if (sv_compare_cstr(word, "__LOCATION__")) {
+        push_token(TOK_magic_location, nullptr, line_number);
+    }
     else {
         push_token(TOK_identifier, word, line_number);
     }

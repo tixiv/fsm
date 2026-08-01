@@ -29,6 +29,7 @@ typedef struct {
     X(TOK_keyword_false) \
     X(TOK_keyword_null) \
     X(TOK_keyword_fsm_debug) \
+    X(TOK_magic_location) \
     X(TOK_lparen) \
     X(TOK_rparen) \
     X(TOK_lbrace) \

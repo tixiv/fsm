@@ -185,6 +185,8 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
         return;
     }
 
+    if (is_reference_kind(target_type) && original_type == &builtin_null) return;
+
     if (target_type == get_ref_type_for(&builtin_any)) {
         if (!is_reference_kind(original_type)) {
             if (n->addressable == false) type_checker_error(n->line_number, "Can't convert %s of type '%s' to '%s' because it is not addressable.\n",
@@ -194,8 +196,6 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
         }
         return; // any& can accept any reference type.
     }
-
-    if (is_reference_kind(target_type) && original_type == &builtin_null) return;
 
     if (is_reference_kind(target_type) && !is_reference_kind(original_type)) {
         if (n->addressable == false) type_checker_error(n->line_number, "Can't convert %s of type '%s' to '%s' because it is not addressable.\n",
