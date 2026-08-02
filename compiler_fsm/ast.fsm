@@ -1,25 +1,8 @@
 
-import * from "compiler_fsm/tokenizer";
-
-struct Type {
-}
-
-enum SymbolKind {
-    SYM_global,
-    SYM_local,
-    SYM_arg,
-    SYM_type,
-}
-
-struct Symbol {
-    name: u8[];
-    kind: SymbolKind;
-    type: Type&;
-
-    size; // stack frame size for functions
-    offset; // stack offset for args and local vars
-}
-
+import * from "std";
+import * from "tokenizer";
+import * from "type";
+import * from "symbol";
 
 enum AstKind {
     AST_program,

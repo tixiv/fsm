@@ -1,57 +1,6 @@
 
 import * from "std";
-
-struct EndlosRoll {
-    buffer: u8[];
-    alloc: u8[];
-    latest: u8[];
-}
-
-struct EndlosAllocator {
-    rolls: EndlosRoll[256];
-}
-
-fn endlos_init(allocator: EndlosAllocator&) {
-    let roll_capacity = 1024 * 1024 * 1024;
-    for (let i = 0; i < 256; i++) {
-        allocator.rolls[i].buffer.begin => mmap_anonymous(roll_capacity);
-        allocator.rolls[i].buffer.len = roll_capacity;
-        allocator.rolls[i].alloc = allocator.rolls[i].buffer;
-    }
-}
-
-fn endlos_begin (allocator: EndlosAllocator&) : u8[] {
-    for (let i = 0; i < 256; i++) {
-        if (!allocator.rolls[i].latest.begin) {
-            allocator.rolls[i].latest = allocator.rolls[i].alloc;
-            return allocator.rolls[i].alloc;
-        }
-    }
-    $"{__LOCATION__} Error: Endlos allocator has no free rolls available.\n"
-    exit(1);
-    let a: u8[];
-    return a;
-}
-
-fn endlos_ripp_off (allocator: EndlosAllocator&, returned_roll: u8[]) : u8[] {
-    for (let i = 0; i < 256; i++) {
-        if (allocator.rolls[i].latest.begin) {
-            let r => allocator.rolls[i];
-            if (<i64>r.alloc.begin <= <i64>returned_roll.begin < <i64>r.alloc.begin + r.alloc.len) {
-                let finalized = r.latest;
-                finalized.len = r.latest.len - returned_roll.len;
-                r.alloc = returned_roll;
-                r.latest.begin => null;
-                r.latest.len = 0;
-                return finalized;
-            }
-        }
-    }
-    $"{__LOCATION__} Error: endlos_ripp_off() was called on something that didn't come from a roll.\n"
-    exit(1);
-    let a: u8[];
-    return a;
-}
+import * from "endlos";
 
 fn blurg(allocator: EndlosAllocator&) {
     let my_roll = endlos_begin(allocator);

@@ -1,6 +1,6 @@
 
-import * from "compiler_fsm/parser";
-import * from "compiler_fsm/il_gen";
+import * from "parser";
+import * from "il_gen";
 
 
 fn main () {

@@ -1,36 +1,19 @@
 
-#include "ast.h"
-#include "common.h"
-#include "dyn_array.h"
-#include "sv.h"
-#include "type.h"
-#include "symbol.h"
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
+import * from "ast";
 
-static void resolver_error(int line_number, const char * fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-
-    fprintf(stderr, "[FSM Resolver] %s:%d Error: ", current_filename, line_number);
-    vfprintf(stderr, fmt, args);
-    fprintf(stderr, "\n");
-
-    exit(EXIT_FAILURE);
-    va_end(args);
+fn resolver_error(n: AST_node&, s: u8[]) {
+    write(2, $"[FSM Resolver] {n.location} Error: {s}\n");
+    exit(1);
 }
 
-typedef struct {
-    Dyn_array local_symbols;
-    Symbol *current_function;
-    size_t locals_stack[100];
-    size_t locals_stack_pointer;
-} Resolver;
+struct Resolver {
+    local_symbols: Symbol&[];
+    current_function: Symbol&;
+    locals_stack: i64[];
+    locals_stack_pointer : i64;
+}
 
-static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, bool do_undefined_error);
-
-static void push_symbol(Resolver *res, Dyn_array *arr, Symbol *s, int line_number) {
+fn push_symbol(Resolver *res, Dyn_array *arr, Symbol *s, int line_number) {
     if (s->name.len) {
         Symbol *conflicting = resolver_lookup_symbol(res,  &s->name, line_number, false);
         if (conflicting) {
@@ -92,44 +75,35 @@ static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, 
     s = get_symbol_by_name(&builtin_functions, name);
     if (s) return s;
 
-    // bultin types
-    s = make_type_symbol(name);
-    if (s) {
-        char buf[1024];
-        printf ("Make type symbol '%.*s' type = '%s'\n", SV_prnt(*name), get_type_name_r(buf, s->type));
-        dyn_array_push_p(&global_symbols, s);
-        return s;
-    }
-
     if(do_undefined_error)
         resolver_error(line_number, "Undefined symbol %.*s", SV_prnt(*name));
     
     return nullptr;
 }
 
-static void resolver_enter_function(Resolver *res, Symbol *s_fun) {
+fn resolver_enter_function(Resolver *res, Symbol *s_fun) {
     res->current_function = s_fun;
     res->local_symbols.count = 0;
     res->locals_stack_pointer = 0;
 }
 
-static void resolver_leave_function(Resolver *res) {
+fn resolver_leave_function(Resolver *res) {
     ASSERT(res->current_function, "Resolver leave function called without active function\n");
     res->current_function = nullptr;
     res->local_symbols.count = 0;
 }
 
-static void resolver_enter_scope(Resolver *res, int line_number) {
+fn resolver_enter_scope(Resolver *res, int line_number) {
     if (res->locals_stack_pointer >= 99) resolver_error(line_number, "Scope stack overflow. More than 100 levels nested. What are you doing?.\n");
     res->locals_stack[res->locals_stack_pointer++] = res->local_symbols.count;
 }
 
-static void resolver_leave_scope(Resolver *res) {
+fn resolver_leave_scope(Resolver *res) {
     ASSERT(res->locals_stack_pointer >= 1, "Resolver locals stack underflow.\n")
     res->local_symbols.count = res->locals_stack[--res->locals_stack_pointer];
 }
 
-static void resolve_globals_visitor (AST_node *n, Resolver *res) {
+fn resolve_globals_visitor (AST_node *n, Resolver *res) {
     switch (n->kind) {
         case AST_function: {
             Symbol *s_fun = alloc_symbol(SYM_global, n->fun.name);
@@ -143,7 +117,7 @@ static void resolve_globals_visitor (AST_node *n, Resolver *res) {
     }
 }
 
-static void resolver_visitor(AST_node *n, Resolver *res) {
+fn resolver_visitor(AST_node *n, Resolver *res) {
     switch (n->kind) {
 
         case AST_function: {
@@ -243,6 +217,5 @@ void resolver(AST_node *root) {
 
 void init_resolver () {
     dyn_array_init(&global_symbols, sizeof(Symbol *), 32);
-
     init_builtin_functions();
 }

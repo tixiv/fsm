@@ -215,3 +215,10 @@ fn NOT_IMPLEMENTED(location: u8[], what:u8[]) {
     $"{location}: {what} is not implemented yet.\n"
     exit(1);
 }
+
+fn ASSERT(condition: bool, s: u8[]) {
+    if (!condition) {
+        $"Assertion failed: {s}";
+        exit(1);
+    }
+}

@@ -275,7 +275,12 @@ static void gen_cast(AST_node *n, IL_gen *gen, bool result_used) {
         push_opcode(OP_push_literal, nullptr, get_storage_size(from));
         ast_visit_children(n, (AstVisitor)gen_address_visitor, gen);
     }
-    else if (is_integer_kind(to) && is_reference_kind(from) && n->kind) {
+    else if (is_integer_kind(to) && is_reference_kind(from) && n->kind == AST_user_cast) {
+        // cast pointer to integer
+        ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+    }
+    else if (is_reference_kind(to) && is_reference_kind(from) && n->kind == AST_user_cast) {
+        // cast one reference type to another
         ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
     }
     else {
@@ -631,6 +636,7 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             break;
         
         case AST_typename:
+        case AST_type_ref:
             // Nothing to be done
             break;
 

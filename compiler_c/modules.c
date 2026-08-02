@@ -58,6 +58,7 @@ bool debug_tokens = false;
 
 const char *debug_ast;
 
+// filename at this point is relative to execution path.
 void compile_module(const char *filename) {
     current_module = dyn_array_push(&modules);
     memset(current_module->filename, 0,1024);
@@ -85,33 +86,59 @@ void compile_module(const char *filename) {
     current_module->ast = ast;
 }
 
+static SV get_path(const char *filename) {
+    
+    for (int i = strlen(filename) - 1; i >= 0; i--) {
+        if (filename[i] == '/') {
+            return (SV) {filename, i+1};
+        }
+    }
+    return (SV) {filename, 0};
+}
+
+static bool find_file(SB *sb, SV name, const char *parent_module_filename) {
+    // try current directory
+    sb_printf(sb, "%.*s.fsm", SV_prnt(name));
+    if (access(sb->buffer, R_OK) == 0) return true;
+
+    // search the path of the parent module
+    sb_reset(sb);
+    SV path = get_path(parent_module_filename);
+    sb_printf(sb, "%.*s%.*s.fsm", SV_prnt(path), SV_prnt(name));
+    if (access(sb->buffer, R_OK) == 0) return true;
+
+    // search standard library
+    sb_reset(sb);
+    sb_printf(sb, "stdlib/%.*s.fsm", SV_prnt(name));
+    if (access(sb->buffer, R_OK) == 0) return true;
+
+    return false;
+}
+
+static bool already_imported (const char *filename) {
+    for (int i = 0; i < modules.count; i++) {
+        Module *module = &((Module*)modules.data)[i];
+        if (strcmp(module->filename, filename) == 0) return true;
+    }
+    return false;
+}
+
 bool resolve_import (SV name) {
     SB sb; char buf_1 [1024]; sb_init(&sb, buf_1, 1024);
 
     const char *saved_filename = current_filename;
     Module *saved_module = current_module;
 
-    // Need terminating zeroe
-    sb_printf(&sb, "%.*s.fsm", SV_prnt(name));
-
-    if (access(sb.buffer, R_OK) == 0) {
-        compile_module(sb.buffer);
-    }
-    else {
-        sb_reset(&sb);
-        sb_printf(&sb, "stdlib/%.*s.fsm", SV_prnt(name));
-
-        if (access(sb.buffer, R_OK) == 0) {
+    bool ret = false;
+    if (find_file(&sb, name, saved_module->filename)) {
+        if (!already_imported(sb.buffer))
             compile_module(sb.buffer);
-        }
-        else {
-            current_filename = saved_filename;
-            return false;
-        }
+        ret = true;
     }
+
     current_filename = saved_filename;
     current_module = saved_module;
-    return true;
+    return ret;
 }
 
 void compile_program(const char *filename) {

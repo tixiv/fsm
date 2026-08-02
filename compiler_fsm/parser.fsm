@@ -12,13 +12,6 @@ fn parser_error(parser: Parser&, s: u8[]) {
     exit(1);
 }
 
-fn ASSERT(condition: bool, s: u8[]) {
-    if (!condition) {
-        $"Assertion failed: {s}";
-        exit(1);
-    }
-}
-
 fn MOVE_NEXT(parser: Parser&) {
     parser.tokens++;
     parser.CT => parser.tokens.begin;

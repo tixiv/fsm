@@ -597,8 +597,10 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             }
             
             Type *t = n->symbol.symbol->type;
+            char buf[1024];
+            printf ("Check symbol '%.*s' type = '%s'\n", SV_prnt(n->symbol.symbol->name), get_type_name_r(buf, n->symbol.symbol->type));
             n->type = t;
-            n->addressable = true;
+            n->addressable = n->symbol.symbol->kind != SYM_type;
             break;
         }
 

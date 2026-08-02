@@ -1,0 +1,18 @@
+
+import * from "type";
+
+enum SymbolKind {
+    SYM_global,
+    SYM_local,
+    SYM_arg,
+    SYM_type,
+}
+
+struct Symbol {
+    name: u8[];
+    kind: SymbolKind;
+    type: Type&;
+
+    size; // stack frame size for functions
+    offset; // stack offset for args and local vars
+}
