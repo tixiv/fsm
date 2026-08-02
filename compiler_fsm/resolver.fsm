@@ -1,5 +1,6 @@
 
 import * from "ast";
+import * from "symbol";
 
 fn resolver_error(n: AST_node&, s: u8[]) {
     write(2, $"[FSM Resolver] {n.location} Error: {s}\n");
@@ -7,215 +8,203 @@ fn resolver_error(n: AST_node&, s: u8[]) {
 }
 
 struct Resolver {
-    local_symbols: Symbol&[];
+    symbol_roll: Symbol[];
+    global_symbols: SymbolRefArr;
+    local_symbols: SymbolRefArr;
     current_function: Symbol&;
     locals_stack: i64[];
     locals_stack_pointer : i64;
+    type_cache: TypeCache&;
 }
 
-fn push_symbol(Resolver *res, Dyn_array *arr, Symbol *s, int line_number) {
-    if (s->name.len) {
-        Symbol *conflicting = resolver_lookup_symbol(res,  &s->name, line_number, false);
+fn push_symbol(res: Resolver&, arr: SymbolRefArr&, s: Symbol&, n: AST_node&) {
+    if (s.name.len) {
+        let conflicting => resolver_lookup_symbol(res,  s.name, n, false);
         if (conflicting) {
-            resolver_error(line_number, "Symbol '%.*s' redefined\n", SV_prnt(s->name));
+            resolver_error(n, $"Symbol '{s.name}' redefined\n");
             return;
         }
     }
 
-    dyn_array_push_p(arr, s);
+    SymbolRefArr_push(arr, s);
 }
 
-Dyn_array builtin_functions; // Dyn_array<Symbol*>
-
-void declare_builtin_fn(SV name, Type *return_type, size_t num_args, Type *arg_types[]) {
-    Symbol *s = alloc_symbol(SYM_global, name);
-    s->type = get_function_type(return_type, arg_types, num_args);
-    dyn_array_push_p(&builtin_functions, s);
+fn declare_builtin_fn(res: Resolver&, name :u8[], return_type: Type&, arg_types: Type&[]) : void {
+    let s => alloc_symbol(res.symbol_roll, SymbolKind::SYM_global, name);
+    s.type => get_function_type(res.type_cache, return_type, arg_types);
+    SymbolRefArr_push(res.global_symbols, s);
 }
 
-void init_builtin_functions() {
-    dyn_array_init(&builtin_functions, sizeof(Symbol*), 8);
+fn init_builtin_functions(res: Resolver&) {
+    let tc => res.type_cache;
+    let tmp_arg_types: Type&[10];
+    let tmp_args: Type&[] = tmp_arg_types;
 
-    declare_builtin_fn(mkSV("exit"), &builtin_void, 1, (Type*[]){&builtin_i64 });
-    declare_builtin_fn(mkSV("__open"), &builtin_i64, 2, (Type*[]){&builtin_u8_reference, &builtin_i64 });
-    declare_builtin_fn(mkSV("close"), &builtin_i64, 1, (Type*[]){&builtin_i64});
-    declare_builtin_fn(mkSV("read"), &builtin_i64, 2, (Type*[]){&builtin_i64, &builtin_u8_slice});
-    declare_builtin_fn(mkSV("write"), &builtin_i64, 2, (Type*[]){&builtin_i64, &builtin_u8_slice});
-    declare_builtin_fn(mkSV("socket"), &builtin_i64, 3, (Type*[]){&builtin_i64, &builtin_i64, &builtin_i64});
-    declare_builtin_fn(mkSV("connect"), &builtin_i64, 2, (Type*[]){&builtin_i64, &builtin_u8_slice});
+    tmp_args.len = 1; tmp_args[0] => tc.builtin_i64;
+    declare_builtin_fn(res, "exit", tc.builtin_void, tmp_args);
+/*
+    declare_builtin_fn(res, "__open", tc.builtin_i64, 2, (Type*[]){tc.builtin_u8_reference, tc.builtin_i64 });
+    declare_builtin_fn(res, "close", tc.builtin_i64, 1, (Type*[]){tc.builtin_i64});
+    declare_builtin_fn(res, "read", tc.builtin_i64, 2, (Type*[]){tc.builtin_i64, tc.builtin_u8_slice});
+    declare_builtin_fn(res, "write", tc.builtin_i64, 2, (Type*[]){tc.builtin_i64, tc.builtin_u8_slice});
+    declare_builtin_fn(res, "socket", tc.builtin_i64, 3, (Type*[]){tc.builtin_i64, tc.builtin_i64, tc.builtin_i64});
+    declare_builtin_fn(res, "connect", tc.builtin_i64, 2, (Type*[]){tc.builtin_i64, tc.builtin_u8_slice});
 
     // mmap(addr: any&, lenght: i64, prot: u64, flags: u64, fd: i64, offset: i64) : any &
-    declare_builtin_fn(mkSV("mmap"), get_ref_type_for(&builtin_any), 6, (Type*[]){get_ref_type_for(&builtin_any), &builtin_i64, &builtin_u64, &builtin_u64, &builtin_i64, &builtin_i64});
+    declare_builtin_fn(res, "mmap", get_ref_type_for(tc.builtin_any, 6, (Type*[]){get_ref_type_for(tc.builtin_any), tc.builtin_i64, tc.builtin_u64, tc.builtin_u64, tc.builtin_i64, tc.builtin_i64});
 
-    declare_builtin_fn(mkSV("print"), &builtin_void, 1, (Type*[]){&builtin_i64});
-    declare_builtin_fn(mkSV("putc"), &builtin_void, 1, (Type*[]){&builtin_u8});
-    declare_builtin_fn(mkSV("puts"), &builtin_void, 1, (Type*[]){&builtin_u8_slice});
-    declare_builtin_fn(mkSV("fsize"), &builtin_i64, 1, (Type*[]){&builtin_i64});// fsize(fd: i64) : i64
+*/
+    tmp_args.len = 1; tmp_args[0] => tc.builtin_i64;
+    declare_builtin_fn(res, "print", tc.builtin_void, tmp_args);
+/*
+    declare_builtin_fn(res, "putc", tc.builtin_void, 1, (Type*[]){tc.builtin_u8});
+    declare_builtin_fn(res, "puts", tc.builtin_void, 1, (Type*[]){tc.builtin_u8_slice});
+    declare_builtin_fn(res, "fsize", tc.builtin_i64, 1, (Type*[]){tc.builtin_i64});// fsize(fd: i64) : i64
 
     // TODO: These should act like operators actually, and not like builtin functions, because we can then better handle different types of arguments
-    declare_builtin_fn(mkSV("bittest"), &builtin_bool, 2, (Type*[]){get_ref_type_for(&builtin_any), &builtin_i64});
-    declare_builtin_fn(mkSV("setbit"), &builtin_void, 3, (Type*[]){get_ref_type_for(&builtin_any), &builtin_i64, &builtin_bool});
-    declare_builtin_fn(mkSV("bitshift"), &builtin_u64, 2, (Type*[]){get_ref_type_for(&builtin_any), &builtin_i64});
-    declare_builtin_fn(mkSV("bitand"), &builtin_u64, 2, (Type*[]){&builtin_u64, &builtin_u64});
-    declare_builtin_fn(mkSV("bitor"), &builtin_u64, 2, (Type*[]){&builtin_u64, &builtin_u64});
-    declare_builtin_fn(mkSV("bitxor"), &builtin_u64, 2, (Type*[]){&builtin_u64, &builtin_u64});
-    declare_builtin_fn(mkSV("bitnot"), &builtin_u64, 1, (Type*[]){&builtin_u64});
+    declare_builtin_fn(res, "bittest", tc.builtin_bool, 2, (Type*[]){get_ref_type_for(tc.builtin_any), tc.builtin_i64});
+    declare_builtin_fn(res, "setbit", tc.builtin_void, 3, (Type*[]){get_ref_type_for(tc.builtin_any), tc.builtin_i64, tc.builtin_bool});
+    declare_builtin_fn(res, "bitshift", tc.builtin_u64, 2, (Type*[]){get_ref_type_for(tc.builtin_any), tc.builtin_i64});
+    declare_builtin_fn(res, "bitand", tc.builtin_u64, 2, (Type*[]){tc.builtin_u64, tc.builtin_u64});
+    declare_builtin_fn(res, "bitor", tc.builtin_u64, 2, (Type*[]){tc.builtin_u64, tc.builtin_u64});
+    declare_builtin_fn(res, "bitxor", tc.builtin_u64, 2, (Type*[]){tc.builtin_u64, tc.builtin_u64});
+    declare_builtin_fn(res, "bitnot", tc.builtin_u64, 1, (Type*[]){tc.builtin_u64});
+*/
 }
 
-static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, bool do_undefined_error) {
+
+fn resolver_lookup_symbol(res: Resolver&, name: u8[], n: AST_node&, do_undefined_error: bool) : Symbol& {
     // locals
-    Symbol *s = get_symbol_by_name(&res->local_symbols, name);
+    let s => get_symbol_by_name(res.local_symbols, name);
     if (s) return s;
 
     // globals
-    s = get_symbol_by_name(&global_symbols, name);
-    if (s) return s;
-
-    // builtin
-    s = get_symbol_by_name(&builtin_functions, name);
+    s => get_symbol_by_name(res.global_symbols, name);
     if (s) return s;
 
     if(do_undefined_error)
-        resolver_error(line_number, "Undefined symbol %.*s", SV_prnt(*name));
+        resolver_error(n, $"Undefined symbol {name}");
     
-    return nullptr;
+    return null;
 }
 
-fn resolver_enter_function(Resolver *res, Symbol *s_fun) {
-    res->current_function = s_fun;
-    res->local_symbols.count = 0;
-    res->locals_stack_pointer = 0;
+fn resolver_enter_function(res: Resolver&, s_fun: Symbol&) {
+    res.current_function => s_fun;
+    SymbolRefArr_reset(res.local_symbols, 0);
+    res.locals_stack_pointer = 0;
 }
 
-fn resolver_leave_function(Resolver *res) {
-    ASSERT(res->current_function, "Resolver leave function called without active function\n");
-    res->current_function = nullptr;
-    res->local_symbols.count = 0;
+fn resolver_leave_function(res: Resolver&) {
+    ASSERT(res.current_function, "Resolver leave function called without active function\n");
+    res.current_function => null;
 }
 
-fn resolver_enter_scope(Resolver *res, int line_number) {
-    if (res->locals_stack_pointer >= 99) resolver_error(line_number, "Scope stack overflow. More than 100 levels nested. What are you doing?.\n");
-    res->locals_stack[res->locals_stack_pointer++] = res->local_symbols.count;
+fn resolver_enter_scope(res: Resolver&, n: AST_node&) {
+    $"Scope 1\n"
+    if (res.locals_stack_pointer >= 99) resolver_error(n, "Scope stack overflow. More than 100 levels nested. What are you doing?.\n");
+    $"Scope 2\n"
+    res.locals_stack[res.locals_stack_pointer++] = res.local_symbols.arr.len;
+    $"Scope 3\n"
 }
 
-fn resolver_leave_scope(Resolver *res) {
-    ASSERT(res->locals_stack_pointer >= 1, "Resolver locals stack underflow.\n")
-    res->local_symbols.count = res->locals_stack[--res->locals_stack_pointer];
+fn resolver_leave_scope(res: Resolver&) {
+    ASSERT(res.locals_stack_pointer >= 1, "Resolver locals stack underflow.\n")
+    SymbolRefArr_reset(res.local_symbols, res.locals_stack[--res.locals_stack_pointer]);
 }
 
-fn resolve_globals_visitor (AST_node *n, Resolver *res) {
-    switch (n->kind) {
-        case AST_function: {
-            Symbol *s_fun = alloc_symbol(SYM_global, n->fun.name);
-            push_symbol(res, &global_symbols, s_fun, n->line_number);
-            n->fun.symbol = s_fun;
-            break;
-        }
-        default:
-            ast_visit_children(n, (AstVisitor)resolve_globals_visitor, res);
-            break;
+fn resolve_globals_visitor (n: AST_node&, res: Resolver&) : void {
+    if (n.kind == AST_node::AST_function) {
+        let s_fun => alloc_symbol(res.symbol_roll, SymbolKind::SYM_global, n.AST_function.name);
+        push_symbol(res, res.global_symbols, s_fun, n);
+        n.AST_function.symbol => s_fun;
     }
+    else
+        ast_visit_children(n, resolve_globals_visitor, res);
 }
 
-fn resolver_visitor(AST_node *n, Resolver *res) {
-    switch (n->kind) {
-
-        case AST_function: {
-            resolver_enter_function(res,  n->fun.symbol);
-            ast_visit_children(n, (AstVisitor)resolver_visitor, res);
-            resolver_leave_function(res);
-            break;
-        }
-
-        case AST_arg_decl: {
-            ASSERT(res->current_function, "Found function argument declaration for '%.*s' outside of function\n", SV_prnt(n->arg_decl.name));
-            Symbol *s_arg = alloc_symbol(SYM_arg, n->arg_decl.name);
-            push_symbol(res, &res->local_symbols, s_arg, n->line_number);
-            n->arg_decl.symbol = s_arg;
-            break;
-        }
-
-        case AST_var_decl: {
-            ASSERT(res->current_function, "Found local variable declaration for '%.*s' outside of function\n", SV_prnt(n->var_decl.name));
-            Symbol *s_var = alloc_symbol(SYM_local, n->var_decl.name);
-            push_symbol(res, &res->local_symbols, s_var, n->line_number);
-            n->var_decl.symbol = s_var;
-            ast_visit_children(n, (AstVisitor)resolver_visitor, res);
-            break;
-        }
-
-        case AST_symbol:
-            n->symbol.symbol = resolver_lookup_symbol(res, &n->symbol.name, n->line_number, true);
-            break;
-
-        case AST_call:
-            ast_visit_children(n, (AstVisitor)resolver_visitor, res);
-            break;
-
-        case AST_return:
-            ast_visit_children(n, (AstVisitor)resolver_visitor, res);
-            break;
-
-        case AST_scope:
-            resolver_enter_scope(res, n->line_number);
-            ast_visit_children(n, (AstVisitor)resolver_visitor, res);
-            resolver_leave_scope(res);
-            break;
-
-        case AST_for:
-            resolver_enter_scope(res, n->line_number);
-            ast_visit_children(n, (AstVisitor)resolver_visitor, res);
-            resolver_leave_scope(res);
-            break;
-
-        case AST_arg_list:
-        case AST_program:
-        case AST_if:
-        case AST_while:
-        case AST_number:
-        case AST_bool:
-        case AST_null:
-        case AST_binary:
-        case AST_variadic_operator:
-        case AST_unary:
-        case AST_string:
-        case AST_char_constant:
-        case AST_array_access:
-        case AST_dereference:
-        case AST_reference:
-        case AST_plus_plus:
-        case AST_minus_minus:
-        case AST_struct:
-        case AST_member_def:
-        case AST_member_access:
-        case AST_namespace_access:
-        case AST_enum:
-        case AST_enum_member:
-        case AST_union:
-        case AST_union_member_def:
-        case AST_typename:
-        case AST_type_ref:
-        case AST_type_array:
-        case AST_type_slice:
-        case AST_builder_string:
-        case AST_user_cast:
-            ast_visit_children(n, (AstVisitor)resolver_visitor, res);
-            break;
-
-        default:
-            NOT_IMPLEMENTED("Resolver for %s is not implemented yet.\n", ast_kind_name(n->kind));
-            break;
+fn resolver_visitor(n: AST_node&, res: Resolver&) : void {
+    $"Resolver visitor{n.kind.name}\n"
+    if (n.kind == AST_node::AST_function) {
+        resolver_enter_function(res,  n.AST_function.symbol);
+        ast_visit_children(n, resolver_visitor, res);
+        resolver_leave_function(res);
     }
+    else if (n.kind == AST_node::AST_arg_decl) {
+        ASSERT(res.current_function, $"{__LOCATION__}: Found function argument declaration for '{n.AST_arg_decl.name}' outside of function\n");
+        let s_arg => alloc_symbol(res.symbol_roll, SymbolKind::SYM_arg, n.AST_arg_decl.name);
+        push_symbol(res, &res.local_symbols, s_arg, n);
+        n.AST_arg_decl.symbol => s_arg;
+    }
+    else if (n.kind == AST_node::AST_var_decl) {
+        ASSERT(res.current_function, $"{__LOCATION__}: Found local variable declaration for '{n.AST_var_decl.name}' outside of function\n");
+        let s_var => alloc_symbol(res.symbol_roll, SymbolKind::SYM_local, n.AST_var_decl.name);
+        push_symbol(res, &res.local_symbols, s_var, n);
+        n.AST_var_decl.symbol => s_var;
+        ast_visit_children(n, resolver_visitor, res);
+    }
+    else if (n.kind == AST_node::AST_symbol) {
+        n.AST_symbol.symbol => resolver_lookup_symbol(res, n.AST_symbol.name, n, true);
+    }
+    else if (n.kind == AST_node::AST_scope) {
+        resolver_enter_scope(res, n);
+        ast_visit_children(n, resolver_visitor, res);
+        resolver_leave_scope(res);
+    }
+    else if (n.kind == AST_node::AST_for) {
+        resolver_enter_scope(res, n);
+        ast_visit_children(n, resolver_visitor, res);
+        resolver_leave_scope(res);
+    }
+    else if (n.kind == AST_node::AST_arg_list
+                    |== AST_node::AST_program
+                    |== AST_node::AST_if
+                    |== AST_node::AST_while
+                    |== AST_node::AST_number
+                    |== AST_node::AST_bool
+                    |== AST_node::AST_null
+                    |== AST_node::AST_binary
+                    |== AST_node::AST_variadic_operator
+                    |== AST_node::AST_unary
+                    |== AST_node::AST_string
+                    |== AST_node::AST_char_constant
+                    |== AST_node::AST_array_access
+                    |== AST_node::AST_dereference
+                    |== AST_node::AST_reference
+                    |== AST_node::AST_plus_plus
+                    |== AST_node::AST_minus_minus
+                    |== AST_node::AST_struct
+                    |== AST_node::AST_member_def
+                    |== AST_node::AST_member_access
+                    |== AST_node::AST_namespace_access
+                    |== AST_node::AST_enum
+                    |== AST_node::AST_enum_member
+                    |== AST_node::AST_union
+                    |== AST_node::AST_union_member_def
+                    |== AST_node::AST_typename
+                    |== AST_node::AST_type_ref
+                    |== AST_node::AST_type_array
+                    |== AST_node::AST_type_slice
+                    |== AST_node::AST_builder_string
+                    |== AST_node::AST_user_cast
+                    |== AST_node::AST_call
+                    |== AST_node::AST_return)
+    {
+        ast_visit_children(n, resolver_visitor, res);
+    }
+    else NOT_IMPLEMENTED(__LOCATION__, $"Resolver for {n.kind.name}");
 }
 
-void resolver(AST_node *root) {
-    Resolver res;
-    resolve_globals_visitor(root, &res);
-    dyn_array_init(&res.local_symbols, sizeof(Symbol *), 32);
-    resolver_visitor(root, &res);
+fn resolver_run(res: Resolver&, root: AST_node&) {
+    resolve_globals_visitor(root, res);
+    resolver_visitor(root, res);
 }
 
-void init_resolver () {
-    dyn_array_init(&global_symbols, sizeof(Symbol *), 32);
-    init_builtin_functions();
+fn resolver_init (res: Resolver&, allocator: EndlosAllocator&, type_cache: TypeCache&) {
+    SymbolRefArr_init(res.local_symbols, allocator);
+    SymbolRefArr_init(res.global_symbols, allocator);
+    res.symbol_roll = endlos_begin_Symbol(allocator);
+    res.locals_stack = endlos_begin_i64(allocator);
+    res.type_cache => type_cache;
+    init_builtin_functions(res);
 }
+

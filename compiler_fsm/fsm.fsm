@@ -1,9 +1,14 @@
 
+import * from "endlos";
 import * from "parser";
+import * from "resolver";
 import * from "il_gen";
 
 
 fn main () {
+    let endlos: EndlosAllocator;
+    endlos_init(endlos);
+
     let tokenizer: Tokenizer;
 
     tokenizer.code = read_file ("foo.fsm");
@@ -15,10 +20,18 @@ fn main () {
     let tokens: Token[] = tokenizer.tokens;
     tokens.len = tokenizer.num_tokens;
 
-    let allocator: AST_Node_Allocator;
-    AST_Node_Allocator_init(allocator);
+    let type_cache: TypeCache;
+    TypeCache_init(type_cache, endlos)
 
-    let root => parse_program(tokens, allocator)
+    let ast_allocator: AST_Node_Allocator;
+    AST_Node_Allocator_init(ast_allocator);
+
+    let root => parse_program(tokens, ast_allocator)
+
+    let resolver: Resolver;
+    resolver_init(resolver, endlos, type_cache);
+
+    resolver_run(resolver, root);
 
     ast_dump_tree(root);
 

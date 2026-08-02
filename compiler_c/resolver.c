@@ -95,8 +95,6 @@ static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, 
     // bultin types
     s = make_type_symbol(name);
     if (s) {
-        char buf[1024];
-        printf ("Make type symbol '%.*s' type = '%s'\n", SV_prnt(*name), get_type_name_r(buf, s->type));
         dyn_array_push_p(&global_symbols, s);
         return s;
     }

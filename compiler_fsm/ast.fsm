@@ -4,49 +4,6 @@ import * from "tokenizer";
 import * from "type";
 import * from "symbol";
 
-enum AstKind {
-    AST_program,
-    AST_function,
-    AST_arg_list,
-    AST_scope,
-    AST_var_decl,
-    AST_arg_decl,
-    AST_number,
-    AST_bool,
-    AST_null,
-    AST_string,
-    AST_char_constant,
-    AST_symbol,
-    AST_binary,
-    AST_variadic_operator,
-    AST_unary,
-    AST_call,
-    AST_return,
-    AST_if,
-    AST_while,
-    AST_for,
-    AST_cast,
-    AST_array_access,
-    AST_array_len,
-    AST_dereference,
-    AST_reference,
-    AST_struct,
-    AST_member_def,
-    AST_enum,
-    AST_enum_member,
-    AST_typename,
-    AST_type_ref,
-    AST_type_array,
-    AST_type_slice,
-    AST_function_type,
-    AST_member_access,
-    AST_namespace_access,
-    AST_array_to_slice,
-    AST_plus_plus,
-    AST_minus_minus,
-    AST_builder_string,
-}
-
 struct VariadicOperatorMember {
     token_kind: TokenKind;
     right: AST_node&;
@@ -156,6 +113,11 @@ union AST_node enum kind {
     struct AST_cast {
         body: AST_node&;
         right_type: Type&; // the left type is the type of the AST node
+    }
+
+    struct AST_user_cast {
+        body: AST_node&;
+        typedecl: AST_node&; // target type decl
     }
 
     struct AST_array_access {

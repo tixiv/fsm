@@ -1,4 +1,5 @@
 
+import * from "endlos";
 import * from "type";
 
 enum SymbolKind {
@@ -15,4 +16,77 @@ struct Symbol {
 
     size; // stack frame size for functions
     offset; // stack offset for args and local vars
+}
+
+fn endlos_begin_Symbol (allocator: EndlosAllocator&) : Symbol[] {
+    let roll = endlos_begin(allocator);
+    let fuzz = roll.len % 8;
+    while (fuzz--) roll++;
+    let roll_symbol: Symbol[];
+    roll_symbol.begin => <Symbol&> roll.begin;
+    roll_symbol.len = roll.len / Symbol.sizeof;
+    return roll_symbol;
+}
+
+fn endlos_ripp_off_Symbol (allocator: EndlosAllocator&, roll: Symbol[]) : Symbol[] {
+    let roll_u8: u8[];
+    roll_u8.begin => <u8&> roll.begin;
+    roll_u8.len = roll.len * Symbol.sizeof;
+    roll_u8 = endlos_ripp_off(allocator, roll_u8);
+    roll.begin => <Symbol&> roll_u8.begin;
+    roll.len = roll_u8.len / Symbol.sizeof;
+    return roll;
+}
+
+fn alloc_symbol(roll: Symbol[]&, kind: SymbolKind, name: u8[]) : Symbol& {
+    let s => roll++;
+    s.kind = kind;
+    s.name = name;
+    return s;
+}
+
+struct SymbolRefArr {
+    alloc: Symbol&[];
+    arr: Symbol&[];
+}
+
+fn SymbolRefArr_push (arr: SymbolRefArr&, s: Symbol&) {
+    *(arr.alloc++) => s;
+    arr.arr.len++;
+}
+
+fn SymbolRefArr_reset (arr: SymbolRefArr&, len) {
+    let old_len = arr.arr.len;
+    ASSERT(len <= old_len, __LOCATION__);
+    arr.alloc.begin => &arr.arr[len];
+    arr.alloc.len = arr.alloc.len + old_len - len;
+    arr.arr.len = len;
+}
+
+fn SymbolRefArr_init (arr: SymbolRefArr&, allocator: EndlosAllocator&) {
+    let roll = endlos_begin_i64(allocator);
+    arr.alloc.begin => <Symbol& &> roll.begin;
+    arr.alloc.len = roll.len;
+    arr.arr.begin => arr.alloc.begin;
+    arr.arr.len = 0;
+}
+
+/*
+fn make_type_symbol(SV *name) : Symbol & {
+    Type *t = get_type_by_name(name);
+    if (!t) return nullptr;
+
+    Symbol *s = alloc_symbol(SYM_type, *name);
+    s->type = t;
+    return s;
+}
+*/
+
+fn get_symbol_by_name(arr: SymbolRefArr&, name: u8[]) : Symbol& {
+    for (let i = 0; i < arr.arr.len; i++) {
+        let s => arr.arr[i];
+        if (sv_equal(s.name, name)) return s;
+    }
+
+    return null;
 }
