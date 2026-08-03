@@ -230,7 +230,7 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             break;
         case AST_variadic_operator:
             visit_non_null(n->variadic_operator.left, visit, arg);
-            for (int i = 0; i < n->variadic_operator.num_members; i++) {
+            for (size_t i = 0; i < n->variadic_operator.num_members; i++) {
                 visit_non_null(n->variadic_operator.members[i].right, visit, arg);
             }
             break;
@@ -275,7 +275,8 @@ static void print_symbol(Symbol *s) {
         printf("(%s '%.*s')", symbol_kind_name(s->kind), SV_prnt(s->name));
 }
 
-static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
+static void ast_dump_visitor (AST_node *n, void *spaces_vp) {
+    uint64_t spaces = (uint64_t) spaces_vp;
     const char *spc = "                                                              " // Yeah, these are my spaces
                       "                                                              ";
 
@@ -375,15 +376,15 @@ static void ast_dump_visitor (AST_node *n, uint64_t spaces) {
             printf("%.*s%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf, n->type));
             if (n->_if.condition) {
                 printf("%.*s  Condition:\n", (int)spaces, spc);
-                ast_dump_visitor(n->_if.condition, spaces + 4);
+                ast_dump_visitor(n->_if.condition, (void*)(spaces + 4));
             }
             if (n->_if.if_clause) {
                 printf("%.*s  If clause:\n", (int)spaces, spc);
-                ast_dump_visitor(n->_if.if_clause, spaces + 4);
+                ast_dump_visitor(n->_if.if_clause, (void*)(spaces + 4));
             }
             if (n->_if.else_clause) {
                 printf("%.*s  Else clause:\n", (int)spaces, spc);
-                ast_dump_visitor(n->_if.else_clause, spaces + 4);
+                ast_dump_visitor(n->_if.else_clause, (void*)(spaces + 4));
             }
             break;
         case AST_binary:

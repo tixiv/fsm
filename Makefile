@@ -6,7 +6,7 @@ BUILD_DIR = build
 TEST_DIR = tests
 AOC21_DIR = aoc_21
 
-CFLAGS += -Wall -O0 -g -MMD -MP
+CFLAGS += -Wall -Wextra -O0 -g -MMD -MP
 
 C_SRCS = $(wildcard $(SRC_DIR)/*.c)
 

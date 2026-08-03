@@ -61,23 +61,23 @@ typedef struct Type_s {
         } _array;
 
         struct {
-            int num_arguments;
+            size_t num_arguments;
             struct Type_s **argument_types;
             struct Type_s *return_type;
         } fun;
 
         struct {
-            int num_members;
+            size_t num_members;
             StructMember *members;
         } _struct;
 
         struct {
-            int num_members;
+            size_t num_members;
             EnumMember *members;
         } _enum;
 
         struct {
-            int num_members;
+            size_t num_members;
             UnionMember *members;
             SV enumarator_name;
         } _union;

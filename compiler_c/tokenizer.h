@@ -5,12 +5,6 @@
 #include "dyn_array.h"
 #include "modules.h"
 
-typedef struct {
-    int kind;
-    SV value;
-    int line_number;
-} Token;
-
 #define TOKEN_LIST \
     X(TOK_null) \
     X(TOK_keyword_fn) \
@@ -77,6 +71,12 @@ typedef enum {
     TOKEN_LIST
 #undef X
 } TokenKind;
+
+typedef struct {
+    TokenKind kind;
+    SV value;
+    int line_number;
+} Token;
 
 const char *token_kind_name(TokenKind kind);
 const char *token_kind_printable(TokenKind kind);

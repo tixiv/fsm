@@ -91,7 +91,7 @@ void output_asm(const char *asm_file_name) {
     fprintf(file, "%s", header);
     fprintf(file, "%s", builtin_functions_asm);
     
-    for (int i=0; i<num_opcodes; i++) {
+    for (size_t i=0; i<num_opcodes; i++) {
         Opcode *op = &opcodes[i];
 
         fprintf(file,"; ------- %s ---------\n", opcode_name(op->kind));
@@ -586,7 +586,7 @@ void output_asm(const char *asm_file_name) {
     Dyn_array enum_types_with_names;
     dyn_array_init(&enum_types_with_names, sizeof(Type*), 8);
 
-    for (int i=0; i<num_opcodes; i++) {
+    for (size_t i=0; i<num_opcodes; i++) {
         Opcode *op = &opcodes[i];
 
         if (op->kind == OP_push_string_literal) {
@@ -617,7 +617,7 @@ void output_asm(const char *asm_file_name) {
         else if (op->kind == OP_get_enum_member_name)
         {
             bool found = false;
-            for (int i = 0; !found && i < enum_types_with_names.count; i++)
+            for (size_t i = 0; !found && i < enum_types_with_names.count; i++)
                 if(op->type == ((Type**)enum_types_with_names.data)[i])
                     found = true;
             
@@ -626,7 +626,7 @@ void output_asm(const char *asm_file_name) {
 
     }
 
-    for (int i = 0; i < enum_types_with_names.count; i++) {
+    for (size_t i = 0; i < enum_types_with_names.count; i++) {
         Type *t = ((Type**)enum_types_with_names.data)[i];
         ASSERT(is_enum_kind(t) || is_enumerator_kind(t), "Tried to generate member names for something that is not an enum.\n");
 
@@ -652,14 +652,14 @@ void output_asm(const char *asm_file_name) {
         }
 
         if (is_enum_kind(t)) {
-            for (int j = 0; j < t->_enum.num_members; j++) {
+            for (size_t j = 0; j < t->_enum.num_members; j++) {
                 fprintf(file, "enum_names_%.*s_%.*s: db \"%.*s\"\n", SV_prnt(t->name),
                         SV_prnt(t->_enum.members[j].name), SV_prnt(t->_enum.members[j].name));
             }
         }
         else if (is_enumerator_kind(t) && is_union_kind(t->enumerator.target_type)) {
             Type *u = t->enumerator.target_type;
-            for (int j = 0; j < u->_union.num_members; j++) {
+            for (size_t j = 0; j < u->_union.num_members; j++) {
                 fprintf(file, "enum_names_%.*s_%.*s: db \"%.*s\"\n", SV_prnt(u->name),
                         SV_prnt(u->_union.members[j].name), SV_prnt(u->_union.members[j].name));
             }

@@ -4,6 +4,7 @@
 #include "dyn_array.h"
 #include "resolver.h"
 #include "common.h"
+#include <stddef.h>
 #include <stdio.h>
 
 typedef struct {
@@ -15,7 +16,7 @@ typedef struct {
 static void calculate_function_stack(StackVisitor *res, Symbol *s_fun) {
     {
         size_t offset = 0;
-        for (int i = res->arg_symbols.count-1; i >= 0; i--) {
+        for (ssize_t i = res->arg_symbols.count-1; i >= 0; i--) {
             Symbol *s = get_symbol(&res->arg_symbols, i);
             s->offset = offset;
             offset += get_stack_offset_for(s->type);
@@ -23,7 +24,7 @@ static void calculate_function_stack(StackVisitor *res, Symbol *s_fun) {
     }
     {
         size_t offset = 0;
-        for (int i = 0; i < res->var_symbols.count; i++) {
+        for (size_t i = 0; i < res->var_symbols.count; i++) {
             Symbol *s = get_symbol(&res->var_symbols, i);
             if (s->kind == SYM_local) {
                 offset += get_stack_offset_for(s->type);

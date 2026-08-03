@@ -33,7 +33,7 @@ Symbol *make_type_symbol(SV *name) {
 }
 
 Symbol *get_symbol_by_name(Dyn_array *arr, SV *name) {
-    for (int i = 0; i < arr->count; i++) {
+    for (size_t i = 0; i < arr->count; i++) {
         Symbol *s = get_symbol(arr, i);
         if (sv_equal(&s->name, name)) return s;
     }

@@ -13,6 +13,7 @@
 #include "type_checker.h"
 #include "type_resolver.h"
 #include "calculate_stacks.h"
+#include <sys/types.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -36,12 +37,12 @@ void read_file(SV *contents, const char *path)
     }
 
     fseek(f, 0, SEEK_END);
-    long size = ftell(f);
+    ssize_t size = ftell(f);
     rewind(f);
 
     char *buffer = malloc(size + 1);
 
-    if (fread(buffer, 1, size, f) != size) {
+    if ((ssize_t)fread(buffer, 1, size, f) != size) {
         fprintf(stderr, "[FSM Compiler] Error reading from file '%s': %s\n", path, strerror(errno));
         exit(EXIT_FAILURE);
     }
@@ -116,7 +117,7 @@ static bool find_file(SB *sb, SV name, const char *parent_module_filename) {
 }
 
 static bool already_imported (const char *filename) {
-    for (int i = 0; i < modules.count; i++) {
+    for (size_t i = 0; i < modules.count; i++) {
         Module *module = &((Module*)modules.data)[i];
         if (strcmp(module->filename, filename) == 0) return true;
     }

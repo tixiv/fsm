@@ -83,7 +83,7 @@ typedef struct AST_node_s {
 
         struct {
             struct AST_node_s *left;
-            int num_members;
+            size_t num_members;
             VariadicOperatorMember *members;
         } variadic_operator;
 

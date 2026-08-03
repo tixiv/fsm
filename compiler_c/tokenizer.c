@@ -505,7 +505,7 @@ void tokenizer(SV *code) {
 }
 
 void dump_tokens() {
-    for (int i=0; i<num_tokens; i++) {
+    for (size_t i=0; i<num_tokens; i++) {
         Token *t = &tokens[i];
         if (t->value.begin) {
             printf("[%2d: %s, \"" SV_FMT "\"]\n", t->line_number, token_kind_name(t->kind), SV_prnt(t->value));

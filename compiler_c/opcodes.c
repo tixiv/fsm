@@ -16,7 +16,7 @@ const char *opcode_name(enum Op_Kind kind) {
 Dyn_array opcodes_dyn;
 
 void dump_opcodes() {
-    for (int i=0; i<num_opcodes; i++) {
+    for (size_t i=0; i<num_opcodes; i++) {
         Opcode *op = &opcodes[i];
         if (op->string_value.begin) {
             printf("[%s, \"" SV_FMT "\"]\n", opcode_name(op->kind), SV_prnt(op->string_value));

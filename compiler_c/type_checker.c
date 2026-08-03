@@ -40,7 +40,7 @@ static void type_checker_warning(int line_number, const char * fmt, ...) {
     va_end(args);
 }
 
-void annotate_used_visitor(AST_node *n, uint64_t used) {
+void annotate_used_visitor(AST_node *n, void* used) {
     if (!n) return;
     n->result_used = used;
 
@@ -61,20 +61,20 @@ void annotate_used_visitor(AST_node *n, uint64_t used) {
             break;
         
         case AST_if:
-            annotate_used_visitor(n->_if.condition, true);
+            annotate_used_visitor(n->_if.condition, (void*)true);
             annotate_used_visitor(n->_if.if_clause, used);
             annotate_used_visitor(n->_if.else_clause, used);
             break;
 
         case AST_while:
             if (used) type_checker_error(n->line_number, "The 'while' statement has no value and therefore can't be used in an expression.\n");
-            annotate_used_visitor(n->_while.condition, true);
+            annotate_used_visitor(n->_while.condition, (void*)true);
             annotate_used_visitor(n->_while.body, false);
             break;
 
         case AST_for:
             annotate_used_visitor(n->_for.initializer, false);
-            annotate_used_visitor(n->_for.condition, true);
+            annotate_used_visitor(n->_for.condition, (void*)true);
             annotate_used_visitor(n->_for.post_action, false);
             annotate_used_visitor(n->_for.body, false);
             break;
@@ -84,7 +84,7 @@ void annotate_used_visitor(AST_node *n, uint64_t used) {
                 ast_visit_children(n, (AstVisitor)annotate_used_visitor, (void*)true);
             }
             else if (n->binary.token_kind == TOK_boolean_and || n->binary.token_kind == TOK_boolean_or) {
-                annotate_used_visitor(n->binary.left, true);
+                annotate_used_visitor(n->binary.left, (void*)true);
                 annotate_used_visitor(n->binary.right, used);
             }
             else {
@@ -338,7 +338,7 @@ void type_check_variadic_operator (AST_node *n){
         case TOK_lower:
         case TOK_greater_equal:
         case TOK_lower_equal:
-            for (int i = 0; i < n->variadic_operator.num_members; i++) {
+            for (size_t i = 0; i < n->variadic_operator.num_members; i++) {
                 try_convert_to_type_if_necessary(n->variadic_operator.left, &builtin_i64, "Argument of variadic operator");
                 try_convert_to_type_if_necessary(n->variadic_operator.members[i].right, &builtin_i64, "Argument of variadic operator");                
             }
@@ -354,7 +354,7 @@ void type_check_variadic_operator (AST_node *n){
             bool all_same_type = true;
             bool all_integer = is_integer_kind(left_type);
 
-            for (int i = 0; i < n->variadic_operator.num_members; i++) {
+            for (size_t i = 0; i < n->variadic_operator.num_members; i++) {
                 auto_dereference(n->variadic_operator.members[i].right);
                 if (left_type != n->variadic_operator.members[i].right->type) all_same_type = false;
                 if (!is_integer_kind(n->variadic_operator.members[i].right->type)) all_integer = false;
@@ -392,7 +392,7 @@ typedef struct {
     Dyn_array arg_symbols;
 } PropagationVisitorData;
 
-void type_check_function_call(AST_node *n_call, PropagationVisitorData *prop) {
+void type_check_function_call(AST_node *n_call, PropagationVisitorData *) {
     char buf[1024];
     Type *fn_type = n_call->call.target->type;
     if (is_reference_kind(fn_type)) fn_type = dereferenced_type(fn_type);
@@ -400,8 +400,8 @@ void type_check_function_call(AST_node *n_call, PropagationVisitorData *prop) {
     if (!is_function_kind(fn_type)) type_checker_error(n_call->line_number,
             "Trying to call something that is not a function. have '%s'", get_type_name_r(buf, n_call->call.target->type));
 
-    int num_args_expected = fn_type->fun.num_arguments;
-    int num_args = ast_count_chain(n_call->call.args);
+    size_t num_args_expected = fn_type->fun.num_arguments;
+    size_t num_args = ast_count_chain(n_call->call.args);
 
     if (num_args < num_args_expected) type_checker_error(n_call->line_number,
             "Not enough arguments to function call. Expected %d, got %d.\n", num_args_expected, num_args);
@@ -410,7 +410,7 @@ void type_check_function_call(AST_node *n_call, PropagationVisitorData *prop) {
             "Too many arguments to function call. Expected %d, got %d.\n", num_args_expected, num_args);
 
     AST_node *arg = n_call->call.args;
-    for (int i = 0; i < num_args; i++) {
+    for (size_t i = 0; i < num_args; i++) {
         Type *expected_type = fn_type->fun.argument_types[i];
 
         try_convert_to_type_if_necessary(arg, expected_type, "Function argument");
@@ -464,7 +464,7 @@ void type_resolve_functions_visitor(AST_node *n, PropagationVisitorData *prop) {
             ast_visit_children(n, (AstVisitor)type_resolve_functions_visitor, prop);
 
             Type **arg_types = malloc(sizeof(Type*) * prop->arg_symbols.count);
-            for (int i = 0; i < prop->arg_symbols.count; i++) {
+            for (size_t i = 0; i < prop->arg_symbols.count; i++) {
                 arg_types[i] = get_symbol(&prop->arg_symbols, i)->type;
             }
 

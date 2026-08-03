@@ -10,8 +10,8 @@
 #include <stdio.h>
 #include <string.h>
 
-Type builtin_void = (Type){T_void};
-Type builtin_null = (Type){T_null};
+Type builtin_void = (Type){T_void,    .storage_size = 0};
+Type builtin_null = (Type){T_null,    .storage_size = 0};
 Type builtin_bool = (Type){T_boolean, .storage_size = 1};
 
 Type builtin_u64 = (Type){T_unsigned_integer, .storage_size = 8, .integer.num_bits = 64};
@@ -76,7 +76,7 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
         case T_function:
             sb_printf(&sb, "fn (");
             Type **args = type->fun.argument_types;
-            for (int i = 0; i < type->fun.num_arguments; i++) {
+            for (size_t i = 0; i < type->fun.num_arguments; i++) {
                 sb_printf(&sb, "%s", get_type_name_r(child_print_buf, args[i]));
                 if (i < type->fun.num_arguments-1) sb_printf(&sb, ", ");
             }
@@ -251,7 +251,7 @@ size_t get_member_offset(Type *_struct, size_t index) {
     ASSERT(index < _struct->_struct.num_members, "Index out of range.\n");
 
     size_t offset = 0;
-    for (int i = 0; i < index; i++) {
+    for (size_t i = 0; i < index; i++) {
         StructMember *member = &_struct->_struct.members[i];
 
         offset += member->type->storage_size;
@@ -269,7 +269,7 @@ Type *get_member_type_and_offset_by_name(Type *t, SV *member_name, size_t *out_o
 
     if (t->kind == T_struct || t->kind == T_record) {
         size_t offset = 0;
-        for (int i = 0; i < t->_struct.num_members; i++) {
+        for (size_t i = 0; i < t->_struct.num_members; i++) {
             StructMember *member = &t->_struct.members[i];
 
             if (sv_equal(&member->name, member_name)) {
@@ -288,7 +288,7 @@ Type *get_member_type_and_offset_by_name(Type *t, SV *member_name, size_t *out_o
             }
             offset += 8;
         }
-        for (int i = 0; i < t->_union.num_members; i++) {
+        for (size_t i = 0; i < t->_union.num_members; i++) {
             UnionMember *member = &t->_union.members[i];
 
             if (member->name.begin == nullptr) {
@@ -315,7 +315,7 @@ Type *get_member_type_and_offset_by_name(Type *t, SV *member_name, size_t *out_o
 }
 
 bool get_enum_member_value (Type *t, SV *member_name, int64_t *enum_value) {
-    for (int i = 0; i < t->_enum.num_members; i++) {
+    for (size_t i = 0; i < t->_enum.num_members; i++) {
         EnumMember *member = &t->_enum.members[i];
 
         if (sv_equal(&member->name, member_name)) {
@@ -327,7 +327,7 @@ bool get_enum_member_value (Type *t, SV *member_name, int64_t *enum_value) {
 }
 
 bool get_union_member_value (Type *t, SV *member_name, int64_t *enum_value) {
-    for (int i = 0; i < t->_union.num_members; i++) {
+    for (size_t i = 0; i < t->_union.num_members; i++) {
         UnionMember *member = &t->_union.members[i];
 
         if (sv_equal(&member->name, member_name)) {
@@ -342,7 +342,7 @@ void calculate_storage_size(Type *container) {
     char buf[1024];
     if (is_struct_kind(container)) {
         size_t offset = 0;
-        for (int i = 0; i < container->_struct.num_members; i++) {
+        for (size_t i = 0; i < container->_struct.num_members; i++) {
             StructMember *member = &container->_struct.members[i];
             offset += member->type->storage_size;
         }
@@ -350,7 +350,7 @@ void calculate_storage_size(Type *container) {
     }
     else if (is_record_kind(container)) {
         size_t offset = 0;
-        for (int i = 0; i < container->_struct.num_members; i++) {
+        for (size_t i = 0; i < container->_struct.num_members; i++) {
             StructMember *member = &container->_struct.members[i];
             offset += member->type->storage_size;
         }
@@ -360,7 +360,7 @@ void calculate_storage_size(Type *container) {
         size_t offset = 0;
         if (container->_union.enumarator_name.begin) offset += 8;
         size_t max_member_size = 0;
-        for (int i = 0; i < container->_union.num_members; i++) {
+        for (size_t i = 0; i < container->_union.num_members; i++) {
             UnionMember *member = &container->_union.members[i];
             size_t sz = member->type->storage_size;
             if (member->name.begin == nullptr) {
@@ -381,7 +381,7 @@ size_t get_function_arguments_size(Type *t) {
     if (is_reference_kind(t)) t = dereferenced_type(t);
     ASSERT(t->kind == T_function,"get_function_arguments_size() called on something that is not a function.\n")
     size_t size = 0;
-    for (int i = 0; i < t->fun.num_arguments; i++) {
+    for (size_t i = 0; i < t->fun.num_arguments; i++) {
         Type *arg = t->fun.argument_types[i];
         size += arg->storage_size;
         if (size % 8) size += 8 - (size % 8);
@@ -404,7 +404,7 @@ Type *get_ref_type_for(Type *t) {
     if (ref_types.capacity == 0)
         dyn_array_init(&ref_types, sizeof(Type*), 16);
 
-    for (int i = 0; i < ref_types.count; i++) {
+    for (size_t i = 0; i < ref_types.count; i++) {
         Type *ref = ((Type**)ref_types.data)[i];
         if (ref->reference.target_type == t) return ref;
     }
@@ -426,7 +426,7 @@ Type *get_enumerator_type_for(Type *t) {
     if (enumerator_types.capacity == 0)
         dyn_array_init(&enumerator_types, sizeof(Type*), 16);
 
-    for (int i = 0; i < enumerator_types.count; i++) {
+    for (size_t i = 0; i < enumerator_types.count; i++) {
         Type *enumerator = ((Type**)enumerator_types.data)[i];
         if (enumerator->enumerator.target_type == t) return enumerator;
     }
@@ -449,7 +449,7 @@ Type *get_array_type(Type *element_type, size_t n_elements) {
     if (array_types.capacity == 0)
         dyn_array_init(&array_types, sizeof(Type*), 16);
 
-    for (int i = 0; i < array_types.count; i++) {
+    for (size_t i = 0; i < array_types.count; i++) {
         Type *arr = ((Type**)array_types.data)[i];
         if (arr->_array.element_type == element_type
             && arr->_array.n_elements == n_elements) return arr;
@@ -482,7 +482,7 @@ Type *get_sclice_type(Type *element_type) {
     if (slice_types.capacity == 0)
         dyn_array_init(&slice_types, sizeof(Type*), 16);
 
-    for (int i = 0; i < slice_types.count; i++) {
+    for (size_t i = 0; i < slice_types.count; i++) {
         Type *slice = ((Type**)slice_types.data)[i];
         if (slice->_struct.members[0].type == get_ref_type_for(element_type))
             return slice;
@@ -498,7 +498,7 @@ Type *get_function_type(Type *ret_type, Type *arg_types[], size_t num_args) {
     if (function_types.capacity == 0)
         dyn_array_init(&function_types, sizeof(Type*), 16);
 
-    for (int i = 0; i < function_types.count; i++) {
+    for (size_t i = 0; i < function_types.count; i++) {
         Type *fn_type = ((Type**)function_types.data)[i];
         if (fn_type->fun.return_type == ret_type && fn_type->fun.num_arguments == num_args) {
             for (size_t i = 0; i < fn_type->fun.num_arguments; i++) {
@@ -512,7 +512,7 @@ Type *get_function_type(Type *ret_type, Type *arg_types[], size_t num_args) {
     new_fun->fun.return_type = ret_type;
     new_fun->fun.num_arguments = num_args;
     new_fun->fun.argument_types = malloc(sizeof(Type*) * num_args);
-    for (int i = 0; i < num_args; i++)
+    for (size_t i = 0; i < num_args; i++)
         new_fun->fun.argument_types[i] = arg_types[i];
     dyn_array_push_p(&function_types, new_fun);
     return new_fun;
@@ -521,7 +521,7 @@ Type *get_function_type(Type *ret_type, Type *arg_types[], size_t num_args) {
 bool is_slice_type(Type *t) {
     if (t == &builtin_u8_slice) return true;
     
-    for (int i = 0; i < slice_types.count; i++) {
+    for (size_t i = 0; i < slice_types.count; i++) {
         Type *slice = ((Type**)slice_types.data)[i];
         if (t == slice) return true;
     }

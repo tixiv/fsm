@@ -42,7 +42,7 @@ Type *get_type_by_name(const SV *name) {
     if (sv_compare_cstr(name,"u8"))  return &builtin_u8;
     if (sv_compare_cstr(name,"i8"))  return &builtin_i8;
 
-    for (int i = 0; i < named_types.count; i++) {
+    for (size_t i = 0; i < named_types.count; i++) {
         Type *t = get_named_type(i);
         if (sv_equal(&t->name, name))
             return t;
@@ -112,13 +112,13 @@ typedef struct {
 } EnumResolverState;
 
 typedef struct {
-    TypeResolverState *res;
+    // TypeResolverState *res;
     Type *current_struct;
     Dyn_array struct_members; // DynArray<TypeMember>
 } StructResolverState;
 
 typedef struct {
-    TypeResolverState *res;
+    // TypeResolverState *res;
     Type *current_union;
     Dyn_array union_members; // DynArray<UnionMember>
 } UnionResolverState;
@@ -235,7 +235,7 @@ void type_resolver_union_visitor(AST_node *n, UnionResolverState *trs) {
     }
 }
 
-void type_resolver_visitor(AST_node *n, void *arg) {
+void type_resolver_visitor(AST_node *n, void *) {
     switch (n->kind) {
         case AST_struct:
             type_resolve_struct(n, true);
