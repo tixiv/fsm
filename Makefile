@@ -6,7 +6,8 @@ BUILD_DIR = build
 TEST_DIR = tests
 AOC21_DIR = aoc_21
 
-CFLAGS += -Wall -Wextra -O0 -g -MMD -MP
+CFLAGS += -Wall -Wextra -g -O0 -MMD -MP
+# -fsanitize=address -fno-omit-frame-pointer
 
 C_SRCS = $(wildcard $(SRC_DIR)/*.c)
 

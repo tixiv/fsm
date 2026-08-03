@@ -234,8 +234,8 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
 
 void resolver(AST_node *root) {
     Resolver res;
-    resolve_globals_visitor(root, &res);
     dyn_array_init(&res.local_symbols, sizeof(Symbol *), 32);
+    resolve_globals_visitor(root, &res);
     resolver_visitor(root, &res);
 }
 

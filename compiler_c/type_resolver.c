@@ -211,7 +211,7 @@ void type_resolver_union_visitor(AST_node *n, UnionResolverState *trs) {
         case AST_union_member_def: {
             UnionMember *member = dyn_array_push(&trs->union_members);
             member->name = n->union_member_def.name;
-            ast_visit_children(n, (AstVisitor)type_resolver_union_visitor, nullptr);
+            ast_visit_children(n, (AstVisitor)type_resolver_union_visitor, trs);
             if (n->union_member_def._typedef) {
                 if (!n->union_member_def._typedef->type) type_resolver_error(n->line_number, "The type for union member '%.*s' could not be resolved.\n", SV_prnt(member->name));
                 n->type = n->union_member_def._typedef->type;
