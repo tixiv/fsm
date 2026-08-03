@@ -247,6 +247,9 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             visit_non_null(n->user_cast.typedecl, visit, arg);
             visit_non_null(n->user_cast.body, visit, arg);
             break;
+        case AST_generic:
+            visit_non_null(n->generic.body, visit, arg);
+            break;
 
         case AST_enum_member:
         case AST_symbol:

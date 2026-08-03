@@ -969,11 +969,39 @@ static AST_node *parse_enum() {
     return ast_enum;
 }
 
+AST_node *parse_generic() {
+    expect_token(TOK_keyword_generic);
+    AST_node *ast_generic = ast_alloc(AST_generic, CT->line_number);
+    MOVE_NEXT();
+
+    expect_token(TOK_lower);
+    MOVE_NEXT();
+
+    expect_token(TOK_identifier);
+    ast_generic->generic.parameter_name = CT->value;
+    MOVE_NEXT();
+
+    expect_token(TOK_greater);
+    MOVE_NEXT();
+
+    if (CT->kind == TOK_keyword_fn) {
+        ast_generic->generic.body = parse_function();
+    }
+    else if (CT->kind == TOK_keyword_struct || CT->kind == TOK_keyword_record) {
+        ast_generic->generic.body = parse_struct();
+    }
+    else if (CT->kind == TOK_keyword_union) {
+        ast_generic->generic.body = parse_union();
+    }
+    else parser_error(CT->line_number, "Generic definition expects either 'fn', 'struct', 'record' or 'union'.\n");
+
+    return ast_generic;
+}
+
 AST_node *parse_program_ast() {
     debug_log_parser("Entering %s\n", __func__);
 
     AST_node *root = ast_alloc(AST_program, 0);
-    AST_node *last = nullptr;
 
     current_token = tokens;
     while (1) {
@@ -989,36 +1017,19 @@ AST_node *parse_program_ast() {
             take_expected(TOK_semicolon);
         }
         else if (CT->kind == TOK_keyword_fn) {
-            AST_node *fun = parse_function();
-            if (last) 
-                last->next = fun;
-            else
-                root->program.body = fun;
-            last = fun;
+            ast_link_to_chain(&root->program.body, parse_function());
         }
         else if (CT->kind == TOK_keyword_struct || CT->kind == TOK_keyword_record) {
-            AST_node *n = parse_struct();
-            if (last) 
-                last->next = n;
-            else
-                root->program.body = n;
-            last = n;
+            ast_link_to_chain(&root->program.body, parse_struct());
         }
         else if (CT->kind == TOK_keyword_union) {
-            AST_node *n = parse_union();
-            if (last) 
-                last->next = n;
-            else
-                root->program.body = n;
-            last = n;
+            ast_link_to_chain(&root->program.body, parse_union());
         }
         else if (CT->kind == TOK_keyword_enum) {
-            AST_node *n = parse_enum();
-            if (last) 
-                last->next = n;
-            else
-                root->program.body = n;
-            last = n;
+            ast_link_to_chain(&root->program.body, parse_enum());
+        }
+        else if (CT->kind == TOK_keyword_generic) {
+            ast_link_to_chain(&root->program.body, parse_generic());
         }
         else if (CT->kind == TOK_eof) {
             break;

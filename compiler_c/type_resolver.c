@@ -103,16 +103,22 @@ void type_lookup_visitor(AST_node *n, void *arg) {
 }
 
 typedef struct {
+    SV generic_parameter_name;
+} TypeResolverState;
+
+typedef struct {
     Type *current_enum;
     Dyn_array enum_members;   // DynArray<EnumMember>
 } EnumResolverState;
 
 typedef struct {
+    TypeResolverState *res;
     Type *current_struct;
     Dyn_array struct_members; // DynArray<TypeMember>
 } StructResolverState;
 
 typedef struct {
+    TypeResolverState *res;
     Type *current_union;
     Dyn_array union_members; // DynArray<UnionMember>
 } UnionResolverState;
@@ -295,6 +301,10 @@ void type_resolver_visitor(AST_node *n, void *arg) {
             n->type = get_sclice_type(n->_type_slice.body->type);
             break;
         }
+
+        case AST_generic:
+            break;
+            NOT_IMPLEMENTED("Type resolver for generic is not implemented yet.\n")
 
         default:
             ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);

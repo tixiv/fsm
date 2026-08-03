@@ -41,6 +41,7 @@
     X(AST_enum_member) \
     X(AST_union) \
     X(AST_union_member_def) \
+    X(AST_generic) \
     X(AST_typename) \
     X(AST_type_ref) \
     X(AST_type_array) \
@@ -284,6 +285,11 @@ typedef struct AST_node_s {
             struct AST_node_s *var_decl_arr;
             struct AST_node_s *body;
         } builder_string;
+
+        struct {
+            struct AST_node_s *body;
+            SV parameter_name;
+        } generic;
     };
 } AST_node;
 

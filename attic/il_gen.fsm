@@ -1,0 +1,74 @@
+
+enum CallArgumentRegs {
+    RDI, RSI, RDX, RCX, R8, R9
+}
+
+enum CallerSavedRegisters {
+    // The caller must assume these are destroyed by a function call:
+    RAX, RCX, RDX, RSI, RDI, R8, R9, R10, R11, /* XMM0-XMM15 */
+}
+
+enum CalleeSavedRegisters {
+    // If the callee uses these, it must restore them before returning:
+    RBX, RBP, R12, R13, R14, R15, RSP,
+}
+
+enum StorageKind {
+    Argument,
+    Local
+}
+
+struct IL_Value {
+
+}
+
+enum IL_BinaryOpKind {
+    Add,
+    Sub,
+    Mul,
+    Div,
+}
+
+union IL_Op enum kind {
+    struct {
+        result: IL_Value&;
+    }
+    struct Binary {
+        kind: IL_BinaryOpKind;
+        left: IL_Value&;
+        right: IL_Value&;
+    }
+    struct Load {
+        storage: StorageKind;
+    }
+}
+
+struct IL_Function {
+    name: u8[];
+}
+
+struct IL_Generator {
+
+}
+
+fn il_gen_function_visitor(n: AST_node&, arg: any&) : void {
+
+}
+
+fn il_gen_function(n: AST_node&) {
+    ast_visit_children(n, il_gen_function_visitor, null);
+}
+
+fn il_gen_visitor (n: AST_node&, arg: any&) : void {
+    if (n.kind == AST_node::AST_program) {
+        ast_visit_children(n, il_gen_visitor, arg);
+    }
+    else if (n.kind == AST_node::AST_function) {
+        il_gen_function(n);
+    }
+    else NOT_IMPLEMENTED(__LOCATION__, $"IL GEN visitor for {n.kind.name}");
+}
+
+fn run_il_gen (root: AST_node&) {
+    il_gen_visitor(root, null);
+}

@@ -134,6 +134,7 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_keyword_record: return("'record'");
         case TOK_keyword_enum: return("'enum'");
         case TOK_keyword_union: return("'union'");
+        case TOK_keyword_generic: return("'generic'");
         case TOK_keyword_import: return("'import'");
         case TOK_keyword_true: return("'true'");
         case TOK_keyword_false: return("'false'");
@@ -227,6 +228,9 @@ void handle_word(SV *word, int line_number) {
     }
     else if (sv_compare_cstr(word, "union")) {
         push_token(TOK_keyword_union, nullptr, line_number);
+    }
+    else if (sv_compare_cstr(word, "generic")) {
+        push_token(TOK_keyword_generic, nullptr, line_number);
     }
     else if (sv_compare_cstr(word, "import")) {
         push_token(TOK_keyword_import, nullptr, line_number);
