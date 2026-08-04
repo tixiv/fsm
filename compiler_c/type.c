@@ -129,6 +129,8 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
                 sb_printf(&sb, "anonymous enum", SV_prnt(type->name));
             }
             break;
+        case T_void:
+            return "non_builtin_void";
         default:
             NOT_IMPLEMENTED("Dumping type kind %d is not implemented yet.\n", type->kind);
             break;

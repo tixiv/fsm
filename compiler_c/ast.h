@@ -54,6 +54,7 @@
     X(AST_minus_minus) \
     X(AST_builder_string) \
     X(AST_generic_speciation) \
+    X(AST_generic_implementation) \
 
 typedef enum {
 #define X(name) name,
@@ -296,6 +297,10 @@ typedef struct AST_node_s {
             struct AST_node_s *typedecl;
             struct AST_node_s *body;
         } generic_speciation;
+
+        struct {
+            struct AST_node_s *body;
+        } generic_implementation;
     };
 } AST_node;
 

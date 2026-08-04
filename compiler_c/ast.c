@@ -255,6 +255,9 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             visit_non_null(n->generic_speciation.typedecl, visit, arg);
             visit_non_null(n->generic_speciation.body, visit, arg);
             break;
+        case AST_generic_implementation:
+            visit_non_null(n->generic_implementation.body, visit, arg);
+            break;
 
         case AST_enum_member:
         case AST_symbol:
@@ -286,8 +289,10 @@ AST_node *ast_copy_chain(AST_node *n) {
 
 AST_node *ast_copy_tree(AST_node *n) {
     if (!n) return nullptr;
+    printf("copy_tree %s\n", ast_kind_name(n->kind));
     AST_node *nn = ast_alloc(n->kind, n->line_number);
     memcpy(nn, n, sizeof(AST_node));
+    nn->next = nullptr;
     switch (n->kind) {
         case AST_generic:
             nn->generic.body = ast_copy_tree(n->generic.body);
@@ -442,6 +447,7 @@ static void ast_dump_visitor (AST_node *n, void *spaces_vp) {
         case AST_return:
         case AST_while:
         case AST_for:
+        case AST_generic_implementation:
             printf("%.*s%s \n", (int)spaces, spc, kind_name);
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;

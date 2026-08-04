@@ -72,6 +72,11 @@ static void stack_calc_vistitor(AST_node *n, StackVisitor *res) {
             break;
         }
 
+        case AST_generic:
+            // Don't calculate stacks for non speciated functions
+            break;
+
+
         default:
             ast_visit_children(n, (AstVisitor)stack_calc_vistitor, res);
             break;

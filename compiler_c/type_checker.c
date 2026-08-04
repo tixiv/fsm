@@ -12,6 +12,7 @@
 #include "symbol.h"
 #include <stdarg.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 static AST_node *ast_root;
@@ -498,15 +499,23 @@ void type_resolve_functions_visitor(AST_node *n, PropagationVisitorData *prop) {
 void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) ;
 
 Symbol *get_speciated_function_symbol(Symbol *g, PropagationVisitorData *prop) {
+    ASSERT(g->source, "Speciate called with null source on %.*s.\n", SV_prnt(g->name));
+    ASSERT(g->source->kind == AST_generic, "Speciate called on wrong kind of node.\n");
 
     AST_node *ast_generic = ast_copy_tree(g->source);
-    ASSERT(ast_generic->kind == AST_generic, "Speciate called on wrong kind of node.\n");
 
     type_resolver_speciate_generic(ast_generic, prop->generic_type);
     Symbol *s = resolver_speciate_generic(ast_generic, prop->generic_type);
-    type_propagation_visitor(ast_generic->generic.body, prop);
 
-    ast_link_to_chain(&prop->program->program.body, ast_generic->generic.body);
+    PropagationVisitorData prop_child = {0};
+    prop_child.program = prop->program;
+    type_propagation_visitor(ast_generic->generic.body, &prop_child);
+
+
+    AST_node *ast_implementation = ast_alloc(AST_generic_implementation, ast_generic->line_number);
+    ast_implementation->generic_implementation.body = ast_generic->generic.body;
+
+    ast_link_to_chain(&prop->program->program.body, ast_implementation);
     return s;
 }
 
@@ -573,6 +582,11 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
         case AST_generic:
             // Not visiting children since there is no sense in type checking the generic without speciation
+            n->type = &builtin_void;
+            break;
+        
+        case AST_generic_implementation:
+            // implementation has already been type checked
             n->type = &builtin_void;
             break;
         
@@ -938,6 +952,10 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
         case AST_generic_speciation:
             n->type = n->generic_speciation.body->type;
+            break;
+        
+        case AST_generic_implementation:
+            // already handled
             break;
 
         case AST_typename:

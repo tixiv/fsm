@@ -322,6 +322,17 @@ static void gen_call(AST_node *n, IL_gen *gen, bool result_used) {
                 push_opcode_sz(OP_push_result, nullptr, 0, n->type->storage_size);
         }
     }
+    else if (n->call.target->kind == AST_generic_speciation
+             && n->call.target->generic_speciation.body->kind == AST_symbol
+             && is_function_kind(n->call.target->type))
+    {
+        Symbol *s_call = n->call.target->generic_speciation.body->symbol.symbol;
+        SV name = n->call.target->generic_speciation.body->symbol.name;
+        ASSERT(s_call, "Symbol for called function '%.*s' is not resolved\n", SV_prnt(name));
+        push_opcode_sz(OP_call, &name, 0, get_function_arguments_size(s_call->type));
+        if (result_used)
+            push_opcode_sz(OP_push_result, nullptr, 0, n->type->storage_size);
+    }
     else if (is_reference_kind(n->call.target->type)
         && is_function_kind(dereferenced_type(n->call.target->type)))
     {
@@ -741,6 +752,7 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         case AST_enum_member:
         case AST_union:
         case AST_union_member_def:
+        case AST_generic_implementation:
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             break;
         default:

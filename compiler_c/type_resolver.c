@@ -327,7 +327,7 @@ void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
 }
 
 void type_resolver_speciate_generic(AST_node *root, Type *t) {
-    TypeResolverState trs;
+    TypeResolverState trs = {0};
     trs.generic_parameter_name = (SV) {nullptr, 0};
     trs.generic_parameter_type = t;
     type_resolver_visitor(root, &trs);
@@ -335,7 +335,7 @@ void type_resolver_speciate_generic(AST_node *root, Type *t) {
 
 
 void run_type_resolver(AST_node *root) {
-    TypeResolverState trs;
+    TypeResolverState trs = {0};
     trs.generic_parameter_name = (SV) {nullptr, 0};
     type_lookup_visitor(root, nullptr);
     type_resolver_visitor(root, &trs);
