@@ -329,6 +329,7 @@ static void gen_call(AST_node *n, IL_gen *gen, bool result_used) {
         Symbol *s_call = n->call.target->generic_speciation.body->symbol.symbol;
         SV name = n->call.target->generic_speciation.body->symbol.name;
         ASSERT(s_call, "Symbol for called function '%.*s' is not resolved\n", SV_prnt(name));
+        ast_visit_chain(n->call.args, (AstVisitor)gen_value_visitor, gen);
         push_opcode_sz(OP_call, &name, 0, get_function_arguments_size(s_call->type));
         if (result_used)
             push_opcode_sz(OP_push_result, nullptr, 0, n->type->storage_size);

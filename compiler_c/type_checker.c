@@ -503,13 +503,18 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) ;
 Symbol *get_speciated_function_symbol(Symbol *g, PropagationVisitorData *prop) {
     ASSERT(g->source, "Speciate called with null source on %.*s.\n", SV_prnt(g->name));
     ASSERT(g->source->kind == AST_generic, "Speciate called on wrong kind of node.\n");
+    ASSERT(g->source->generic.body->kind == AST_function, "Speciate called on wrong kind of node.\n");
 
+    SV encoded_name = encode_function_name(g->source->generic.body->fun.name, prop->generic_type);
+
+    Symbol * existing = get_symbol_by_name(&global_symbols, &encoded_name);
+
+    if (existing) return existing;
+    
     AST_node *ast_generic = ast_copy_tree(g->source);
-
     AST_node *ast_fn = ast_generic->generic.body;
-    ASSERT(ast_fn->kind == AST_function, "Speciate called on wrong kind of node.\n");
 
-    ast_fn->fun.name = encode_function_name(ast_fn->fun.name, prop->generic_type);
+    ast_fn->fun.name = encoded_name;
 
     type_resolver_speciate_generic(ast_generic, prop->generic_type);
     Symbol *s = resolver_speciate_generic(ast_generic, prop->generic_type);
@@ -517,6 +522,7 @@ Symbol *get_speciated_function_symbol(Symbol *g, PropagationVisitorData *prop) {
     PropagationVisitorData prop_child = {0};
     prop_child.program = prop->program;
     prop_child.current_function_symbol = s;
+    dyn_array_init(&prop_child.arg_symbols, sizeof(Symbol*), 8);
     type_resolve_functions_visitor(ast_generic->generic.body, &prop_child);
     type_propagation_visitor(ast_generic->generic.body, &prop_child);
 

@@ -35,6 +35,6 @@ fn main () {
 
     ast_dump_tree(root);
 
-    run_il_gen(root);
+    //run_il_gen(root);
 
 }

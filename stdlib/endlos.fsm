@@ -20,27 +20,36 @@ fn endlos_init(allocator: EndlosAllocator&) {
     }
 }
 
-fn endlos_begin (allocator: EndlosAllocator&) : u8[] {
+generic T fn endlos_begin (allocator: EndlosAllocator&) : T[] {
+    let align = T.sizeof;
+    if (align > 8) align = 8;
     for (let i = 0; i < 256; i++) {
         if (!allocator.rolls[i].latest.begin) {
-            allocator.rolls[i].latest = allocator.rolls[i].alloc;
-            return allocator.rolls[i].alloc;
+            let roll => allocator.rolls[i];
+            while (<u64>roll.alloc.begin % align) roll.alloc++;
+            roll.latest = roll.alloc;
+            let t_roll: T[];
+            t_roll.begin => <T&>roll.alloc.begin;
+            t_roll.len = roll.alloc.len / T.sizeof;
+            return t_roll;
         }
     }
     $"{__LOCATION__} Error: Endlos allocator has no free rolls available.\n"
     exit(1);
-    let a: u8[];
+    let a: T[];
     return a;
 }
 
-fn endlos_ripp_off (allocator: EndlosAllocator&, returned_roll: u8[]) : u8[] {
+generic T fn endlos_ripp_off (allocator: EndlosAllocator&, returned_roll: T[]) : T[] {
     for (let i = 0; i < 256; i++) {
         if (allocator.rolls[i].latest.begin) {
             let r => allocator.rolls[i];
             if (<i64>r.alloc.begin <= <i64>returned_roll.begin < <i64>r.alloc.begin + r.alloc.len) {
-                let finalized = r.latest;
-                finalized.len = r.latest.len - returned_roll.len;
-                r.alloc = returned_roll;
+                let finalized: T[];
+                finalized.begin => r.latest.begin;
+                finalized.len = (r.latest.len - returned_roll.len * T.sizeof) / T.sizeof;
+                r.alloc.begin => returned_roll.begin;
+                r.alloc.len = returned_roll.len * T.sizeof;
                 r.latest.begin => null;
                 r.latest.len = 0;
                 return finalized;
@@ -49,27 +58,6 @@ fn endlos_ripp_off (allocator: EndlosAllocator&, returned_roll: u8[]) : u8[] {
     }
     $"{__LOCATION__} Error: endlos_ripp_off() was called on something that didn't come from a roll.\n"
     exit(1);
-    let a: u8[];
+    let a: T[];
     return a;
-}
-
-
-fn endlos_begin_i64 (allocator: EndlosAllocator&) : i64[] {
-    let roll = endlos_begin(allocator);
-    let fuzz = roll.len % i64.sizeof;
-    while (fuzz--) roll++;
-    let roll_i64: i64[];
-    roll_i64.begin => <i64&> roll.begin;
-    roll_i64.len = roll.len / i64.sizeof;
-    return roll_i64;
-}
-
-fn endlos_ripp_off_i64 (allocator: EndlosAllocator&, roll: i64[]) : i64[] {
-    let roll_u8: u8[];
-    roll_u8.begin => <u8&> roll.begin;
-    roll_u8.len = roll.len * i64.sizeof;
-    roll_u8 = endlos_ripp_off(allocator, roll_u8);
-    roll.begin => <i64&> roll_u8.begin;
-    roll.len = roll_u8.len / i64.sizeof;
-    return roll;
 }

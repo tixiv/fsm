@@ -289,7 +289,6 @@ AST_node *ast_copy_chain(AST_node *n) {
 
 AST_node *ast_copy_tree(AST_node *n) {
     if (!n) return nullptr;
-    printf("copy_tree %s\n", ast_kind_name(n->kind));
     AST_node *nn = ast_alloc(n->kind, n->line_number);
     memcpy(nn, n, sizeof(AST_node));
     nn->next = nullptr;

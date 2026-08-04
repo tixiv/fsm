@@ -54,7 +54,7 @@ static void print_array_type(SB *sb, Type *arr_t) {
     }
 }
 
-const char *get_type_name_r(char print_buf[1024], Type *type) {
+static const char *get_type_name_r_impl(char print_buf[1024], Type *type, bool encoded) {
     if (type == nullptr)       return "(null type)";
     if (type == &builtin_void) return "void";
     if (type == &builtin_null) return "null";
@@ -80,26 +80,26 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
             sb_printf(&sb, "fn (");
             Type **args = type->fun.argument_types;
             for (size_t i = 0; i < type->fun.num_arguments; i++) {
-                sb_printf(&sb, "%s", get_type_name_r(child_print_buf, args[i]));
+                sb_printf(&sb, "%s", get_type_name_r_impl(child_print_buf, args[i], encoded));
                 if (i < type->fun.num_arguments-1) sb_printf(&sb, ", ");
             }
-            sb_printf(&sb, ") :%s", get_type_name_r(child_print_buf, type->fun.return_type));
+            sb_printf(&sb, ") :%s", get_type_name_r_impl(child_print_buf, type->fun.return_type, encoded));
             break;
         case T_reference:
-            sb_printf(&sb, "%s &", get_type_name_r(child_print_buf, type->reference.target_type));
+            sb_printf(&sb, "%s%s", get_type_name_r_impl(child_print_buf, type->reference.target_type, encoded), encoded ? "_ref" : " &");
             break;
         case T_enumerator:
-            sb_printf(&sb, "%s::enumerator", get_type_name_r(child_print_buf, type->enumerator.target_type));
+            sb_printf(&sb, "%s::enumerator", get_type_name_r_impl(child_print_buf, type->enumerator.target_type, encoded));
             break;
         case T_array:
             print_array_type(&sb, type);
             break;
         case T_struct:
             if (is_slice_type(type)) {
-                sb_printf(&sb, "%s[]", get_type_name_r(child_print_buf, dereferenced_type(type->_struct.members[0].type)));
+                sb_printf(&sb, "%s%s", get_type_name_r_impl(child_print_buf, dereferenced_type(type->_struct.members[0].type), encoded), encoded ? "slice" : "[]");
             }
             else if (type->name.begin) {
-                sb_printf(&sb, "struct %.*s", SV_prnt(type->name));
+                sb_printf(&sb, "%s%.*s", encoded ? "" : "struct ", SV_prnt(type->name));
             }
             else {
                 sb_printf(&sb, "anonymous struct", SV_prnt(type->name));
@@ -115,7 +115,7 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
             break;
         case T_union:
             if (type->name.begin) {
-                sb_printf(&sb, "union %.*s", SV_prnt(type->name));
+                sb_printf(&sb, "%s%.*s", encoded ? "" : "union ", SV_prnt(type->name));
             }
             else {
                 sb_printf(&sb, "anonymous record", SV_prnt(type->name));
@@ -137,6 +137,14 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
     }
 
     return sb.buffer;
+}
+
+const char *get_type_name_r(char print_buf[1024], Type *type) {
+    return get_type_name_r_impl(print_buf, type, false);
+}
+
+const char *get_type_name_encoded_r(char print_buf[1024], Type *type) {
+    return get_type_name_r_impl(print_buf, type, true);
 }
 
 bool is_boolean_kind(Type *t) {

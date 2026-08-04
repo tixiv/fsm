@@ -18,26 +18,6 @@ struct Symbol {
     offset; // stack offset for args and local vars
 }
 
-fn endlos_begin_Symbol (allocator: EndlosAllocator&) : Symbol[] {
-    let roll = endlos_begin(allocator);
-    let fuzz = roll.len % 8;
-    while (fuzz--) roll++;
-    let roll_symbol: Symbol[];
-    roll_symbol.begin => <Symbol&> roll.begin;
-    roll_symbol.len = roll.len / Symbol.sizeof;
-    return roll_symbol;
-}
-
-fn endlos_ripp_off_Symbol (allocator: EndlosAllocator&, roll: Symbol[]) : Symbol[] {
-    let roll_u8: u8[];
-    roll_u8.begin => <u8&> roll.begin;
-    roll_u8.len = roll.len * Symbol.sizeof;
-    roll_u8 = endlos_ripp_off(allocator, roll_u8);
-    roll.begin => <Symbol&> roll_u8.begin;
-    roll.len = roll_u8.len / Symbol.sizeof;
-    return roll;
-}
-
 fn alloc_symbol(roll: Symbol[]&, kind: SymbolKind, name: u8[]) : Symbol& {
     let s => roll++;
     s.kind = kind;
@@ -64,10 +44,8 @@ fn SymbolRefArr_reset (arr: SymbolRefArr&, len) {
 }
 
 fn SymbolRefArr_init (arr: SymbolRefArr&, allocator: EndlosAllocator&) {
-    let roll = endlos_begin_i64(allocator);
-    arr.alloc.begin => <Symbol& &> roll.begin;
-    arr.alloc.len = roll.len;
-    arr.arr.begin => arr.alloc.begin;
+    arr.alloc = endlos_begin:Symbol&(allocator);
+    arr.arr = arr.alloc;
     arr.arr.len = 0;
 }
 

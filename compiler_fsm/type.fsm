@@ -86,31 +86,9 @@ fn TypeRefArr_reset (arr: TypeRefArr&, len) {
 }
 
 fn TypeRefArr_init (arr: TypeRefArr&, allocator: EndlosAllocator&) {
-    let roll = endlos_begin_i64(allocator);
-    arr.alloc.begin => <Type& &> roll.begin;
-    arr.alloc.len = roll.len;
-    arr.arr.begin => arr.alloc.begin;
+    arr.alloc = endlos_begin:Type& (allocator);
+    arr.arr = arr.alloc;
     arr.arr.len = 0;
-}
-
-fn endlos_begin_Type (allocator: EndlosAllocator&) : Type[] {
-    let roll = endlos_begin(allocator);
-    let fuzz = roll.len % 8;
-    while (fuzz--) roll++;
-    let roll_symbol: Type[];
-    roll_symbol.begin => <Type&> roll.begin;
-    roll_symbol.len = roll.len / Type.sizeof;
-    return roll_symbol;
-}
-
-fn endlos_ripp_off_Type (allocator: EndlosAllocator&, roll: Type[]) : Type[] {
-    let roll_u8: u8[];
-    roll_u8.begin => <u8&> roll.begin;
-    roll_u8.len = roll.len * Type.sizeof;
-    roll_u8 = endlos_ripp_off(allocator, roll_u8);
-    roll.begin => <Type&> roll_u8.begin;
-    roll.len = roll_u8.len / Type.sizeof;
-    return roll;
 }
 
 struct TypeCache {
@@ -135,11 +113,8 @@ struct TypeCache {
 }
 
 fn TypeCache_init(cache: TypeCache&, allocator: EndlosAllocator&) {
-    cache.type_roll = endlos_begin_Type(allocator);
-    
-    let trr = endlos_begin_i64(allocator);
-    cache.type_ref_roll.begin => <Type& &> trr.begin;
-    cache.type_ref_roll.len = trr.len;
+    cache.type_roll = endlos_begin:Type(allocator);
+    cache.type_ref_roll = endlos_begin:Type&(allocator);
 
     TypeRefArr_init(cache.function_types, allocator);
 

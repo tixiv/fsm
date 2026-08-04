@@ -24,27 +24,32 @@
 bool debug_opcodes = false;
 
 static struct option long_options[] = {
-    {"help",    no_argument,       0, 'h'},
+    {"help",             no_argument, 0, 'h'},
     {"debug-ast",  required_argument, 0, 'a'},
+    {"debug_opcodes",    no_argument, 0, 'p'},
     {0, 0, 0, 0}
 };
 
 static void usage(const char *prg) {
     fprintf(stderr, "Usage: %s [options] <input.fsm>\n", prg);
     fprintf(stderr, "  -a --debug_ast <n> : Debug the AST at different points\n");
+    fprintf(stderr, "  -p --debug_opcodes : Debug the generated opcodes\n");
 }
 
 int main (int argc, char **argv) {
     int option_index = 0;
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "ha:", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "ha:p", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'h':
                 usage(argv[0]);
                 return 0;
             case 'a':
                 debug_ast = optarg;
+                break;
+            case 'p':
+                debug_opcodes = true;
                 break;
             default:
                 fprintf(stderr, "Unknown option '-%c'\n", optopt);

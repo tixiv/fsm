@@ -1,5 +1,5 @@
 
-import * from "ast"
+import * from "ast";
 
 fn il_gen_error(n: AST_node&, s: u8[]) {
     write(2, $"[FSM IL Gen] {n.location} Error: {s}\n");
@@ -11,6 +11,7 @@ fn il_gen_warning(n: AST_node&, s: u8[]) {
     exit(1);
 }
 
+/*
 
 struct IL_gen {
     static int num_ifs;
@@ -775,3 +776,5 @@ void ast_to_il(AST_node *root) {
 void ast_to_il_init() {
     dyn_array_init(&opcodes_dyn, sizeof(Opcode), 32);
 }
+
+*/

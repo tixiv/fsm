@@ -3,18 +3,18 @@ import * from "std";
 import * from "endlos";
 
 fn blurg(allocator: EndlosAllocator&) {
-    let my_roll = endlos_begin(allocator);
+    let my_roll = endlos_begin:u8(allocator);
 
     for (let i = 0; i < 10; i++) {
         my_roll++ = i + '0';
     }
 
-    return endlos_ripp_off(allocator, my_roll);
+    return endlos_ripp_off:u8(allocator, my_roll);
 }
 
 fn blarg (allocator: EndlosAllocator&, level) : void {
 
-    let my_roll = endlos_begin(allocator);
+    let my_roll = endlos_begin:u8(allocator);
 
     let blurg_result: u8[];
 
@@ -27,11 +27,10 @@ fn blarg (allocator: EndlosAllocator&, level) : void {
         }
     }
 
-    let finalized = endlos_ripp_off(allocator, my_roll);
+    let finalized = endlos_ripp_off:u8(allocator, my_roll);
 
     $"{finalized}   {blurg_result}\n"
 }
-
 
 fn main () {
     let allocator: EndlosAllocator;
