@@ -52,7 +52,7 @@ static void il_gen_push_symbol_address(Symbol *s) {
     else if (s->kind == SYM_arg) {
         push_opcode(OP_push_arg_address, nullptr, s->offset);
     }
-    else if (s->kind == SYM_global) {
+    else if (s->kind == SYM_function) {
         push_opcode(OP_push_global_address, &s->name, 0);
     }
     else {
@@ -718,6 +718,11 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         case AST_symbol:
             il_gen_warning(n->line_number, "unused code.");
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
+            break;
+        
+        case AST_generic:
+            // Don't generate code for generic functions.
+            // Their implementations for specific types live outside of generic blocks.
             break;
 
 

@@ -53,6 +53,7 @@
     X(AST_plus_plus) \
     X(AST_minus_minus) \
     X(AST_builder_string) \
+    X(AST_generic_speciation) \
 
 typedef enum {
 #define X(name) name,
@@ -290,6 +291,11 @@ typedef struct AST_node_s {
             struct AST_node_s *body;
             SV parameter_name;
         } generic;
+
+        struct {
+            struct AST_node_s *typedecl;
+            struct AST_node_s *body;
+        } generic_speciation;
     };
 } AST_node;
 
@@ -304,5 +310,7 @@ typedef void (*AstVisitor)(AST_node *, void *);
 
 void ast_visit_chain(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg);
 void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg);
+
+AST_node *ast_copy_tree(AST_node *n);
 size_t ast_count_chain(AST_node *n);
 void ast_dump_tree (AST_node *root);

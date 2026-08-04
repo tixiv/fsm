@@ -30,6 +30,8 @@ Type builtin_u8_slice = (Type){T_struct, .storage_size = 16, ._struct.num_member
 
 Type builtin_any = (Type){T_any, .storage_size = 0};
 
+Type builtin_generic = (Type){T_generic, .storage_size = 0};
+
 Type *type_alloc(TypeKind kind) {
     Type *t = malloc(sizeof(Type));
     memset(t, 0, sizeof(Type));
@@ -58,6 +60,7 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
     if (type == &builtin_null) return "null";
     if (type == &builtin_bool) return "bool";
     if (type == &builtin_any)  return "any";
+    if (type == &builtin_generic) return "generic";
     if (type == &builtin_u64)  return "u64";
     if (type == &builtin_i64)  return "i64";
     if (type == &builtin_u32)  return "u32";

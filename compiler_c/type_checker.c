@@ -8,6 +8,7 @@
 #include "common.h"
 #include "string_builder.h"
 #include "resolver.h"
+#include "type_resolver.h"
 #include "symbol.h"
 #include <stdarg.h>
 #include <stdint.h>
@@ -390,6 +391,8 @@ typedef struct {
     Type *current_function_ret_type_decl;
     Type *current_function_ret_type;
     Dyn_array arg_symbols;
+    Type *generic_type;
+    AST_node *program;
 } PropagationVisitorData;
 
 void type_check_function_call(AST_node *n_call, PropagationVisitorData *) {
@@ -492,6 +495,52 @@ void type_resolve_functions_visitor(AST_node *n, PropagationVisitorData *prop) {
     }
 }
 
+void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) ;
+
+Symbol *get_speciated_function_symbol(Symbol *g, PropagationVisitorData *prop) {
+
+    AST_node *ast_generic = ast_copy_tree(g->source);
+    ASSERT(ast_generic->kind == AST_generic, "Speciate called on wrong kind of node.\n");
+
+    type_resolver_speciate_generic(ast_generic, prop->generic_type);
+    Symbol *s = resolver_speciate_generic(ast_generic, prop->generic_type);
+    type_propagation_visitor(ast_generic->generic.body, prop);
+
+    ast_link_to_chain(&prop->program->program.body, ast_generic->generic.body);
+    return s;
+}
+
+void type_check_symbol(AST_node *n, PropagationVisitorData *prop)
+{
+    // check for recursive use of the function we are propagating right now
+    if (n->symbol.symbol == prop->current_function_symbol &&
+        !n->symbol.symbol->type->fun.return_type)
+    {
+        // Maybe we have a return type by now? In the recursive fibonacci
+        // test we would for example because it returns something before
+        // doing the recursion
+        update_current_function_type(prop);
+
+        // Still no return type?
+        if (!n->symbol.symbol->type->fun.return_type) {
+            type_checker_error(n->line_number,
+                "The return type for function '%.*s()' can't be determined automatically in recursive use. Please specify it!",
+                SV_prnt(n->symbol.name));
+        }
+    }
+
+    if (prop->generic_type) {
+        if (n->symbol.symbol->kind == SYM_function) {
+            n->symbol.symbol = get_speciated_function_symbol(n->symbol.symbol, prop);
+        }
+        else {
+            type_checker_error(n->line_number, "Generic speciation not allowed for %s\n", symbol_kind_name(n->symbol.symbol->kind));
+        }
+    }
+    n->type = n->symbol.symbol->type;
+    n->addressable = n->symbol.symbol->kind != SYM_type;
+}
+
 void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
     char buf_1[1024]; char buf_2[1024];
 
@@ -514,6 +563,22 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             prop->current_function_symbol = nullptr;
             prop->current_function_ret_type = nullptr;
             prop->current_function_ret_type_decl = nullptr;
+            break;
+
+        case AST_generic_speciation:
+            prop->generic_type = n->generic_speciation.typedecl->type;
+            ast_visit_children(n, (AstVisitor)type_propagation_visitor, prop);
+            prop->generic_type = nullptr;
+            break;
+
+        case AST_generic:
+            // Not visiting children since there is no sense in type checking the generic without speciation
+            n->type = &builtin_void;
+            break;
+        
+        case AST_program:
+            prop->program = n;
+            ast_visit_children(n, (AstVisitor)type_propagation_visitor, prop);
             break;
 
         default:
@@ -578,29 +643,9 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             n->type = &builtin_void; // the declaration itself has no value.
             break;
         }
-        case AST_symbol: {
-            // check for recursive use of the function we are propagating right now
-            if (n->symbol.symbol == prop->current_function_symbol &&
-                !n->symbol.symbol->type->fun.return_type)
-            {
-                // Maybe we have a return type by now? In the recursive fibonacci
-                // test we would for example because it returns something before
-                // doing the recursion
-                update_current_function_type(prop);
-
-                // Still no return type?
-                if (!n->symbol.symbol->type->fun.return_type) {
-                    type_checker_error(n->line_number,
-                        "The return type for function '%.*s()' can't be determined automatically in recursive use. Please specify it!",
-                        SV_prnt(n->symbol.name));
-                }
-            }
-            
-            Type *t = n->symbol.symbol->type;
-            n->type = t;
-            n->addressable = n->symbol.symbol->kind != SYM_type;
+        case AST_symbol:
+            type_check_symbol(n, prop);
             break;
-        }
 
         case AST_binary:
             type_propagate_binary_operator(n);
@@ -885,6 +930,14 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
         case AST_null:
             n->type = &builtin_null;
+            break;
+
+        case AST_generic:
+            n->type = &builtin_void;
+            break;
+
+        case AST_generic_speciation:
+            n->type = n->generic_speciation.body->type;
             break;
 
         case AST_typename:

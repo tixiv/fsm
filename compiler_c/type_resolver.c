@@ -76,7 +76,7 @@ void push_named_type(SV name, Type * t, int line_number) {
     type_resolver_push_symbol(s, line_number);
 }
 
-void type_lookup_visitor(AST_node *n, void *arg) {
+void type_lookup_visitor(AST_node *n, void *) {
     switch (n->kind) {
         case AST_struct:
             if (n->_struct.is_record)
@@ -97,28 +97,30 @@ void type_lookup_visitor(AST_node *n, void *arg) {
             break;
 
         default:
-            ast_visit_children(n, type_lookup_visitor, arg);
+            ast_visit_children(n, type_lookup_visitor, nullptr);
             break;
     }
 }
 
 typedef struct {
     SV generic_parameter_name;
+    Type *generic_parameter_type;
 } TypeResolverState;
 
 typedef struct {
+    TypeResolverState *trs;
     Type *current_enum;
     Dyn_array enum_members;   // DynArray<EnumMember>
 } EnumResolverState;
 
 typedef struct {
-    // TypeResolverState *res;
+    TypeResolverState *trs;
     Type *current_struct;
     Dyn_array struct_members; // DynArray<TypeMember>
 } StructResolverState;
 
 typedef struct {
-    // TypeResolverState *res;
+    TypeResolverState *trs;
     Type *current_union;
     Dyn_array union_members; // DynArray<UnionMember>
 } UnionResolverState;
@@ -146,12 +148,13 @@ void copy_union_members(UnionResolverState *trs){
     calculate_storage_size(trs->current_union);
 }
 
-void type_resolver_visitor(AST_node *n, void *);
+void type_resolver_visitor(AST_node *n, TypeResolverState *trs);
 void type_resolver_struct_visitor(AST_node *n, StructResolverState *trs);
 
-void type_resolve_struct(AST_node *n, bool global) {
-    StructResolverState trs_1;
-    dyn_array_init(&trs_1.struct_members, sizeof(StructMember), 8);
+void type_resolve_struct(AST_node *n, TypeResolverState *trs, bool global) {
+    StructResolverState srs;
+    srs.trs = trs;
+    dyn_array_init(&srs.struct_members, sizeof(StructMember), 8);
     if (global) {
         n->type = get_type_by_name(&n->_struct.name);
         ASSERT(n->type, "The type name '%.*s' should exist because it should have been found in the lookup pass.\n", SV_prnt(n->_struct.name));
@@ -159,18 +162,18 @@ void type_resolve_struct(AST_node *n, bool global) {
     else {
         n->type = type_alloc(n->_struct.is_record ? T_record : T_struct);
     }
-    trs_1.current_struct = n->type;
-    ast_visit_children(n, (AstVisitor)type_resolver_struct_visitor, &trs_1);
-    copy_struct_members(&trs_1);
+    srs.current_struct = n->type;
+    ast_visit_children(n, (AstVisitor)type_resolver_struct_visitor, &srs);
+    copy_struct_members(&srs);
 }
 
-void type_resolver_enum_visitor(AST_node *n, EnumResolverState *trs) {
+void type_resolver_enum_visitor(AST_node *n, EnumResolverState *ers) {
     switch (n->kind) {
         case AST_enum_member: {
-            ASSERT(trs->current_enum, "Encountered %s outside of enum.\n", ast_kind_name(n->kind));
-            EnumMember *member = dyn_array_push(&trs->enum_members);
+            ASSERT(ers->current_enum, "Encountered %s outside of enum.\n", ast_kind_name(n->kind));
+            EnumMember *member = dyn_array_push(&ers->enum_members);
             member->name = n->_enum_member.name;
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, ers->trs);
             member->value = n->_enum_member.value;
             n->type = &builtin_i64;
             break;
@@ -182,13 +185,13 @@ void type_resolver_enum_visitor(AST_node *n, EnumResolverState *trs) {
     }
 }
 
-void type_resolver_struct_visitor(AST_node *n, StructResolverState *trs) {
+void type_resolver_struct_visitor(AST_node *n, StructResolverState *srs) {
     switch (n->kind) {
         case AST_member_def: {
-            ASSERT(trs->current_struct, "Encountered %s outside of struct.\n", ast_kind_name(n->kind));
-            StructMember *member = dyn_array_push(&trs->struct_members);
+            ASSERT(srs->current_struct, "Encountered %s outside of struct.\n", ast_kind_name(n->kind));
+            StructMember *member = dyn_array_push(&srs->struct_members);
             member->name = n->struct_member_def.name;
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, srs->trs);
             if (n->struct_member_def._typedef) {
                 if (!n->struct_member_def._typedef->type) type_resolver_error(n->line_number, "The type for struct member '%.*s' could not be resolved.\n", SV_prnt(member->name));
                 n->type = n->struct_member_def._typedef->type;
@@ -206,12 +209,12 @@ void type_resolver_struct_visitor(AST_node *n, StructResolverState *trs) {
     }
 }
 
-void type_resolver_union_visitor(AST_node *n, UnionResolverState *trs) {
+void type_resolver_union_visitor(AST_node *n, UnionResolverState *urs) {
     switch (n->kind) {
         case AST_union_member_def: {
-            UnionMember *member = dyn_array_push(&trs->union_members);
+            UnionMember *member = dyn_array_push(&urs->union_members);
             member->name = n->union_member_def.name;
-            ast_visit_children(n, (AstVisitor)type_resolver_union_visitor, trs);
+            ast_visit_children(n, (AstVisitor)type_resolver_union_visitor, urs);
             if (n->union_member_def._typedef) {
                 if (!n->union_member_def._typedef->type) type_resolver_error(n->line_number, "The type for union member '%.*s' could not be resolved.\n", SV_prnt(member->name));
                 n->type = n->union_member_def._typedef->type;
@@ -225,7 +228,7 @@ void type_resolver_union_visitor(AST_node *n, UnionResolverState *trs) {
         }
 
         case AST_struct: {
-            type_resolve_struct(n, false);
+            type_resolve_struct(n, urs->trs, false);
             break;
         }
 
@@ -235,44 +238,52 @@ void type_resolver_union_visitor(AST_node *n, UnionResolverState *trs) {
     }
 }
 
-void type_resolver_visitor(AST_node *n, void *) {
+void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
     switch (n->kind) {
         case AST_struct:
-            type_resolve_struct(n, true);
+            type_resolve_struct(n, trs, true);
             break;
 
         case AST_enum: {
-            EnumResolverState trs_1;
-            dyn_array_init(&trs_1.enum_members, sizeof(EnumMember), 8);
+            EnumResolverState ers;
+            dyn_array_init(&ers.enum_members, sizeof(EnumMember), 8);
             n->type = get_type_by_name(&n->_enum.name);
             ASSERT(n->type, "The type name should exist because it should have been found in the lookup pass.\n");
-            trs_1.current_enum = n->type;
-            ast_visit_children(n, (AstVisitor)type_resolver_enum_visitor, &trs_1);
-            copy_enum_members(&trs_1);
+            ers.current_enum = n->type;
+            ast_visit_children(n, (AstVisitor)type_resolver_enum_visitor, &ers);
+            copy_enum_members(&ers);
             break;
         }
 
         case AST_union: {
-            UnionResolverState trs_1;
-            dyn_array_init(&trs_1.union_members, sizeof(UnionMember), 8);
+            UnionResolverState urs;
+            urs.trs = trs;
+            dyn_array_init(&urs.union_members, sizeof(UnionMember), 8);
             n->type = get_type_by_name(&n->_union.name);
             n->type->_union.enumarator_name = n->_union.enumerator_name;
             ASSERT(n->type, "The type name should exist because it should have been found in the lookup pass.\n");
-            trs_1.current_union = n->type;
-            ast_visit_children(n, (AstVisitor)type_resolver_union_visitor, &trs_1);
-            copy_union_members(&trs_1);
+            urs.current_union = n->type;
+            ast_visit_children(n, (AstVisitor)type_resolver_union_visitor, &urs);
+            copy_union_members(&urs);
             break;
         }
 
         case AST_typename: {
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
-            n->type = get_type_by_name(&n->_typename.name);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
+            if (trs->generic_parameter_name.begin && sv_equal(&trs->generic_parameter_name, &n->_typename.name)) {
+                if (trs->generic_parameter_type)
+                    n->type = trs->generic_parameter_type;
+                else
+                    n->type = &builtin_generic;
+            }
+            else
+                n->type = get_type_by_name(&n->_typename.name);
             if (!n->type) type_resolver_error(n->line_number, "The typename '%.*s' could not be resolved.\n", SV_prnt(n->_typename.name));
             break;
         }
 
         case AST_function_type: {
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
 
             size_t num_arguments = ast_count_chain(n->_function_type.function_args);
             Type**args = malloc(sizeof(Type*) * num_arguments);
@@ -287,35 +298,47 @@ void type_resolver_visitor(AST_node *n, void *) {
         }
 
         case AST_type_ref:
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
             n->type = get_ref_type_for(n->_type_ref.body->type);
             break;
 
         case AST_type_array:
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
             n->type = get_array_type(n->_type_array.body->type, n->_type_array.n_elements);
             break;
 
         case AST_type_slice: {
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
             n->type = get_sclice_type(n->_type_slice.body->type);
             break;
         }
 
         case AST_generic:
+            trs->generic_parameter_name = n->generic.parameter_name;
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
+            trs->generic_parameter_name = (SV) {nullptr, 0};
             break;
-            NOT_IMPLEMENTED("Type resolver for generic is not implemented yet.\n")
 
         default:
-            ast_visit_children(n, (AstVisitor)type_resolver_visitor, nullptr);
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
             break;
             
     }
 }
 
+void type_resolver_speciate_generic(AST_node *root, Type *t) {
+    TypeResolverState trs;
+    trs.generic_parameter_name = (SV) {nullptr, 0};
+    trs.generic_parameter_type = t;
+    type_resolver_visitor(root, &trs);
+}
+
+
 void run_type_resolver(AST_node *root) {
+    TypeResolverState trs;
+    trs.generic_parameter_name = (SV) {nullptr, 0};
     type_lookup_visitor(root, nullptr);
-    type_resolver_visitor(root, nullptr);
+    type_resolver_visitor(root, &trs);
 }
 
 void type_resolver_init() {

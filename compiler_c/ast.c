@@ -8,6 +8,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
@@ -250,6 +251,10 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
         case AST_generic:
             visit_non_null(n->generic.body, visit, arg);
             break;
+        case AST_generic_speciation:
+            visit_non_null(n->generic_speciation.typedecl, visit, arg);
+            visit_non_null(n->generic_speciation.body, visit, arg);
+            break;
 
         case AST_enum_member:
         case AST_symbol:
@@ -267,6 +272,151 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
     }
 }
 
+AST_node *ast_copy_tree(AST_node *n);
+
+AST_node *ast_copy_chain(AST_node *n) {
+    AST_node *base = nullptr;
+    while(n) {
+        ast_link_to_chain(&base, ast_copy_tree(n));
+        n = n->next;
+    }
+    
+    return base;
+}
+
+AST_node *ast_copy_tree(AST_node *n) {
+    if (!n) return nullptr;
+    AST_node *nn = ast_alloc(n->kind, n->line_number);
+    memcpy(nn, n, sizeof(AST_node));
+    switch (n->kind) {
+        case AST_generic:
+            nn->generic.body = ast_copy_tree(n->generic.body);
+            break;
+        case AST_arg_list:
+            nn->arg_list.body = ast_copy_chain(n->arg_list.body);
+            break;
+        case AST_scope:
+            nn->scope.body = ast_copy_chain(n->scope.body);
+            break;
+        case AST_function:
+            nn->fun.args = ast_copy_tree(n->fun.args);
+            nn->fun.ret_typedecl = ast_copy_tree(n->fun.ret_typedecl);
+            nn->fun.body = ast_copy_chain(n->fun.body);
+            break;
+        case AST_return:
+            nn->ret.body = ast_copy_tree(n->ret.body);
+            break;
+        case AST_var_decl:
+            nn->var_decl._typedecl = ast_copy_tree(n->var_decl._typedecl);
+            nn->var_decl.initializer = ast_copy_tree(n->var_decl.initializer);
+            break;
+        case AST_arg_decl:
+            nn->arg_decl._typedecl = ast_copy_tree(n->arg_decl._typedecl);
+            break;
+        case AST_if:
+            nn->_if.condition = ast_copy_tree(n->_if.condition);
+            nn->_if.if_clause = ast_copy_tree(n->_if.if_clause);
+            nn->_if.else_clause = ast_copy_tree(n->_if.else_clause);
+            break;
+        case AST_while:
+            nn->_while.condition = ast_copy_tree(n->_while.condition);
+            nn->_while.body = ast_copy_tree(n->_while.body);
+            break;
+        case AST_for:
+            nn->_for.initializer = ast_copy_tree(n->_for.initializer);
+            nn->_for.condition = ast_copy_tree(n->_for.condition);
+            nn->_for.post_action = ast_copy_tree(n->_for.post_action);
+            nn->_for.body = ast_copy_tree(n->_for.body);
+            nn->_for.result = ast_copy_tree(n->_for.result);
+            break;
+        case AST_binary:
+            nn->binary.left = ast_copy_tree(n->binary.left);
+            nn->binary.right = ast_copy_tree(n->binary.right);
+            break;
+        case AST_unary:
+            nn->unary.body = ast_copy_tree(n->unary.body);
+            break;
+        case AST_call:
+            nn->call.target = ast_copy_tree(n->call.target);
+            nn->call.args = ast_copy_chain(n->call.args);
+            break;
+        case AST_cast:
+            nn->_cast.body = ast_copy_tree(n->_cast.body);
+            break;
+        case AST_array_to_slice:
+            nn->_array_to_slice.body = ast_copy_tree(n->_array_to_slice.body);
+            break;
+        case AST_array_access:
+            nn->_array.array = ast_copy_tree(n->_array.array);
+            nn->_array.index = ast_copy_tree(n->_array.index);
+            break;
+        case AST_dereference:
+            nn->deref.body = ast_copy_tree(n->deref.body);
+            break;
+        case AST_reference:
+            nn->reference.body = ast_copy_tree(n->reference.body);
+            break;
+        case AST_plus_plus:
+            nn->plus_plus.body = ast_copy_tree(n->plus_plus.body);
+            break;
+        case AST_minus_minus:
+            nn->minus_minus.body = ast_copy_tree(n->minus_minus.body);
+            break;
+        case AST_member_access:
+            nn->member_access.body = ast_copy_tree(n->member_access.body);
+            break;
+        case AST_namespace_access:
+            nn->namespace_access.body = ast_copy_tree(n->namespace_access.body);
+            break;
+        case AST_typename:
+            break;
+        case AST_type_ref:
+            nn->_type_ref.body = ast_copy_tree(n->_type_ref.body);
+            break;
+        case AST_type_array:
+            nn->_type_array.body = ast_copy_tree(n->_type_array.body);
+            break;
+        case AST_type_slice:
+            nn->_type_slice.body = ast_copy_tree(n->_type_slice.body);
+            break;
+        case AST_variadic_operator:
+            nn->variadic_operator.left = ast_copy_tree(n->variadic_operator.left);
+            nn->variadic_operator.members = malloc(sizeof(VariadicOperatorMember) * n->variadic_operator.num_members);
+            for (size_t i = 0; i < n->variadic_operator.num_members; i++) {
+                memcpy(&nn->variadic_operator.members[i], &n->variadic_operator.members[i], sizeof(VariadicOperatorMember));
+                nn->variadic_operator.members[i].right = ast_copy_tree(n->variadic_operator.members[i].right);
+            }
+            break;
+        case AST_builder_string:
+            nn->builder_string.var_decl_sb = ast_copy_tree(n->builder_string.var_decl_sb);
+            nn->builder_string.var_decl_arr = ast_copy_tree(n->builder_string.var_decl_arr);
+            nn->builder_string.body = ast_copy_chain(n->builder_string.body);
+            break;
+        case AST_function_type:
+            nn->_function_type.function_args = ast_copy_chain(n->_function_type.function_args);
+            nn->_function_type.function_ret = ast_copy_tree(n->_function_type.function_ret);
+            break;
+        case AST_user_cast:
+            nn->user_cast.typedecl = ast_copy_tree(n->user_cast.typedecl);
+            nn->user_cast.body = ast_copy_tree(n->user_cast.body);
+            break;
+        case AST_enum_member:
+        case AST_symbol:
+        case AST_number:
+        case AST_bool:
+        case AST_null:
+        case AST_string:
+        case AST_char_constant:
+        case AST_array_len:
+            break;
+
+        default:
+            NOT_IMPLEMENTED("Copying %s is not implemented yet.\n", ast_kind_name(n->kind));
+            break;
+    }
+
+    return nn;
+}
 
 static void print_symbol(Symbol *s) {
     if(!s)
@@ -283,6 +433,7 @@ static void ast_dump_visitor (AST_node *n, void *spaces_vp) {
     const char *kind_name = ast_kind_name(n->kind);
 
     char buf[1024];
+    char buf2[1024];
 
     switch (n->kind) {
         case AST_program:
@@ -426,6 +577,14 @@ static void ast_dump_visitor (AST_node *n, void *spaces_vp) {
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         }
+        case AST_generic:
+            printf("%.*s%s \"%.*s\" (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->generic.parameter_name), get_type_name_r(buf, n->type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_generic_speciation:
+            printf("%.*s%s :%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf2, n->generic_speciation.typedecl->type), get_type_name_r(buf, n->type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
         default:
             NOT_IMPLEMENTED("Dumping %s is not implemented yet.\n", ast_kind_name(n->kind));
             break;

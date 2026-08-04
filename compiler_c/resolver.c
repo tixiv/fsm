@@ -24,8 +24,12 @@ static void resolver_error(int line_number, const char * fmt, ...) {
 typedef struct {
     Dyn_array local_symbols;
     Symbol *current_function;
+    Symbol *out_latest_function;
     size_t locals_stack[100];
     size_t locals_stack_pointer;
+    Symbol *generic_symbol;
+    AST_node *current_generic;
+    Type *current_generic_type;
 } Resolver;
 
 static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, bool do_undefined_error);
@@ -45,7 +49,7 @@ static void push_symbol(Resolver *res, Dyn_array *arr, Symbol *s, int line_numbe
 Dyn_array builtin_functions; // Dyn_array<Symbol*>
 
 void declare_builtin_fn(SV name, Type *return_type, size_t num_args, Type *arg_types[]) {
-    Symbol *s = alloc_symbol(SYM_global, name);
+    Symbol *s = alloc_symbol(SYM_function, name);
     s->type = get_function_type(return_type, arg_types, num_args);
     dyn_array_push_p(&builtin_functions, s);
 }
@@ -99,6 +103,10 @@ static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, 
         return s;
     }
 
+    if (res->generic_symbol && sv_equal(&res->generic_symbol->name, name)) {
+        return res->generic_symbol;
+    }
+
     if(do_undefined_error)
         resolver_error(line_number, "Undefined symbol %.*s", SV_prnt(*name));
     
@@ -107,6 +115,7 @@ static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, 
 
 static void resolver_enter_function(Resolver *res, Symbol *s_fun) {
     res->current_function = s_fun;
+    res->out_latest_function = s_fun;
     res->local_symbols.count = 0;
     res->locals_stack_pointer = 0;
 }
@@ -130,11 +139,17 @@ static void resolver_leave_scope(Resolver *res) {
 static void resolve_globals_visitor (AST_node *n, Resolver *res) {
     switch (n->kind) {
         case AST_function: {
-            Symbol *s_fun = alloc_symbol(SYM_global, n->fun.name);
+            Symbol *s_fun = alloc_symbol(SYM_function, n->fun.name);
+            s_fun->source = res->current_generic;
             push_symbol(res, &global_symbols, s_fun, n->line_number);
             n->fun.symbol = s_fun;
             break;
         }
+        case AST_generic:
+            res->current_generic = n;
+            ast_visit_children(n, (AstVisitor)resolve_globals_visitor, res);
+            res->current_generic = nullptr;
+            break;
         default:
             ast_visit_children(n, (AstVisitor)resolve_globals_visitor, res);
             break;
@@ -192,6 +207,18 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
             resolver_leave_scope(res);
             break;
 
+        case AST_generic:
+            res->current_generic = n;
+            res->generic_symbol = alloc_symbol(SYM_type, n->generic.parameter_name);
+            if (res->current_generic_type)
+                res->generic_symbol->type = res->current_generic_type;
+            else
+                res->generic_symbol->type = &builtin_generic;
+            ast_visit_children(n, (AstVisitor)resolver_visitor, res);
+            res->generic_symbol = nullptr;
+            res->current_generic = nullptr;
+            break;
+
         case AST_arg_list:
         case AST_program:
         case AST_if:
@@ -223,6 +250,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_type_slice:
         case AST_builder_string:
         case AST_user_cast:
+        case AST_generic_speciation:
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             break;
 
@@ -232,8 +260,16 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
     }
 }
 
+Symbol *resolver_speciate_generic(AST_node *root, Type *t) {
+    Resolver res = {0};
+    res.current_generic_type = t;
+    dyn_array_init(&res.local_symbols, sizeof(Symbol *), 32);
+    resolver_visitor(root, &res);
+    return res.out_latest_function;
+}
+
 void resolver(AST_node *root) {
-    Resolver res;
+    Resolver res = {0};
     dyn_array_init(&res.local_symbols, sizeof(Symbol *), 32);
     resolve_globals_visitor(root, &res);
     resolver_visitor(root, &res);

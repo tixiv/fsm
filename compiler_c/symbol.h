@@ -5,7 +5,7 @@
 #include "type.h"
 
 #define SYM_LIST \
-    X(SYM_global) \
+    X(SYM_function) \
     X(SYM_local) \
     X(SYM_arg) \
     X(SYM_type) \
@@ -19,6 +19,8 @@ typedef enum {
 
 const char *symbol_kind_name(SymbolKind kind);
 
+struct AST_node_s;
+
 typedef struct {
     SV name;
     SymbolKind kind;
@@ -26,6 +28,8 @@ typedef struct {
 
     size_t size; // stack frame size for functions
     size_t offset; // stack offset for args and local vars
+
+    struct AST_node_s *source; // for generics
 } Symbol;
 
 Symbol *alloc_symbol(SymbolKind kind, SV name);

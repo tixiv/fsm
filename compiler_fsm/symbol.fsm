@@ -3,7 +3,7 @@ import * from "endlos";
 import * from "type";
 
 enum SymbolKind {
-    SYM_global,
+    SYM_function,
     SYM_local,
     SYM_arg,
     SYM_type,

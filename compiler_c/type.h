@@ -22,6 +22,7 @@ typedef enum {
     T_enumerator,
     T_enum,
     T_any, // 'any' works like the 'void' in C's void* for now, just with a better name.
+    T_generic,
 } TypeKind;
 
 struct Type_s;
@@ -104,6 +105,8 @@ extern Type builtin_i8;
 
 extern Type builtin_u8_reference;
 extern Type builtin_u8_slice;
+
+extern Type builtin_generic;
 
 
 Type *type_alloc(TypeKind kind);
