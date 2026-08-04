@@ -264,6 +264,7 @@ Symbol *resolver_speciate_generic(AST_node *root, Type *t) {
     Resolver res = {0};
     res.current_generic_type = t;
     dyn_array_init(&res.local_symbols, sizeof(Symbol *), 32);
+    resolve_globals_visitor(root, &res);
     resolver_visitor(root, &res);
     return res.out_latest_function;
 }

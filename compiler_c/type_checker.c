@@ -10,6 +10,7 @@
 #include "resolver.h"
 #include "type_resolver.h"
 #include "symbol.h"
+#include "type_name_encoding.h"
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -429,7 +430,8 @@ void type_check_function_call(AST_node *n_call, PropagationVisitorData *) {
 
 void update_current_function_type(PropagationVisitorData *prop) {
     // Check ret type changed during function type propagating
-    if (prop->current_function_symbol->type->fun.return_type != prop->current_function_ret_type)
+    if (prop->current_function_symbol->type &&
+        prop->current_function_symbol->type->fun.return_type != prop->current_function_ret_type)
     {
         // yes: update function symbol with proper type
         prop->current_function_symbol->type =
@@ -504,11 +506,18 @@ Symbol *get_speciated_function_symbol(Symbol *g, PropagationVisitorData *prop) {
 
     AST_node *ast_generic = ast_copy_tree(g->source);
 
+    AST_node *ast_fn = ast_generic->generic.body;
+    ASSERT(ast_fn->kind == AST_function, "Speciate called on wrong kind of node.\n");
+
+    ast_fn->fun.name = encode_function_name(ast_fn->fun.name, prop->generic_type);
+
     type_resolver_speciate_generic(ast_generic, prop->generic_type);
     Symbol *s = resolver_speciate_generic(ast_generic, prop->generic_type);
 
     PropagationVisitorData prop_child = {0};
     prop_child.program = prop->program;
+    prop_child.current_function_symbol = s;
+    type_resolve_functions_visitor(ast_generic->generic.body, &prop_child);
     type_propagation_visitor(ast_generic->generic.body, &prop_child);
 
 
@@ -541,6 +550,7 @@ void type_check_symbol(AST_node *n, PropagationVisitorData *prop)
     if (prop->generic_type) {
         if (n->symbol.symbol->kind == SYM_function) {
             n->symbol.symbol = get_speciated_function_symbol(n->symbol.symbol, prop);
+            n->symbol.name = n->symbol.symbol->name;
         }
         else {
             type_checker_error(n->line_number, "Generic speciation not allowed for %s\n", symbol_kind_name(n->symbol.symbol->kind));

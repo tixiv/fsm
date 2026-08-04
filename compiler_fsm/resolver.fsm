@@ -30,7 +30,7 @@ fn push_symbol(res: Resolver&, arr: SymbolRefArr&, s: Symbol&, n: AST_node&) {
 }
 
 fn declare_builtin_fn(res: Resolver&, name :u8[], return_type: Type&, arg_types: Type&[]) : void {
-    let s => alloc_symbol(res.symbol_roll, SymbolKind::SYM_global, name);
+    let s => alloc_symbol(res.symbol_roll, SymbolKind::SYM_function, name);
     s.type => get_function_type(res.type_cache, return_type, arg_types);
     SymbolRefArr_push(res.global_symbols, s);
 }
@@ -111,7 +111,7 @@ fn resolver_leave_scope(res: Resolver&) {
 
 fn resolve_globals_visitor (n: AST_node&, res: Resolver&) : void {
     if (n.kind == AST_node::AST_function) {
-        let s_fun => alloc_symbol(res.symbol_roll, SymbolKind::SYM_global, n.AST_function.name);
+        let s_fun => alloc_symbol(res.symbol_roll, SymbolKind::SYM_function, n.AST_function.name);
         push_symbol(res, res.global_symbols, s_fun, n);
         n.AST_function.symbol => s_fun;
     }
