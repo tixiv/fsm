@@ -8,6 +8,7 @@
 #include <malloc.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 Type builtin_void = (Type){T_void,    .storage_size = 0};
@@ -539,6 +540,85 @@ bool is_slice_type(Type *t) {
         if (t == slice) return true;
     }
     return false;
+}
+
+
+static Type *speciate_tree(Type *t, Type *speciation) {
+    char buf[1024];
+    switch (t->kind) {
+        case T_generic: return speciation;
+
+        case T_record:
+        case T_struct: {
+            bool need_to_copy = false;
+            StructMember *members = malloc(sizeof(StructMember) * t->_struct.num_members);
+            for (size_t i = 0; i < t->_struct.num_members; i++) {
+                members[i].type = speciate_tree(t->_struct.members[i].type, speciation);
+                if (members[i].type != t->_struct.members[i].type) need_to_copy = true;
+                members[i].name = t->_struct.members[i].name;
+            }
+
+            if (!need_to_copy) {
+                free(members);
+                return t;
+            }
+
+            Type *new_struct = type_alloc(T_struct);
+            memcpy(new_struct, t, sizeof(Type));
+            new_struct->_struct.members = members;
+
+            calculate_storage_size(new_struct);
+            return new_struct;
+        }
+
+        case T_reference: return get_ref_type_for(speciate_tree(t->reference.target_type, speciation));
+        case T_array:     return get_array_type(speciate_tree(t->_array.element_type, speciation), t->_array.n_elements);
+    
+        case T_signed_integer:
+        case T_unsigned_integer:
+        case T_boolean:
+        case T_enum:
+        case T_enumerator:
+            return t;
+
+        default: NOT_IMPLEMENTED("Speciating %s is not implemented yet.", get_type_name_r(buf, t));
+    }
+
+}
+
+static Type *make_speciated_type(Type *base, Type *speciation) {
+    Type * t = speciate_tree(base, speciation);
+
+    if (t != base) {
+        t->speciation = speciation;
+    }
+    return t;
+}
+
+typedef struct  {
+    Type * base_type;
+    Type * speciation;
+    Type * speciated;
+} SpeciatedType;
+
+Dyn_array speciated_types; // <SpeciatedType>
+
+Type *get_speciated_type(Type *base, Type *speciation) {
+    if (speciated_types.capacity == 0)
+        dyn_array_init(&speciated_types, sizeof(SpeciatedType), 16);
+
+    for (size_t i = 0; i < speciated_types.count; i++) {
+        SpeciatedType *spec = &((SpeciatedType*)speciated_types.data)[i];
+        if (spec->base_type == base
+            && spec->speciation == speciation) return spec->speciated;
+    }
+
+    SpeciatedType *spec = dyn_array_push(&speciated_types);
+    spec->base_type = base;
+    spec->speciation = speciation;
+    spec->speciated = make_speciated_type(base, speciation);
+
+    return spec->speciated;
 }
 
 Type *get_slice_element_type(Type *t) {

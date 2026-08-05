@@ -255,6 +255,10 @@ void ast_visit_children(AST_node *n, void (*visit)(AST_node *, void *arg), void 
             visit_non_null(n->generic_speciation.typedecl, visit, arg);
             visit_non_null(n->generic_speciation.body, visit, arg);
             break;
+        case AST_type_generic_speciation:
+            visit_non_null(n->type_generic_speciation.typedecl, visit, arg);
+            visit_non_null(n->type_generic_speciation.body, visit, arg);
+            break;
         case AST_generic_implementation:
             visit_non_null(n->generic_implementation.body, visit, arg);
             break;
@@ -588,6 +592,10 @@ static void ast_dump_visitor (AST_node *n, void *spaces_vp) {
             break;
         case AST_generic_speciation:
             printf("%.*s%s :%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf2, n->generic_speciation.typedecl->type), get_type_name_r(buf, n->type));
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
+            break;
+        case AST_type_generic_speciation:
+            printf("%.*s%s :%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf2, n->type_generic_speciation.typedecl->type), get_type_name_r(buf, n->type));
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         default:

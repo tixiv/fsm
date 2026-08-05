@@ -174,6 +174,7 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_colon_colon: return "'::'";
         case TOK_ampersand: return("'&'");
         case TOK_exclam: return("'!'");
+        case TOK_tilde: return("'~'");
         case TOK_identifier: return("identifier");
         case TOK_string: return("string constant");
         case TOK_number: return("number");
@@ -469,6 +470,10 @@ void tokenize_fsm (Tokenizer *tok) {
         else if (c == '!') {
             sv_pop(code);
             push_token(TOK_exclam, nullptr, tok->line_number);
+        }
+        else if (c == '~') {
+            sv_pop(code);
+            push_token(TOK_tilde, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "$\"")) {
             read_builder_string(tok);

@@ -23,6 +23,7 @@ typedef enum {
     T_enum,
     T_any, // 'any' works like the 'void' in C's void* for now, just with a better name.
     T_generic,
+    T_speciated,
 } TypeKind;
 
 struct Type_s;
@@ -47,6 +48,7 @@ typedef struct Type_s {
     TypeKind kind;
     SV name;
     size_t storage_size;
+    struct Type_s *speciation;
     union {
         struct {
             size_t num_bits;
@@ -152,6 +154,8 @@ Type *get_enumerator_type_for(Type *t);
 Type *get_array_type(Type *element_type, size_t n_elements);
 Type *get_sclice_type(Type *element_type);
 Type *get_function_type(Type *ret_type, Type *arg_types[], size_t num_args);
+
+Type *get_speciated_type(Type *base, Type *speciation);
 
 Type *get_slice_element_type(Type *slice);
 

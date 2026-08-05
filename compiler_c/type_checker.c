@@ -500,8 +500,10 @@ void type_resolve_functions_visitor(AST_node *n, PropagationVisitorData *prop) {
 
 void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) ;
 
-Symbol *get_speciated_function_symbol(Symbol *g, PropagationVisitorData *prop) {
-    ASSERT(g->source, "Speciate called with null source on %.*s.\n", SV_prnt(g->name));
+Symbol *get_speciated_function_symbol(AST_node *n, Symbol *g, PropagationVisitorData *prop) {
+    if (!g->source) {
+        type_checker_error(n->line_number, "Cannot speciate non generic function '%.*s'.\n", SV_prnt(g->name));
+    }
     ASSERT(g->source->kind == AST_generic, "Speciate called on wrong kind of node.\n");
     ASSERT(g->source->generic.body->kind == AST_function, "Speciate called on wrong kind of node.\n");
 
@@ -555,7 +557,7 @@ void type_check_symbol(AST_node *n, PropagationVisitorData *prop)
 
     if (prop->generic_type) {
         if (n->symbol.symbol->kind == SYM_function) {
-            n->symbol.symbol = get_speciated_function_symbol(n->symbol.symbol, prop);
+            n->symbol.symbol = get_speciated_function_symbol(n, n->symbol.symbol, prop);
             n->symbol.name = n->symbol.symbol->name;
         }
         else {
@@ -969,7 +971,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
         case AST_generic_speciation:
             n->type = n->generic_speciation.body->type;
             break;
-        
+                
         case AST_generic_implementation:
             // already handled
             break;
@@ -985,6 +987,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
         case AST_type_array:
         case AST_type_slice:
         case AST_function_type:
+        case AST_type_generic_speciation:
             // already filled in by type resolver
             break;
 

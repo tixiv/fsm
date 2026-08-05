@@ -86,7 +86,7 @@ fn TypeRefArr_reset (arr: TypeRefArr&, len) {
 }
 
 fn TypeRefArr_init (arr: TypeRefArr&, allocator: EndlosAllocator&) {
-    arr.alloc = endlos_begin:Type& (allocator);
+    arr.alloc = endlos_begin~Type& (allocator);
     arr.arr = arr.alloc;
     arr.arr.len = 0;
 }
@@ -113,8 +113,8 @@ struct TypeCache {
 }
 
 fn TypeCache_init(cache: TypeCache&, allocator: EndlosAllocator&) {
-    cache.type_roll = endlos_begin:Type(allocator);
-    cache.type_ref_roll = endlos_begin:Type&(allocator);
+    cache.type_roll = endlos_begin~Type(allocator);
+    cache.type_ref_roll = endlos_begin~Type&(allocator);
 
     TypeRefArr_init(cache.function_types, allocator);
 

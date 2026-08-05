@@ -58,6 +58,7 @@
     X(TOK_colon_colon) \
     X(TOK_ampersand) \
     X(TOK_exclam) \
+    X(TOK_tilde) \
     X(TOK_identifier) \
     X(TOK_string) \
     X(TOK_number) \

@@ -307,17 +307,22 @@ void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
             n->type = get_array_type(n->_type_array.body->type, n->_type_array.n_elements);
             break;
 
-        case AST_type_slice: {
+        case AST_type_slice:
             ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
             n->type = get_sclice_type(n->_type_slice.body->type);
             break;
-        }
+
+        case AST_type_generic_speciation:
+            ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
+            n->type = get_speciated_type(n->type_generic_speciation.body->type, n->type_generic_speciation.typedecl->type);
+            break;
 
         case AST_generic:
             trs->generic_parameter_name = n->generic.parameter_name;
             ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
             trs->generic_parameter_name = (SV) {nullptr, 0};
             break;
+
 
         default:
             ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);

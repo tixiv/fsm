@@ -159,10 +159,20 @@ static AST_node *parse_typedecl() {
         return ast_fn_type;
     }
     else if (CT->kind == TOK_identifier) {
-        AST_node *ast_type = ast_alloc(AST_typename, CT->line_number);
-        ast_type->_typename.name = CT->value;
+        AST_node *ast_typename = ast_alloc(AST_typename, CT->line_number);
+        ast_typename->_typename.name = CT->value;
         MOVE_NEXT();
-        return parse_typedecl_postifx(ast_type);
+        if (CT->kind == TOK_lower) {
+            AST_node * ast_speciation = ast_alloc(AST_type_generic_speciation, CT->line_number);
+            MOVE_NEXT();
+            ast_speciation->type_generic_speciation.body = ast_typename;
+            ast_speciation->type_generic_speciation.typedecl = parse_typedecl();
+            take_expected(TOK_greater);
+            return parse_typedecl_postifx(ast_speciation);
+        }
+        else {
+            return parse_typedecl_postifx(ast_typename);
+        }
     }
     
     return nullptr;
@@ -418,7 +428,7 @@ static AST_node *parse_primary()
         MOVE_NEXT();
 
         while (CT->kind == TOK_lparen || CT->kind == TOK_lbracket
-               || CT->kind == TOK_dot || CT->kind == TOK_colon_colon || CT->kind == TOK_colon)
+               || CT->kind == TOK_dot || CT->kind == TOK_colon_colon || CT->kind == TOK_tilde)
         {
             if (CT->kind == TOK_lparen) {
                 AST_node *ast_call = ast_alloc(AST_call, CT->line_number);
@@ -456,7 +466,7 @@ static AST_node *parse_primary()
                 MOVE_NEXT();
                 n = ast_namespace_access;
             }
-            if (CT->kind == TOK_colon) {
+            if (CT->kind == TOK_tilde) {
                 AST_node *ast_generic_speciation = ast_alloc(AST_generic_speciation, CT->line_number);
                 MOVE_NEXT();
                 ast_generic_speciation->generic_speciation.typedecl = parse_typedecl();

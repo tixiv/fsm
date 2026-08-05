@@ -251,6 +251,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_builder_string:
         case AST_user_cast:
         case AST_generic_speciation:
+        case AST_type_generic_speciation:
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             break;
 

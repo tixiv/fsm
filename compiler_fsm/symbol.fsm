@@ -44,7 +44,7 @@ fn SymbolRefArr_reset (arr: SymbolRefArr&, len) {
 }
 
 fn SymbolRefArr_init (arr: SymbolRefArr&, allocator: EndlosAllocator&) {
-    arr.alloc = endlos_begin:Symbol&(allocator);
+    arr.alloc = endlos_begin~Symbol&(allocator);
     arr.arr = arr.alloc;
     arr.arr.len = 0;
 }
