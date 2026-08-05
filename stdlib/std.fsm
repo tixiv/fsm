@@ -88,6 +88,13 @@ fn sv_split(str: u8[]&, splitter: u8[]) : u8[] {
     return start;
 }
 
+fn sv_of_c_string(c_str: u8&) : u8[] {
+    let sv: u8[];
+    sv.begin => c_str;
+    sv.len = for (let i = 0; sv[i] != 0; i++; i);
+    return sv;
+}
+
 fn is_digit_in_base(digit: i32, base) {
     if (base == 16) return is_hex_digit(digit);
     return '0' <= digit < '0' + base

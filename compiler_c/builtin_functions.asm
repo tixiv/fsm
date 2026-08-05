@@ -1,3 +1,17 @@
+format ELF64 executable
+segment readable writeable executable
+entry _start
+_start:
+    mov rcx, [rsp]
+    lea rax, [rsp+8]
+    push rcx
+    push rax
+    
+    call fn_main
+    mov rax, 60
+    mov rdi, 0
+    syscall
+
 ; The print function and some other assembly snippets are copied
 ; from the Porth compiler https://gitlab.com/tsoding/porth which
 ; was also the main inspiration for me to start this project.

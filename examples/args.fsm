@@ -1,0 +1,8 @@
+
+import * from "std";
+
+fn main (argv: u8&[])
+{
+    for (let i = 0; i < argv.len; i++)
+        $"{sv_of_c_string(argv[i])}\n";
+}

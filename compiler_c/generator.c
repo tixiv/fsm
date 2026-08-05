@@ -74,21 +74,10 @@ extern const char *builtin_functions_asm;
 void output_asm(const char *asm_file_name) {
     FILE *file = fopen(asm_file_name, "w");
 
-    const char* header =
-    "format ELF64 executable\n"
-    "segment readable writeable executable\n"
-    "entry _start\n"
-    "_start:\n"
-    "call fn_main\n"
-    "mov rax, 60\n"
-    "mov rdi, 0\n"
-    "syscall\n";
-
     // The print function and some other assembly snippets are copied
     // from the Porth compiler https://gitlab.com/tsoding/porth which
     // was also the main inspiration for me to start this project.
 
-    fprintf(file, "%s", header);
     fprintf(file, "%s", builtin_functions_asm);
     
     for (size_t i=0; i<num_opcodes; i++) {
