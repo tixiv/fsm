@@ -22,14 +22,29 @@ static void type_resolver_error(int line_number, const char * fmt, ...) {
     va_end(args);
 }
 
-Dyn_array named_types;
+typedef struct {
+    Type *type;
+    const char *source_file;
+    int source_line;
+} NamedType;
 
-Type *get_named_type(size_t index) {
+Dyn_array named_types; // <NamedType>
+
+NamedType *get_named_type(size_t index) {
     ASSERT(index < named_types.count, "Named type index out of bounds.\n");
-    return ((void**)named_types.data)[index];
+    return &((NamedType*)named_types.data)[index];
 }
 
-Type *get_type_by_name(const SV *name) {
+NamedType *get_named_type_by_name(const SV *name) {
+    for (size_t i = 0; i < named_types.count; i++) {
+        NamedType *nt = get_named_type(i);
+        if (sv_equal(&nt->type->name, name))
+            return nt;
+    }
+    return nullptr;
+}
+
+Type *get_builtin_type_by_name(const SV *name) {
     if (sv_compare_cstr(name,"void")) return &builtin_void;
     if (sv_compare_cstr(name,"any")) return &builtin_any;
     if (sv_compare_cstr(name,"bool")) return &builtin_bool;
@@ -42,11 +57,15 @@ Type *get_type_by_name(const SV *name) {
     if (sv_compare_cstr(name,"u8"))  return &builtin_u8;
     if (sv_compare_cstr(name,"i8"))  return &builtin_i8;
 
-    for (size_t i = 0; i < named_types.count; i++) {
-        Type *t = get_named_type(i);
-        if (sv_equal(&t->name, name))
-            return t;
-    }
+    return nullptr;
+}
+
+Type *get_type_by_name(const SV *name) {
+    Type *t = get_builtin_type_by_name(name);
+    if (t) return t;
+
+    NamedType *nt = get_named_type_by_name(name);
+    if (nt) return nt->type;
 
     return nullptr;
 }
@@ -62,12 +81,20 @@ static void type_resolver_push_symbol(Symbol *s, int line_number) {
 }
 
 void push_named_type(SV name, Type * t, int line_number) {
-    if (get_type_by_name(&name)) {
-        type_resolver_error(line_number, "Tried to redefine type '%.*s'\n", SV_prnt(name));
+    NamedType *nt = get_named_type_by_name(&name);
+    if (nt) {
+        type_resolver_error(line_number, "Tried to redefine type '%.*s' which was previously defined in %s:%d\n", SV_prnt(name), nt->source_file, nt->source_line);
+    }
+
+    if (get_builtin_type_by_name(&name)) {
+        type_resolver_error(line_number, "Tried to redefine builtin type '%.*s'", SV_prnt(name));
     }
 
     t->name = name;
-    dyn_array_push_p(&named_types, t);
+    nt = dyn_array_push(&named_types);
+    nt->source_file = current_filename;
+    nt->source_line = line_number;
+    nt->type = t;
 
     Symbol *s = alloc_symbol(SYM_type, name);
     s->name = name;
@@ -347,5 +374,5 @@ void run_type_resolver(AST_node *root) {
 }
 
 void type_resolver_init() {
-    dyn_array_init(&named_types, sizeof(void*), 32);
+    dyn_array_init(&named_types, sizeof(NamedType), 32);
 }

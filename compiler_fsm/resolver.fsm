@@ -199,8 +199,8 @@ fn resolver_run(res: Resolver&, root: AST_node&) {
 fn resolver_init (res: Resolver&, allocator: EndlosAllocator&, type_cache: TypeCache&) {
     SymbolRefArr_init(res.local_symbols, allocator);
     SymbolRefArr_init(res.global_symbols, allocator);
-    res.symbol_roll = endlos_begin:Symbol(allocator);
-    res.locals_stack = endlos_begin:i64(allocator);
+    res.symbol_roll = endlos_begin~Symbol(allocator);
+    res.locals_stack = endlos_begin~i64(allocator);
     res.type_cache => type_cache;
     init_builtin_functions(res);
 }

@@ -56,6 +56,7 @@ void read_file(SV *contents, const char *path)
 
 
 bool debug_tokens = false;
+bool debug_imports = false;
 
 const char *debug_ast;
 
@@ -124,6 +125,8 @@ static bool already_imported (const char *filename) {
     return false;
 }
 
+int depth;
+
 bool resolve_import (SV name) {
     SB sb; char buf_1 [1024]; sb_init(&sb, buf_1, 1024);
 
@@ -132,8 +135,17 @@ bool resolve_import (SV name) {
 
     bool ret = false;
     if (find_file(&sb, name, saved_module->filename)) {
-        if (!already_imported(sb.buffer))
+        bool already = already_imported(sb.buffer);
+        if (debug_imports) {
+            for (int i = 0; i < depth; i++) fprintf(stderr, "    ");
+            fprintf(stderr, "'%s': importing '%s' %s\n", saved_filename, sb.buffer, already ? "(already imported)" : "");
+        }
+
+        depth++;
+        if (!already)
             compile_module(sb.buffer);
+        depth--;
+        
         ret = true;
     }
 
