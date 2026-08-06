@@ -1,0 +1,89 @@
+
+import * from "type"
+
+enum Op_Kind {
+    OP_begin_fn,
+    OP_return,
+    OP_add,
+    OP_sub,
+    OP_mul,
+    OP_div,
+    OP_mod,
+    OP_ipow,
+    OP_equal,
+    OP_unequal,
+    OP_not,
+    OP_neg,
+    OP_compare_GT,
+    OP_compare_LT,
+    OP_compare_GE,
+    OP_compare_LE,
+    OP_call,
+    OP_icall,
+    OP_push_result,
+    OP_push_arg,
+    OP_push_literal,
+    OP_push_string_literal,
+    OP_push_char_literal,
+    OP_push_local_var,
+    OP_push_local_var_address,
+    OP_push_arg_address,
+    OP_push_global_address,
+    OP_if,
+    OP_else,
+    OP_end_if,
+    OP_while_loop,
+    OP_while_check,
+    OP_while_end,
+    OP_to_bool,
+    OP_sign_extend,
+    OP_array_access,
+    OP_member_access,
+    OP_load,
+    OP_store,
+    OP_store_and_dup,
+    OP_integer_plus_plus,
+    OP_integer_minus_minus,
+    OP_slice_plus_plus,
+    OP_bittest,
+    OP_bitshift,
+    OP_bitand,
+    OP_bitor,
+    OP_bitxor,
+    OP_bitnot,
+    OP_setbit,
+    OP_pop,
+    OP_get_enum_member_name,
+}
+
+
+struct Opcode {
+    kind: Op_Kind;
+    string_value: u8[];
+    type: Type&;
+    u64_value: u64;
+    size;
+    _signed: bool;
+}
+
+/*
+
+fn dump_opcodes() {
+    for (int i=0; i<num_opcodes; i++) {
+        Opcode *op = &opcodes[i];
+        if (op->string_value.begin) {
+            printf("[%s, \"" SV_FMT "\"]\n", opcode_name(op->kind), SV_prnt(op->string_value));
+        } else {
+            switch (op->kind) {
+                case OP_push_local_var:
+                    printf("[%s, sz:%u, var:%u]\n", opcode_name(op->kind), op->u32_value[1], op->u32_value[0]);
+                    break;
+
+                default:
+                    printf("[%s, %lu]\n", opcode_name(op->kind), op->u64_value);
+                    break;
+            }
+        }
+    }
+}
+*/

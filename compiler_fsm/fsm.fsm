@@ -3,6 +3,7 @@ import * from "endlos";
 import * from "parser";
 import * from "resolver";
 import * from "il_gen";
+import * from "type_checker"
 
 
 fn main () {

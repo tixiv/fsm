@@ -117,7 +117,7 @@ void annotate_used_visitor(AST_node *n, void* used) {
 
 void insert_dereference(AST_node *n) {
     ASSERT (is_reference_kind(n->type), "Trying to insert dereference for something that is not a reference.\n")
-    AST_node *deref = ast_alloc(AST_dereference, 0);
+    AST_node *deref = ast_alloc(AST_dereference, n->line_number);
     deref->type = dereferenced_type(n->type);
     deref->addressable = true;
     ast_insert_node(n, deref);
@@ -129,7 +129,7 @@ void auto_dereference(AST_node *n) {
 }
 
 void insert_take_reference(AST_node *n) {
-    AST_node *ref = ast_alloc(AST_reference, 0);
+    AST_node *ref = ast_alloc(AST_reference, n->line_number);
     ref->type = get_ref_type_for(n->type);
     ref->addressable = false;
     ast_insert_node(n, ref);

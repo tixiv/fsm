@@ -61,3 +61,26 @@ generic T fn endlos_ripp_off (allocator: EndlosAllocator&, returned_roll: T[]) :
     let a: T[];
     return a;
 }
+
+generic T struct EndlosArr {
+    alloc: T[];
+    arr: T[];
+}
+
+generic T fn EndlosArr_begin(arr: EndlosArr<T>&, allocator: EndlosAllocator&) : void {
+    arr.alloc = endlos_begin~T(allocator);
+    arr.arr = arr.alloc;
+    arr.len = 0;
+    return arr;
+}
+
+generic T fn EndlosArr_finalize(arr: EndlosArr<T>&, allocator: EndlosAllocator&) : T[] {
+    return endlos_ripp_off~T(allocator, arr.alloc);
+}
+
+generic T fn EndlosArr_free(arr: EndlosArr<T>&, allocator: EndlosAllocator&) : void {
+    let a: T[];
+    a.begin => arr.arr.begin;
+    a.len = arr.arr.len + arr.arr.alloc.len;
+    endlos_ripp_off~T(allocator, a);
+}

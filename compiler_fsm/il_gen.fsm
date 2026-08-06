@@ -8,7 +8,6 @@ fn il_gen_error(n: AST_node&, s: u8[]) {
 
 fn il_gen_warning(n: AST_node&, s: u8[]) {
     write(2, $"[FSM IL Gen] {n.location} Warning: {s}\n");
-    exit(1);
 }
 
 /*
