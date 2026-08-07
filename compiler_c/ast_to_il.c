@@ -141,6 +141,8 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen, bool result_used) {
             case TOK_lower:         if (result_used) push_opcode(OP_compare_LT, nullptr, 0); break;
             case TOK_greater_equal: if (result_used) push_opcode(OP_compare_GE, nullptr, 0); break;
             case TOK_lower_equal:   if (result_used) push_opcode(OP_compare_LE, nullptr, 0); break;
+            case TOK_reference_target_equal:   if (result_used) push_opcode(OP_equal, nullptr, 0); break;
+            case TOK_reference_target_unequal: if (result_used) push_opcode(OP_unequal, nullptr, 0); break;
 
             default:
                 NOT_IMPLEMENTED("Generating IL for binary operator %s is not implemented yet.\n", token_kind_name(n->binary.token_kind));
@@ -281,6 +283,10 @@ static void gen_cast(AST_node *n, IL_gen *gen, bool result_used) {
     }
     else if (is_reference_kind(to) && is_reference_kind(from) && n->kind == AST_user_cast) {
         // cast one reference type to another
+        ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+    }
+    else if (is_reference_kind(to) && is_integer_kind(from) && n->kind == AST_user_cast) {
+        // cast integer to reference
         ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
     }
     else {
@@ -754,6 +760,7 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         case AST_union:
         case AST_union_member_def:
         case AST_generic_implementation:
+        case AST_type_generic_speciation:
             ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
             break;
         default:

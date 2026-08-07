@@ -135,6 +135,12 @@ void insert_take_reference(AST_node *n) {
     ast_insert_node(n, ref);
 }
 
+void auto_take_reference(AST_node *n) {
+    if (is_reference_kind(n->type)) return;
+    if (is_null_kind(n->type)) return;
+    insert_take_reference(n);
+}
+
 bool check_function_argument_compatible(Type *arg_1, Type *arg_2) {
     return arg_1 == arg_2
         || (is_reference_kind(arg_1) && is_reference_kind(arg_2)
@@ -319,6 +325,21 @@ void type_propagate_binary_operator(AST_node *n) {
                 }
                 n->type = &builtin_bool;
                 break;
+            }
+            
+            case TOK_reference_target_equal: 
+            case TOK_reference_target_unequal: {
+                auto_take_reference(n->binary.left);
+                auto_take_reference(n->binary.right);
+                bool okay = (n->binary.left->type == n->binary.right->type)
+                            || (is_null_kind(n->binary.left->type) && is_reference_kind(n->binary.right->type))
+                            || (is_reference_kind(n->binary.left->type) && is_null_kind(n->binary.right->type));
+                if (!okay) {
+                    type_checker_error(n->line_number, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
+                        token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
+                }
+                n->type = &builtin_bool;
+                break;      
             }
 
             case TOK_equal_assign:
@@ -536,6 +557,16 @@ Symbol *get_speciated_function_symbol(AST_node *n, Symbol *g, PropagationVisitor
     return s;
 }
 
+void type_check_user_cast(AST_node *n) {
+    char buf_1[1024]; char buf_2[1024];
+    Type *t_to   = n->user_cast.typedecl->type;
+    Type *t_from = n->user_cast.body->type;
+    if (is_reference_kind(t_to) && (is_reference_kind(t_from) || is_integer_kind(t_from) || is_null_kind(t_from))) return;
+    if (is_integer_kind(t_to) && (is_reference_kind(t_from) || is_integer_kind(t_from) || is_boolean_kind(t_from))) return;
+    if (is_boolean_kind(t_to) && (is_integer_kind(t_from) || is_boolean_kind(t_from))) return;
+    type_checker_error(n->line_number, "Can't cast '%s' to '%s'.", get_type_name_r(buf_1, t_from), get_type_name_r(buf_2, t_to));
+}
+
 void type_check_symbol(AST_node *n, PropagationVisitorData *prop)
 {
     // check for recursive use of the function we are propagating right now
@@ -695,8 +726,9 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_user_cast:
+            type_check_user_cast(n);
             n->type = n->user_cast.typedecl->type;
-            n->addressable = n->_cast.body->addressable;
+            n->addressable = n->user_cast.body->addressable;
             break;
 
         case AST_return:
@@ -812,9 +844,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_reference:
-            if (!n->reference.body->addressable) type_checker_error(n->line_number, "Can't take reference to something that is not addressable.\n",
-                get_type_name_r(buf_1, n->reference.body->type));
-            
+            if (!n->reference.body->addressable) type_checker_error(n->line_number, "Can't take reference to something that is not addressable.\n");
             n->type = get_ref_type_for(n->reference.body->type);
             n->addressable = false;
             break;
@@ -947,7 +977,9 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                 n->type = get_enumerator_type_for(t);
                 n->addressable = false;
             }
-            else NOT_IMPLEMENTED("Namespace access is not implemented yet for typ %s.\n", get_type_name_r(buf_1, t));
+            else {
+                type_checker_error(n->line_number, "Namespace access on type '%s' is not supported.\n", get_type_name_r(buf_1, t));
+            }
             break;
         }
 

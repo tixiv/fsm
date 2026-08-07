@@ -161,6 +161,8 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_unequal: return("'!='");
         case TOK_or_equal_to: return("'|=='");
         case TOK_and_not_equal_to: return("'&!='");
+        case TOK_reference_target_equal: return "'<==>'";
+        case TOK_reference_target_unequal: return "'<!=>'";
         case TOK_greater: return("'>'");
         case TOK_lower: return("'<'");
         case TOK_greater_equal: return("'>='");
@@ -378,6 +380,14 @@ void tokenize_fsm (Tokenizer *tok) {
         else if (sv_starts_with(code, "=>")) {
             sv_pop(code);  sv_pop(code);
             push_token(TOK_bind_ref, nullptr, tok->line_number);
+        }
+        else if (sv_starts_with(code, "<==>")) {
+            sv_pop(code);  sv_pop(code); sv_pop(code);  sv_pop(code);
+            push_token(TOK_reference_target_equal, nullptr, tok->line_number);
+        }
+        else if (sv_starts_with(code, "<!=>")) {
+            sv_pop(code);  sv_pop(code); sv_pop(code);  sv_pop(code);
+            push_token(TOK_reference_target_unequal, nullptr, tok->line_number);
         }
         else if (sv_starts_with(code, "==")) {
             sv_pop(code);  sv_pop(code);

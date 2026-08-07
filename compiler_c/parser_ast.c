@@ -508,17 +508,17 @@ static AST_node *parse_primary()
 }
 
 #define NUM_PRIOS 8
-#define NUM_MAX_OPERATORS_IN_PRIO 4
+#define NUM_MAX_OPERATORS_IN_PRIO 6
 
 const uint8_t operator_table[NUM_PRIOS][NUM_MAX_OPERATORS_IN_PRIO] =  {
-    { TOK_equal_assign, TOK_bind_ref, 0, 0},
-    { TOK_boolean_or, 0, 0, 0},
-    { TOK_boolean_and, 0, 0, 0},
-    { TOK_greater, TOK_lower, TOK_greater_equal, TOK_lower_equal},
-    { TOK_equal, TOK_unequal, TOK_or_equal_to, TOK_and_not_equal_to},
-    { TOK_plus, TOK_minus, 0, 0},
-    { TOK_asterisk, TOK_slash, TOK_percent, 0},
-    { TOK_up_arrow, 0, 0, 0},
+    { TOK_equal_assign, TOK_bind_ref, 0, 0, 0, 0},
+    { TOK_boolean_or, 0, 0, 0, 0, 0},
+    { TOK_boolean_and, 0, 0, 0, 0, 0},
+    { TOK_greater, TOK_lower, TOK_greater_equal, TOK_lower_equal, 0, 0},
+    { TOK_equal, TOK_unequal, TOK_or_equal_to, TOK_and_not_equal_to, TOK_reference_target_equal, TOK_reference_target_unequal},
+    { TOK_plus, TOK_minus, 0, 0, 0, 0},
+    { TOK_asterisk, TOK_slash, TOK_percent, 0, 0, 0},
+    { TOK_up_arrow, 0, 0, 0, 0, 0},
 };
 
 static bool is_in_prio(int op, int prio) {

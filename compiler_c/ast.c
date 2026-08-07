@@ -408,6 +408,14 @@ AST_node *ast_copy_tree(AST_node *n) {
             nn->user_cast.typedecl = ast_copy_tree(n->user_cast.typedecl);
             nn->user_cast.body = ast_copy_tree(n->user_cast.body);
             break;
+        case AST_generic_speciation:
+            nn->generic_speciation.typedecl = ast_copy_tree(n->generic_speciation.typedecl);
+            nn->generic_speciation.body = ast_copy_tree(n->generic_speciation.body);
+            break;
+        case AST_type_generic_speciation:
+            nn->type_generic_speciation.typedecl = ast_copy_tree(n->type_generic_speciation.typedecl);
+            nn->type_generic_speciation.body = ast_copy_tree(n->type_generic_speciation.body);
+            break;
         case AST_enum_member:
         case AST_symbol:
         case AST_number:

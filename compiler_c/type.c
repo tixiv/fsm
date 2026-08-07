@@ -103,7 +103,7 @@ static const char *get_type_name_r_impl(char print_buf[1024], Type *type, bool e
                 sb_printf(&sb, "%s%.*s", encoded ? "" : "struct ", SV_prnt(type->name));
             }
             else {
-                sb_printf(&sb, "anonymous struct", SV_prnt(type->name));
+                sb_printf(&sb, "anonymous struct");
             }
             break;
         case T_record:
@@ -111,7 +111,7 @@ static const char *get_type_name_r_impl(char print_buf[1024], Type *type, bool e
                 sb_printf(&sb, "record %.*s", SV_prnt(type->name));
             }
             else {
-                sb_printf(&sb, "anonymous record", SV_prnt(type->name));
+                sb_printf(&sb, "anonymous record");
             }
             break;
         case T_union:
@@ -119,7 +119,7 @@ static const char *get_type_name_r_impl(char print_buf[1024], Type *type, bool e
                 sb_printf(&sb, "%s%.*s", encoded ? "" : "union ", SV_prnt(type->name));
             }
             else {
-                sb_printf(&sb, "anonymous record", SV_prnt(type->name));
+                sb_printf(&sb, "anonymous union");
             }
             break;
         case T_enum:
@@ -127,7 +127,7 @@ static const char *get_type_name_r_impl(char print_buf[1024], Type *type, bool e
                 sb_printf(&sb, "enum %.*s", SV_prnt(type->name));
             }
             else {
-                sb_printf(&sb, "anonymous enum", SV_prnt(type->name));
+                sb_printf(&sb, "anonymous enum");
             }
             break;
         case T_void:
@@ -146,6 +146,10 @@ const char *get_type_name_r(char print_buf[1024], Type *type) {
 
 const char *get_type_name_encoded_r(char print_buf[1024], Type *type) {
     return get_type_name_r_impl(print_buf, type, true);
+}
+
+bool is_null_kind(Type *t) {
+    return t && t->kind == T_null;
 }
 
 bool is_boolean_kind(Type *t) {
