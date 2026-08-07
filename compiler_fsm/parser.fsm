@@ -8,7 +8,8 @@ struct Parser {
 }
 
 fn parser_error(parser: Parser&, s: u8[]) {
-    write(2, $"[FSM Parser] {parser.CT.location} Error: {s}\n");
+    let l = parser.CT.location;
+    write(2, $"[FSM Parser] {l.module.filename}:{l.line} Error: {s}\n");
     exit(1);
 }
 

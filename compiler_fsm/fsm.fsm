@@ -12,11 +12,15 @@ fn main () {
 
     let tokenizer: Tokenizer;
 
-    tokenizer.code = read_file ("foo.fsm");
+    let module: Module;
+    module.filename = "foo.fsm";
+
+    tokenizer.code = read_file (module.filename);
+    tokenizer.location.module => module;
     tokenizer.location.line = 1;
 
     tokenize_fsm(tokenizer);
-    dump_tokens(tokenizer);
+    // dump_tokens(tokenizer);
 
     let tokens: Token[] = tokenizer.tokens;
     tokens.len = tokenizer.num_tokens;
@@ -34,10 +38,15 @@ fn main () {
 
     resolver_run(resolver, root);
 
+    ast_dump_tree(root);
+
+
     let type_checker: TypeChecker;
     type_checker_init(type_checker, type_cache, ast_allocator, endlos, resolver.global_symbols);
 
+    $"Going to run type checker...\n"
     type_checker_run(type_checker, root);
+    $"Finished type checking.\n"
 
     ast_dump_tree(root);
 

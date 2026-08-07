@@ -281,6 +281,14 @@ static void gen_cast(AST_node *n, IL_gen *gen, bool result_used) {
         // cast pointer to integer
         ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
     }
+    else if (is_integer_kind(to) && is_enumerator_kind(from) && n->kind == AST_user_cast) {
+        // cast enumerator to integer
+        ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+    }
+    else if (is_integer_kind(to) && is_enum_kind(from) && n->kind == AST_user_cast) {
+        // cast enum value to integer
+        ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+    }
     else if (is_reference_kind(to) && is_reference_kind(from) && n->kind == AST_user_cast) {
         // cast one reference type to another
         ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);

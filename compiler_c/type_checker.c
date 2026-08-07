@@ -22,7 +22,7 @@ static void type_checker_error(int line_number, const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    ast_dump_tree(ast_root);
+    // ast_dump_tree(ast_root);
 
     fprintf(stderr, "[FSM Type Checker] %s:%d Error: ", current_filename, line_number);
     vfprintf(stderr, fmt, args);
@@ -558,8 +558,8 @@ void type_check_user_cast(AST_node *n) {
     char buf_1[1024]; char buf_2[1024];
     Type *t_to   = n->user_cast.typedecl->type;
     Type *t_from = n->user_cast.body->type;
+    if (is_integer_kind(t_to) && (is_reference_kind(t_from) || is_integer_kind(t_from) || is_boolean_kind(t_from) || is_enumerator_kind(t_from) || is_enum_kind(t_from))) return;
     if (is_reference_kind(t_to) && (is_reference_kind(t_from) || is_integer_kind(t_from) || is_null_kind(t_from))) return;
-    if (is_integer_kind(t_to) && (is_reference_kind(t_from) || is_integer_kind(t_from) || is_boolean_kind(t_from))) return;
     if (is_boolean_kind(t_to) && (is_integer_kind(t_from) || is_boolean_kind(t_from))) return;
     type_checker_error(n->line_number, "Can't cast '%s' to '%s'.", get_type_name_r(buf_1, t_from), get_type_name_r(buf_2, t_to));
 }

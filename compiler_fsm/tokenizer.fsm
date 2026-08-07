@@ -129,8 +129,14 @@ fn token_kind_printable(kind: TokenKind) : u8[] {
     return kind.name;
 }
 
+struct Module {
+    filename: u8[];
+}
 
-struct Location { line: i32; col: i32; }
+struct Location {
+    module: Module&;
+    line: i32; col: i32;
+}
 
 struct Token {
     kind: TokenKind;
@@ -350,7 +356,6 @@ fn tokenize_fsm (tokenizer: Tokenizer&) : void {
 
     while (code.len) {
         let c = code.begin;
-        putc(c);
         
         if (is_numeric(c)) {
             let num = read_number(code);

@@ -124,21 +124,25 @@ fn TypeCache_init(cache: TypeCache&, allocator: EndlosAllocator&) {
     cache.type_roll = endlos_begin~Type(allocator);
     cache.type_ref_roll = endlos_begin~Type&(allocator);
 
-    TypeRefArr_init(cache.function_types, allocator);
+    TypeRefArr_init(cache.function_types,   allocator);
+    TypeRefArr_init(cache.ref_types,        allocator);
+    TypeRefArr_init(cache.enumerator_types, allocator);
+    TypeRefArr_init(cache.array_types,      allocator);
+    TypeRefArr_init(cache.slice_types,      allocator);
 
     let t: Type&;
     t => cache.builtin_void;         t.kind = Type::T_void;
     t => cache.builtin_null;         t.kind = Type::T_null;
     t => cache.builtin_any;          t.kind = Type::T_any;
     t => cache.builtin_bool;         t.kind = Type::T_boolean;   t.storage_size = 1;
-    t => cache.builtin_u64;          t.kind = Type::T_integer;   t.storage_size = 8; t.T_integer.signed = true;  t.T_integer.num_bits = 64;
-    t => cache.builtin_i64;          t.kind = Type::T_integer;   t.storage_size = 8; t.T_integer.signed = false; t.T_integer.num_bits = 64;
-    t => cache.builtin_u32;          t.kind = Type::T_integer;   t.storage_size = 4; t.T_integer.signed = true;  t.T_integer.num_bits = 32;
-    t => cache.builtin_i32;          t.kind = Type::T_integer;   t.storage_size = 4; t.T_integer.signed = false; t.T_integer.num_bits = 32;
-    t => cache.builtin_u16;          t.kind = Type::T_integer;   t.storage_size = 2; t.T_integer.signed = true;  t.T_integer.num_bits = 16;
-    t => cache.builtin_i16;          t.kind = Type::T_integer;   t.storage_size = 2; t.T_integer.signed = false; t.T_integer.num_bits = 16;
-    t => cache.builtin_u8;           t.kind = Type::T_integer;   t.storage_size = 1; t.T_integer.signed = true;  t.T_integer.num_bits =  8;
-    t => cache.builtin_i8;           t.kind = Type::T_integer;   t.storage_size = 1; t.T_integer.signed = false; t.T_integer.num_bits =  8;
+    t => cache.builtin_u64;          t.kind = Type::T_integer;   t.storage_size = 8; t.T_integer.signed = false;  t.T_integer.num_bits = 64;
+    t => cache.builtin_i64;          t.kind = Type::T_integer;   t.storage_size = 8; t.T_integer.signed = true;   t.T_integer.num_bits = 64;
+    t => cache.builtin_u32;          t.kind = Type::T_integer;   t.storage_size = 4; t.T_integer.signed = false;  t.T_integer.num_bits = 32;
+    t => cache.builtin_i32;          t.kind = Type::T_integer;   t.storage_size = 4; t.T_integer.signed = true;   t.T_integer.num_bits = 32;
+    t => cache.builtin_u16;          t.kind = Type::T_integer;   t.storage_size = 2; t.T_integer.signed = false;  t.T_integer.num_bits = 16;
+    t => cache.builtin_i16;          t.kind = Type::T_integer;   t.storage_size = 2; t.T_integer.signed = true;   t.T_integer.num_bits = 16;
+    t => cache.builtin_u8;           t.kind = Type::T_integer;   t.storage_size = 1; t.T_integer.signed = false;  t.T_integer.num_bits =  8;
+    t => cache.builtin_i8;           t.kind = Type::T_integer;   t.storage_size = 1; t.T_integer.signed = true;   t.T_integer.num_bits =  8;
 }
 
 fn type_ref_roll_take (cache: TypeCache&, len) : Type&[] {

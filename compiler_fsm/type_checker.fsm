@@ -6,12 +6,14 @@ import * from "ast";
 
 
 fn type_checker_error(n: AST_node&, s: u8[]) {
-    write(2, $"[FSM Type Checker] {n.location} Error: {s}\n");
+    let l = n.location;
+    write(2, $"[FSM Type Checker] {l.module.filename}:{l.line} Error: {s}\n");
     exit(1);
 }
 
 fn type_checker_warning(n: AST_node&, s: u8[]) {
-    write(2, $"[FSM Type Checker] {n.location} Warning: {s}\n");
+    let l = n.location;
+    write(2, $"[FSM Type Checker] {l.module.filename}:{l.line} Warning: {s}\n");
 }
 
 struct TypeChecker {
@@ -165,8 +167,10 @@ fn make_cast(type_checker: TypeChecker&, to: Type&, from: Type&) : AST_node& {
 }
 
 fn try_convert_to_type_if_necessary(type_checker: TypeChecker&, n: AST_node&, target_type: Type&, desc: u8[]) {
-
+    let buf_1: u8[1024]; let buf_2: u8[1024];
     let original_type => n.type;
+    $"try_convert_to_type_if_necessary begin {get_type_name_r(buf_1, original_type)} {get_type_name_r(buf_2, target_type)}\n"
+
 
     if (target_type <==> original_type) return;
 
@@ -186,7 +190,7 @@ or to perform a null reference check.");
     if (!is_reference_kind(target_type) && is_reference_kind(original_type)) {
         insert_dereference(type_checker, n);
     }
-    
+
     if (is_slice_type(type_checker.type_cache, target_type) && is_array_kind(n.type)) {
         if (get_slice_element_type(type_checker.type_cache, target_type) <==> n.type.T_array.element_type) {
             let conv => ast_alloc(type_checker.ast_allocator, AST_node::AST_array_to_slice, n.location);
@@ -195,8 +199,7 @@ or to perform a null reference check.");
             return;
         }
         else {
-            type_checker_error(n, $"Can't convert {desc} of type '%s' to '%s'.\n");
-                // get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
+            type_checker_error(n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}'.\n");
         }
     }
 
@@ -215,17 +218,14 @@ or to perform a null reference check.");
 
     if (target_type <==> get_ref_type_for(type_checker.type_cache, type_checker.type_cache.builtin_any)) {
         if (!is_reference_kind(original_type)) {
-            if (n.addressable == false) type_checker_error(n, $"Can't convert {desc} of type '%s' to '%s' because it is not addressable.\n");
-                    // desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
-            
+            if (n.addressable == false) type_checker_error(n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}' because it is not addressable.\n");            
             insert_take_reference(type_checker, n);
         }
         return; // any& can accept any reference type.
     }
 
     if (is_reference_kind(target_type) && !is_reference_kind(original_type)) {
-        if (n.addressable == false) type_checker_error(n, $"Can't convert {desc} of type '%s' to '%s' because it is not addressable.\n");
-               // desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
+        if (n.addressable == false) type_checker_error(n, $"Can't convert {desc} of type '{ get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}' because it is not addressable.\n");
         insert_take_reference(type_checker, n);
     }
 
@@ -242,8 +242,7 @@ or to perform a null reference check.");
         ast_insert_node(type_checker.ast_allocator, n, make_cast(type_checker, target_type, n.type));
     }
     else {
-        type_checker_error(n, $"Can't convert {desc} of type '%s' to '%s'.\n");
-            // desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
+        type_checker_error(n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}'.\n");
     }
 }
 
@@ -254,8 +253,7 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
 
     if (tk == TokenKind::TOK_bind_ref) {
         if (!is_reference_kind(n.AST_binary.left.type)) {
-            type_checker_error(n, $"Operator {token_kind_printable(tk)} requires a reference type on the left side. Have '%s' and '%s'.\n");
-                //  get_type_name_r(buf_1, n.AST_binary.left.type), get_type_name_r(buf_2, n.AST_binary.right.type));
+            type_checker_error(n, $"Operator {token_kind_printable(tk)} requires a reference type on the left side. Have '{get_type_name_r(buf_1, n.AST_binary.left.type)}' and '{get_type_name_r(buf_2, n.AST_binary.right.type)}'.\n");
         }
 
         if (n.AST_binary.right.type <==> type_checker.type_cache.builtin_null) {
@@ -263,16 +261,15 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
         else
         {
             if (!is_reference_kind(n.AST_binary.right.type)) {
-                if (!n.AST_binary.right.addressable) type_checker_error(n, $"Operator {token_kind_printable(tk)} requires either another reference or something addressable on the right side. Have '%s' and '%s'.\n");
-                    //  get_type_name_r(buf_1, n.AST_binary.left.type), get_type_name_r(buf_2, n.AST_binary.right.type));
+                if (!n.AST_binary.right.addressable) type_checker_error(n,
+                    $"Operator {token_kind_printable(tk)} requires either another reference or something addressable on the right side. Have '{get_type_name_r(buf_1, n.AST_binary.left.type)}' and '{get_type_name_r(buf_2, n.AST_binary.right.type)}'.\n");
                 insert_take_reference(type_checker, n.AST_binary.right);
             }
 
             let any_ref => get_ref_type_for(type_checker.type_cache, type_checker.type_cache.builtin_any);
 
             if (n.AST_binary.left.type <!=> n.AST_binary.right.type && n.AST_binary.left.type <!=> any_ref && n.AST_binary.right.type <!=> any_ref) {
-                type_checker_error(n, $"Operator {token_kind_printable(tk)} requires the type on the right side to be referenceable by the left type. Have '%s' and '%s'.\n");
-                    // get_type_name_r(buf_1, n.AST_binary.left.type), get_type_name_r(buf_2, n.AST_binary.right.type));
+                type_checker_error(n, $"Operator {token_kind_printable(tk)} requires the type on the right side to be referenceable by the left type. Have '{get_type_name_r(buf_1, n.AST_binary.left.type)}' and '{get_type_name_r(buf_2, n.AST_binary.right.type)}'.\n");
             }
         }
         
@@ -402,20 +399,18 @@ fn type_check_function_call(type_checker: TypeChecker&, n_call: AST_node&) {
 
     if (!is_function_kind(fn_type)) type_checker_error(n_call,
             $"Trying to call something that is not a function. have '{get_type_name_r(buf, n_call.AST_call.target.type)}'");
-
+    
     let num_args_expected = fn_type.T_function.argument_types.len;
     let num_args = ast_count_chain(n_call.AST_call.args);
-
     if (num_args < num_args_expected) type_checker_error(n_call,
             $"Not enough arguments to function call. Expected {num_args_expected}, got {num_args}.\n");
-    
+
     if (num_args > num_args_expected) type_checker_error(n_call,
             $"Too many arguments to function call. Expected {num_args_expected}, got {num_args}.\n");
 
     let arg => n_call.AST_call.args;
     for (let i = 0; i < num_args; i++) {
         let expected_type => fn_type.T_function.argument_types[i];
-
         try_convert_to_type_if_necessary(type_checker, arg, expected_type, "Function argument");
         arg => arg.next;
     }
@@ -459,8 +454,6 @@ fn type_resolve_functions_visitor(n: AST_node&, type_checker: TypeChecker&) : vo
         let s_fun => type_checker.current_function_symbol;
         ASSERT(s_fun, "Encountered arglist without active function symbol.\n");
         
-        NOT_IMPLEMENTED(__LOCATION__, "Fix Endlos ARR");
-        /*
         EndlosArr_begin~Symbol&(type_checker.arg_symbols, type_checker.endlos);
 
         // visiting the children of the arg list will fill up 'arg_symbols'
@@ -470,14 +463,16 @@ fn type_resolve_functions_visitor(n: AST_node&, type_checker: TypeChecker&) : vo
         let arg_types = endlos_begin~Type&(type_checker.endlos);
 
         for (let i = 0; i < type_checker.arg_symbols.arr.len; i++) {
-            arg_types++ => type_checker.arg_symbols.arr[i].type;
+            *arg_types++ => type_checker.arg_symbols.arr[i].type;
         }
 
         arg_types = endlos_ripp_off~Type&(type_checker.endlos, arg_types);
 
-        type_checker.current_function_symbol.type =
-            get_function_type(type_checker.current_function_ret_type, arg_types);
-        */
+        type_checker.current_function_symbol.type =>
+            get_function_type(type_checker.type_cache, type_checker.current_function_ret_type, arg_types);
+        
+        $"Get_function_type {type_checker.arg_symbols.arr.len} {arg_types.len} \n"
+
     }
     else if (n.kind == AST_node::AST_arg_decl) {
         let t => if (n.AST_arg_decl._typedecl)
@@ -486,10 +481,7 @@ fn type_resolve_functions_visitor(n: AST_node&, type_checker: TypeChecker&) : vo
             &type_checker.type_cache.builtin_i64
 
         n.AST_arg_decl.symbol.type => t;
-        NOT_IMPLEMENTED(__LOCATION__, "Fix EndlosArr");
-        /*
         EndlosArr_push_ref~Symbol&(type_checker.arg_symbols, n.AST_arg_decl.symbol);
-        */
         n.type => type_checker.type_cache.builtin_void; // the declaration itself has no value.
     }
     else {
@@ -573,6 +565,7 @@ fn type_check_symbol(n: AST_node&, type_checker: TypeChecker&)
 fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
     let buf_1: u8[1024]; let buf_2: u8[1024];
 
+    $"Type propagation visitor {n.kind.name}\n"
     // actions while traversing the tree down
     if (n.kind == AST_node::AST_function) {
         type_checker.current_function_symbol => n.AST_function.symbol;
@@ -592,23 +585,19 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
         type_checker.current_function_ret_type => null;
         type_checker.current_function_ret_type_decl => null;
     }
-
     else if (n.kind == AST_node::AST_generic_speciation) {
         type_checker.generic_type => n.AST_generic_speciation.typedecl.type;
         ast_visit_children(n, type_propagation_visitor, type_checker);
         type_checker.generic_type => null;
     }
-
     else if (n.kind == AST_node::AST_generic) {
         // Not visiting children since there is no sense in type checking the generic without speciation
         n.type => type_checker.type_cache.builtin_void;
     }
-    
     else if (n.kind == AST_node::AST_generic_implementation) {
         // implementation has already been type checked
         n.type => type_checker.type_cache.builtin_void;
     }
-    
     else if (n.kind == AST_node::AST_program) {
         type_checker.program => n;
         ast_visit_children(n, type_propagation_visitor, type_checker);
@@ -986,6 +975,9 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
 fn type_checker_run(type_checker: TypeChecker&, root: AST_node&) {
     annotate_used_visitor(root, type_checker);
     type_resolve_functions_visitor(root, type_checker);
+
+    ast_dump_tree(root);
+
     type_propagation_visitor(root, type_checker);
 }
 

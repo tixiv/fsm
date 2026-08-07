@@ -46,9 +46,9 @@ generic T fn endlos_ripp_off (allocator: EndlosAllocator&, returned_roll: T[]) :
             let r => allocator.rolls[i];
             if (<i64>r.alloc.begin <= <i64>returned_roll.begin < <i64>r.alloc.begin + r.alloc.len) {
                 let finalized: T[];
-                finalized.begin => r.latest.begin;
+                finalized.begin => <T&> r.latest.begin;
                 finalized.len = (r.latest.len - returned_roll.len * T.sizeof) / T.sizeof;
-                r.alloc.begin => returned_roll.begin;
+                r.alloc.begin => <u8&> returned_roll.begin;
                 r.alloc.len = returned_roll.len * T.sizeof;
                 r.latest.begin => null;
                 r.latest.len = 0;
@@ -70,8 +70,7 @@ generic T struct EndlosArr {
 generic T fn EndlosArr_begin(arr: EndlosArr<T>&, allocator: EndlosAllocator&) : void {
     arr.alloc = endlos_begin~T(allocator);
     arr.arr = arr.alloc;
-    arr.len = 0;
-    return arr;
+    arr.arr.len = 0;
 }
 
 generic T fn EndlosArr_finalize(arr: EndlosArr<T>&, allocator: EndlosAllocator&) : T[] {
@@ -86,6 +85,6 @@ generic T fn EndlosArr_free(arr: EndlosArr<T>&, allocator: EndlosAllocator&) : v
 }
 
 generic T fn EndlosArr_push_ref(arr: EndlosArr<T>&, ref: T) : void {
-    arr.alloc++ => ref;
+    *arr.alloc++ => ref;
     arr.arr.len++;
 }

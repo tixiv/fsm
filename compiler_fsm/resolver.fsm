@@ -3,7 +3,8 @@ import * from "ast";
 import * from "symbol";
 
 fn resolver_error(n: AST_node&, s: u8[]) {
-    write(2, $"[FSM Resolver] {n.location} Error: {s}\n");
+    let l = n.location;
+    write(2, $"[FSM Resolver] {l.module.filename}:{l.line} Error: {s}\n");
     exit(1);
 }
 
@@ -120,7 +121,7 @@ fn resolve_globals_visitor (n: AST_node&, res: Resolver&) : void {
 }
 
 fn resolver_visitor(n: AST_node&, res: Resolver&) : void {
-    $"Resolver visitor{n.kind.name}\n"
+    // $"Resolver visitor{n.kind.name}\n"
     if (n.kind == AST_node::AST_function) {
         resolver_enter_function(res,  n.AST_function.symbol);
         ast_visit_children(n, resolver_visitor, res);

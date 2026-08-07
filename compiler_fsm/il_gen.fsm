@@ -2,12 +2,14 @@
 import * from "ast";
 
 fn il_gen_error(n: AST_node&, s: u8[]) {
-    write(2, $"[FSM IL Gen] {n.location} Error: {s}\n");
+    let l = n.location;
+    write(2, $"[FSM IL Gen] {l.module.filename}:{l.line} Error: {s}\n");
     exit(1);
 }
 
 fn il_gen_warning(n: AST_node&, s: u8[]) {
-    write(2, $"[FSM IL Gen] {n.location} Warning: {s}\n");
+    let l = n.location;
+    write(2, $"[FSM IL Gen] {l.module.filename}:{l.line} Warning: {s}\n");
 }
 
 /*

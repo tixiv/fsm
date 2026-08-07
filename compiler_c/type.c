@@ -99,11 +99,11 @@ static const char *get_type_name_r_impl(char print_buf[1024], Type *type, bool e
                 sb_printf(&sb, "%s%s", get_type_name_r_impl(child_print_buf, dereferenced_type(type->_struct.members[0].type), encoded), encoded ? "slice" : "[]");
             }
             else {
-                const char *kind_name = "unknown";
-                if (type->_struct.kind == SL_struct) kind_name = "struct";
-                if (type->_struct.kind == SL_record) kind_name = "record";
+                const char *kind_name = "unknown ";
+                if (type->_struct.kind == SL_struct) kind_name = "struct ";
+                if (type->_struct.kind == SL_record) kind_name = "record ";
                 if (type->name.begin) {
-                    sb_printf(&sb, "%s %.*s", encoded ? "" : kind_name, SV_prnt(type->name));
+                    sb_printf(&sb, "%s%.*s", encoded ? "" : kind_name, SV_prnt(type->name));
                 }
                 else {
                     sb_printf(&sb, "anonymous %s", kind_name);
