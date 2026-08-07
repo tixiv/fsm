@@ -24,10 +24,9 @@ Type builtin_i16 = (Type){T_signed_integer,   .storage_size = 2, .integer.num_bi
 Type builtin_u8 =  (Type){T_unsigned_integer, .storage_size = 1, .integer.num_bits =  8};
 Type builtin_i8 =  (Type){T_signed_integer,   .storage_size = 1, .integer.num_bits =  8};
 
-
 Type builtin_u8_reference = (Type){T_reference, .storage_size = 8, .reference.target_type = &builtin_u8};
 static StructMember builtin_u8_slice_members[2] = {{.name = mkSV("begin"), .type = &builtin_u8_reference}, {.name = mkSV("len"), .type = &builtin_i64}};
-Type builtin_u8_slice = (Type){T_struct, .storage_size = 16, ._struct.num_members = 2, ._struct.members = builtin_u8_slice_members};
+Type builtin_u8_slice = (Type){T_struct, .storage_size = 16, ._struct.kind = SL_slice, ._struct.num_members = 2, ._struct.members = builtin_u8_slice_members};
 
 Type builtin_any = (Type){T_any, .storage_size = 0};
 
@@ -96,22 +95,19 @@ static const char *get_type_name_r_impl(char print_buf[1024], Type *type, bool e
             print_array_type(&sb, type);
             break;
         case T_struct:
-            if (is_slice_type(type)) {
+            if (is_slice_kind(type)) {
                 sb_printf(&sb, "%s%s", get_type_name_r_impl(child_print_buf, dereferenced_type(type->_struct.members[0].type), encoded), encoded ? "slice" : "[]");
             }
-            else if (type->name.begin) {
-                sb_printf(&sb, "%s%.*s", encoded ? "" : "struct ", SV_prnt(type->name));
-            }
             else {
-                sb_printf(&sb, "anonymous struct");
-            }
-            break;
-        case T_record:
-            if (type->name.begin) {
-                sb_printf(&sb, "record %.*s", SV_prnt(type->name));
-            }
-            else {
-                sb_printf(&sb, "anonymous record");
+                const char *kind_name = "unknown";
+                if (type->_struct.kind == SL_struct) kind_name = "struct";
+                if (type->_struct.kind == SL_record) kind_name = "record";
+                if (type->name.begin) {
+                    sb_printf(&sb, "%s %.*s", encoded ? "" : kind_name, SV_prnt(type->name));
+                }
+                else {
+                    sb_printf(&sb, "anonymous %s", kind_name);
+                }
             }
             break;
         case T_union:
@@ -168,12 +164,20 @@ bool is_array_kind(Type *t) {
     return t->kind == T_array;
 }
 
-bool is_struct_kind(Type *t) {
+bool is_structlike_kind(Type *t) {
     return t->kind == T_struct;
 }
 
+bool is_struct_kind(Type *t) {
+    return t->kind == T_struct && t->_struct.kind == SL_struct;
+}
+
 bool is_record_kind(Type *t) {
-    return t->kind == T_record;
+    return t->kind == T_struct && t->_struct.kind == SL_record;
+}
+
+bool is_slice_kind(Type *t) {
+    return t->kind == T_struct && t->_struct.kind == SL_slice;
 }
 
 bool is_union_kind(Type *t) {
@@ -248,7 +252,7 @@ bool is_castable_to(Type *to, Type *from, const char **out_warn) {
             return true;
         }
     }
-    if (to == &builtin_u8_slice && (is_record_kind(from) || is_struct_kind(from) || is_union_kind(from))) return true;
+    if (to == &builtin_u8_slice && (is_record_kind(from))) return true;
 
     return false;
 }
@@ -264,7 +268,7 @@ AST_node *make_cast(Type *to, Type *from) {
 }
 
 size_t get_member_offset(Type *_struct, size_t index) {
-    ASSERT(_struct->kind == T_struct || _struct->kind == T_record,
+    ASSERT(_struct->kind == T_struct,
         "get_member_offset() called on something that is not a struct or record.\n")
     ASSERT(index < _struct->_struct.num_members, "Index out of range.\n");
 
@@ -282,10 +286,10 @@ Type *get_member_type_and_offset_by_name(Type *t, SV *member_name, size_t *out_o
     ASSERT(!sv_compare_cstr(member_name, "_"), "get_member_type_and_offset() called on '_'.\n" )
 
     if (is_reference_kind(t)) t = dereferenced_type(t);
-    ASSERT(t->kind == T_struct || t->kind == T_record || t->kind == T_union,
+    ASSERT(t->kind == T_struct || t->kind == T_union,
         "get_member_type_and_offset() called on something that is not a struct or a struct reference.\n")
 
-    if (t->kind == T_struct || t->kind == T_record) {
+    if (t->kind == T_struct) {
         size_t offset = 0;
         for (size_t i = 0; i < t->_struct.num_members; i++) {
             StructMember *member = &t->_struct.members[i];
@@ -358,7 +362,7 @@ bool get_union_member_value (Type *t, SV *member_name, int64_t *enum_value) {
 
 void calculate_storage_size(Type *container) {
     char buf[1024];
-    if (is_struct_kind(container)) {
+    if (is_struct_kind(container) || is_slice_kind(container)) {
         size_t offset = 0;
         for (size_t i = 0; i < container->_struct.num_members; i++) {
             StructMember *member = &container->_struct.members[i];
@@ -479,6 +483,7 @@ Type *get_array_type(Type *element_type, size_t n_elements) {
 
 static Type *make_slice_type(Type *element_type) {
     Type *slice_t = type_alloc(T_struct);
+    slice_t->_struct.kind = SL_slice;
     slice_t->_struct.num_members = 2;
 
     size_t size = 2 * sizeof(StructMember);
@@ -536,43 +541,38 @@ Type *get_function_type(Type *ret_type, Type *arg_types[], size_t num_args) {
     return new_fun;
 }
 
-bool is_slice_type(Type *t) {
-    if (t == &builtin_u8_slice) return true;
-    
-    for (size_t i = 0; i < slice_types.count; i++) {
-        Type *slice = ((Type**)slice_types.data)[i];
-        if (t == slice) return true;
-    }
-    return false;
-}
-
-
 static Type *speciate_tree(Type *t, Type *speciation) {
     char buf[1024];
     switch (t->kind) {
         case T_generic: return speciation;
 
-        case T_record:
         case T_struct: {
-            bool need_to_copy = false;
-            StructMember *members = malloc(sizeof(StructMember) * t->_struct.num_members);
-            for (size_t i = 0; i < t->_struct.num_members; i++) {
-                members[i].type = speciate_tree(t->_struct.members[i].type, speciation);
-                if (members[i].type != t->_struct.members[i].type) need_to_copy = true;
-                members[i].name = t->_struct.members[i].name;
+            if (is_slice_kind(t)) {
+                return get_sclice_type(
+                    dereferenced_type(
+                        speciate_tree(t->_struct.members[0].type, speciation)));
             }
+            else {
+                bool need_to_copy = false;
+                StructMember *members = malloc(sizeof(StructMember) * t->_struct.num_members);
+                for (size_t i = 0; i < t->_struct.num_members; i++) {
+                    members[i].type = speciate_tree(t->_struct.members[i].type, speciation);
+                    if (members[i].type != t->_struct.members[i].type) need_to_copy = true;
+                    members[i].name = t->_struct.members[i].name;
+                }
 
-            if (!need_to_copy) {
-                free(members);
-                return t;
+                if (!need_to_copy) {
+                    free(members);
+                    return t;
+                }
+
+                Type *new_struct = type_alloc(T_struct);
+                memcpy(new_struct, t, sizeof(Type));
+                new_struct->_struct.members = members;
+
+                calculate_storage_size(new_struct);
+                return new_struct;
             }
-
-            Type *new_struct = type_alloc(T_struct);
-            memcpy(new_struct, t, sizeof(Type));
-            new_struct->_struct.members = members;
-
-            calculate_storage_size(new_struct);
-            return new_struct;
         }
 
         case T_reference: return get_ref_type_for(speciate_tree(t->reference.target_type, speciation));
@@ -626,7 +626,7 @@ Type *get_speciated_type(Type *base, Type *speciation) {
 }
 
 Type *get_slice_element_type(Type *t) {
-    ASSERT(is_slice_type(t), "Tried to get slice element type for non slice type.\n");
+    ASSERT(is_slice_kind(t), "Tried to get slice element type for non slice type.\n");
     return dereferenced_type(t->_struct.members[0].type);
 }
 

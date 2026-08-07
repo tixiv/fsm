@@ -273,7 +273,7 @@ static void gen_cast(AST_node *n, IL_gen *gen, bool result_used) {
         ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
         // Just put no cast for now, let's fix potential problems later
     }
-    else if (to == &builtin_u8_slice && (is_struct_kind(from) || is_record_kind(from) || is_union_kind(from))) {
+    else if (to == &builtin_u8_slice && (is_record_kind(from))) {
         push_opcode(OP_push_literal, nullptr, get_storage_size(from));
         ast_visit_children(n, (AstVisitor)gen_address_visitor, gen);
     }
@@ -375,7 +375,7 @@ static void gen_plus_plus(AST_node *n, IL_gen *gen, bool result_used) {
         push_opcode_sz(OP_integer_plus_plus, nullptr,
             result_used ? (n->plus_plus.postfix + 1) : 0, n->type->storage_size);
     }
-    else if (is_slice_type(n->plus_plus.body->type)) {
+    else if (is_slice_kind(n->plus_plus.body->type)) {
         size_t size = get_slice_element_type(n->plus_plus.body->type)->storage_size;
         push_opcode_sz(OP_slice_plus_plus, nullptr,
             result_used ? (n->plus_plus.postfix + 1) : 0, size);
@@ -597,7 +597,7 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
                 gen_value_visitor(n->_array.index, gen);
                 push_opcode_sz(OP_array_access, nullptr, 0, get_storage_size(n->_array.array->type->_array.element_type));
             }
-            else if (is_slice_type(n->_array.array->type)) {
+            else if (is_slice_kind(n->_array.array->type)) {
                 gen_address_visitor(n->_array.array, gen);
                 push_opcode_sz(OP_load, nullptr, 0, 8); // load the 'begin' member
                 gen_value_visitor(n->_array.index, gen);
@@ -620,8 +620,7 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
 
         case AST_member_access: {
             Type *t = n->member_access.body->type;
-            if (is_reference_kind(t) && (is_struct_kind(dereferenced_type(t))
-                                      || is_record_kind(dereferenced_type(t))
+            if (is_reference_kind(t) && (is_structlike_kind(dereferenced_type(t))
                                       || is_union_kind(dereferenced_type(t)))) {
                 ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
                 push_opcode(OP_member_access, nullptr, n->member_access.offset);

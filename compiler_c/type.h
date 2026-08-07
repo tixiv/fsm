@@ -7,6 +7,12 @@
 #include <stdbool.h>
 
 typedef enum {
+    SL_struct,
+    SL_record,
+    SL_slice,
+} StructlikeKind;
+
+typedef enum {
     T_void,
     T_unsigned_integer,
     T_signed_integer,
@@ -15,9 +21,7 @@ typedef enum {
     T_reference,
     T_null,
     T_array,
-    T_slice,
     T_struct,
-    T_record,
     T_union,
     T_enumerator,
     T_enum,
@@ -72,6 +76,7 @@ typedef struct Type_s {
         struct {
             size_t num_members;
             StructMember *members;
+            StructlikeKind kind;
         } _struct;
 
         struct {
@@ -123,6 +128,7 @@ bool is_integer_kind(Type *t);
 bool is_signed_integer(Type *t);
 bool is_boolean_kind(Type *t);
 bool is_array_kind(Type *t);
+bool is_structlike_kind(Type *t);
 bool is_struct_kind(Type *t);
 bool is_record_kind(Type *t);
 bool is_union_kind(Type *t);
@@ -132,7 +138,7 @@ bool is_reference_kind(Type *t);
 bool is_function_kind(Type *t);
 bool is_function_reference(Type *t);
 
-bool is_slice_type(Type *t);
+bool is_slice_kind(Type *t);
 
 int get_ref_order(Type *t);
 

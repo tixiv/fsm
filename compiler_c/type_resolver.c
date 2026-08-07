@@ -105,12 +105,14 @@ void push_named_type(SV name, Type * t, int line_number) {
 
 void type_lookup_visitor(AST_node *n, void *) {
     switch (n->kind) {
-        case AST_struct:
+        case AST_struct: {
+            Type *t = type_alloc(T_struct);
+            t->_struct.kind = SL_struct;
             if (n->_struct.is_record)
-                push_named_type(n->_struct.name, type_alloc(T_record), n->line_number);
-            else
-                push_named_type(n->_struct.name, type_alloc(T_struct), n->line_number);
+                t->_struct.kind = SL_record;
+            push_named_type(n->_struct.name, t, n->line_number);
             break;
+        }
         
         case AST_enum: {
             Type * t =  type_alloc(T_enum);
@@ -187,7 +189,8 @@ void type_resolve_struct(AST_node *n, TypeResolverState *trs, bool global) {
         ASSERT(n->type, "The type name '%.*s' should exist because it should have been found in the lookup pass.\n", SV_prnt(n->_struct.name));
     }
     else {
-        n->type = type_alloc(n->_struct.is_record ? T_record : T_struct);
+        n->type = type_alloc(T_struct);
+        n->type->_struct.kind = n->_struct.is_record ? SL_record : SL_struct;
     }
     srs.current_struct = n->type;
     ast_visit_children(n, (AstVisitor)type_resolver_struct_visitor, &srs);

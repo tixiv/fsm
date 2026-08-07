@@ -284,19 +284,11 @@ fn ast_link_to_chain(chain_p: AST_node& &, n: AST_node&) : void {
     }
 }
 
-fn slicecopy(target: u8[], source: u8[]) {
-    while (target.len && source.len) {
-        target.begin = source.begin;
-        target++ source++
-    }
-}
-
-
 fn ast_insert_node(allocator: AST_Node_Allocator&, at: AST_node&, new_node: AST_node&) : void {
     // We overwrite the old node with the new one.
     // make a copy first.
     let at_copy => ast_alloc(allocator, at.kind, at.location);
-    slicecopy(at_copy, at);
+    objcopy~AST_node(at_copy, at);
 
     at_copy.next => null; // zero chain pointer in case it was used
 
@@ -313,7 +305,7 @@ fn ast_insert_node(allocator: AST_Node_Allocator&, at: AST_node&, new_node: AST_
 
     // overwrite the old node with the new one that has the old
     // ones copy linked
-    slicecopy(at, new_node);
+    objcopy~AST_node(at, new_node);
 }
 
 /*

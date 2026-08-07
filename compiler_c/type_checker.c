@@ -172,7 +172,7 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
         insert_dereference(n);
     }
     
-    if (is_slice_type(target_type) && is_array_kind(n->type)) {
+    if (is_slice_kind(target_type) && is_array_kind(n->type)) {
         if (get_slice_element_type(target_type) == n->type->_array.element_type) {
             AST_node *conv = ast_alloc(AST_array_to_slice, n->line_number);
             conv->type = get_sclice_type(n->type->_array.element_type);
@@ -185,10 +185,7 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
         }
     }
 
-    if ((target_type == &builtin_u8_slice) && (
-            (is_struct_kind(n->type) && !is_slice_type(n->type))
-            || is_record_kind(n->type)
-            || is_union_kind(n->type)))
+    if (target_type == &builtin_u8_slice && is_record_kind(n->type))
     {
         ast_insert_node(n, make_cast(target_type, n->type));
         return;
@@ -812,7 +809,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             if (is_array_kind(n->_array.array->type)) {
                 n->type = get_ref_type_for(n->_array.array->type->_array.element_type);    
             }
-            else if (is_slice_type(n->_array.array->type)) {
+            else if (is_slice_kind(n->_array.array->type)) {
                 n->type = get_ref_type_for(get_slice_element_type(n->_array.array->type));
             }
             else {
@@ -865,7 +862,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
         case AST_plus_plus: {
             Type * original_type = n->plus_plus.body->type;
             auto_dereference(n->plus_plus.body);
-            if (is_slice_type(n->plus_plus.body->type)) {
+            if (is_slice_kind(n->plus_plus.body->type)) {
                 n->type = n->plus_plus.body->type->_struct.members[0].type;
             }
             else if (is_integer_kind(n->plus_plus.body->type)) {
@@ -903,7 +900,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
             if (is_reference_kind(container)) container = dereferenced_type(container);
             
-            if (is_struct_kind(container) || is_record_kind(container) || is_union_kind(container)) {
+            if (is_structlike_kind(container) || is_union_kind(container)) {
                 size_t offset;
                 Type *t = get_member_type_and_offset_by_name(container, &n->member_access.name, &offset);
                 if (!t) type_checker_error(n->line_number, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->member_access.name),
