@@ -3,7 +3,7 @@ import * from "endlos";
 import * from "parser";
 import * from "resolver";
 import * from "il_gen";
-import * from "type_checker"
+import * from "type_checker";
 
 
 fn main () {
@@ -33,6 +33,11 @@ fn main () {
     resolver_init(resolver, endlos, type_cache);
 
     resolver_run(resolver, root);
+
+    let type_checker: TypeChecker;
+    type_checker_init(type_checker, type_cache, ast_allocator, endlos, resolver.global_symbols);
+
+    type_checker_run(type_checker, root);
 
     ast_dump_tree(root);
 

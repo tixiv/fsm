@@ -214,6 +214,25 @@ union AST_node enum kind {
 
     struct AST_null {
     }
+
+    struct AST_generic {
+        body: AST_node&;
+        parameter_name: u8[];
+    }
+
+    struct AST_generic_speciation {
+        typedecl: AST_node&;
+        body: AST_node&;
+    }
+
+    struct AST_type_generic_speciation {
+        typedecl: AST_node&;
+        body: AST_node&;
+    }
+
+    struct AST_generic_implementation {
+        body: AST_node&;
+    }
 }
 
 struct AST_Node_Allocator {

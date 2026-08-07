@@ -98,7 +98,13 @@ fn types_equal(a: any&, b: any&) {
 struct TypeCache {
     type_roll: Type[];
     type_ref_roll: Type&[];
-    function_types :TypeRefArr;
+    endlos: EndlosAllocator&;
+
+    function_types   :TypeRefArr;
+    ref_types        :TypeRefArr;
+    enumerator_types :TypeRefArr;
+    array_types      :TypeRefArr;
+    slice_types      :TypeRefArr;
 
     builtin_void: Type;
     builtin_null: Type;
@@ -112,8 +118,6 @@ struct TypeCache {
     builtin_i16: Type;
     builtin_u8: Type;
     builtin_i8: Type;
-    builtin_u8_reference: Type;
-    builtin_u8_slice: Type;
 }
 
 fn TypeCache_init(cache: TypeCache&, allocator: EndlosAllocator&) {
@@ -135,9 +139,6 @@ fn TypeCache_init(cache: TypeCache&, allocator: EndlosAllocator&) {
     t => cache.builtin_i16;          t.kind = Type::T_integer;   t.storage_size = 2; t.T_integer.signed = false; t.T_integer.num_bits = 16;
     t => cache.builtin_u8;           t.kind = Type::T_integer;   t.storage_size = 1; t.T_integer.signed = true;  t.T_integer.num_bits =  8;
     t => cache.builtin_i8;           t.kind = Type::T_integer;   t.storage_size = 1; t.T_integer.signed = false; t.T_integer.num_bits =  8;
-    t => cache.builtin_u8_reference; t.kind = Type::T_reference; t.storage_size = 8; t.T_reference.target_type => cache.builtin_u8;
-    // static StructMember builtin_u8_slice_members[2] = {{.name = mkSV("begin"), .type = &builtin_u8_reference}, {.name = mkSV("len"), .type = &builtin_i64}};
-    // Type builtin_u8_slice = (Type){T_struct, .storage_size = 16, ._struct.num_members = 2, ._struct.members = builtin_u8_slice_members};
 }
 
 fn type_ref_roll_take (cache: TypeCache&, len) : Type&[] {
@@ -148,152 +149,157 @@ fn type_ref_roll_take (cache: TypeCache&, len) : Type&[] {
     return taking;
 }
 
-/*
+fn type_alloc(cache: TypeCache&, kind) : Type& {
+    let t => cache.type_roll++;
+    t.kind = kind;
+    return t;
+}
 
-static void print_array_type(SB *sb, Type *arr_t) {
-    char child_print_buf[1024];
+fn print_array_type(sb: StringBuilder&, arr_t: Type&) : void {
+    let child_print_buf: u8[1024];
 
-    Type *t = arr_t;
-    while (is_array_kind(t)) t = t._array.element_type;
+    let t => arr_t;
+    while (is_array_kind(t)) t => t.T_array.element_type;
 
-    sb_printf(sb, "%s", get_type_name_r(child_print_buf, t));
+    sb_puts(sb, get_type_name_r(child_print_buf, t));
 
-    t = arr_t;
+    t => arr_t;
     while (is_array_kind(t)) {
-         sb_printf(sb, "[%lu]", t._array.n_elements);
-         t = t._array.element_type;
+         sb_puts(sb, $"[{t.T_array.n_elements}]");
+         t => t.T_array.element_type;
     }
 }
 
-const char *get_type_name_r(char print_buf[1024], Type *type) {
-    if (type == nullptr)       return "(null type)";
-    if (type == &builtin_void) return "void";
-    if (type == &builtin_null) return "null";
-    if (type == &builtin_bool) return "bool";
-    if (type == &builtin_any)  return "any";
-    if (type == &builtin_u64)  return "u64";
-    if (type == &builtin_i64)  return "i64";
-    if (type == &builtin_u32)  return "u32";
-    if (type == &builtin_i32)  return "i32";
-    if (type == &builtin_u16)  return "u16";
-    if (type == &builtin_i16)  return "i16";
-    if (type == &builtin_u8)   return "u8";
-    if (type == &builtin_i8)   return "i8";
+fn get_type_name_r(print_buf: u8[1024]&, type: Type&) : u8[] {
+    if (!type)                        return "(null type)";
+    if (type.kind == Type::T_void)    return "void";
+    if (type.kind == Type::T_null)    return "null";
+    if (type.kind == Type::T_boolean) return "bool";
+    if (type.kind == Type::T_any)     return "any";
+    if (type.kind == Type::T_integer && !type.T_integer.signed && type.T_integer.num_bits == 64) return "u64";
+    if (type.kind == Type::T_integer &&  type.T_integer.signed && type.T_integer.num_bits == 64) return "i64";
+    if (type.kind == Type::T_integer && !type.T_integer.signed && type.T_integer.num_bits == 32) return "u32";
+    if (type.kind == Type::T_integer &&  type.T_integer.signed && type.T_integer.num_bits == 32) return "i32";
+    if (type.kind == Type::T_integer && !type.T_integer.signed && type.T_integer.num_bits == 16) return "u16";
+    if (type.kind == Type::T_integer &&  type.T_integer.signed && type.T_integer.num_bits == 16) return "i16";
+    if (type.kind == Type::T_integer && !type.T_integer.signed && type.T_integer.num_bits == 8) return "u8";
+    if (type.kind == Type::T_integer &&  type.T_integer.signed && type.T_integer.num_bits == 8) return "i8";
 
-    SB sb;
-    sb_init(&sb, print_buf, 1024);
+    let sb: StringBuilder;
+    sb_init(sb, print_buf);
 
-    char child_print_buf[1024];
+    let child_print_buf: u8[1024];
     
-    switch (type.kind) {
-        case T_function:
-            sb_printf(&sb, "fn (");
-            Type **args = type.T_function.argument_types;
-            for (int i = 0; i < type.T_function.num_arguments; i++) {
-                sb_printf(&sb, "%s", get_type_name_r(child_print_buf, args[i]));
-                if (i < type.T_function.num_arguments-1) sb_printf(&sb, ", ");
-            }
-            sb_printf(&sb, ") :%s", get_type_name_r(child_print_buf, type.T_function.return_type));
-            break;
-        case T_reference:
-            sb_printf(&sb, "%s &", get_type_name_r(child_print_buf, type.reference.target_type));
-            break;
-        case T_enumerator:
-            sb_printf(&sb, "%s::enumerator", get_type_name_r(child_print_buf, type.enumerator.target_type));
-            break;
-        case T_array:
-            print_array_type(&sb, type);
-            break;
-        case T_struct:
-            if (is_slice_type(type)) {
-                sb_printf(&sb, "%s[]", get_type_name_r(child_print_buf, dereferenced_type(type._struct.members[0].type)));
-            }
-            else if (type.name.begin) {
-                sb_printf(&sb, "struct %.*s", SV_prnt(type.name));
-            }
-            else {
-                sb_printf(&sb, "anonymous struct", SV_prnt(type.name));
-            }
-            break;
-        case T_record:
-            if (type.name.begin) {
-                sb_printf(&sb, "record %.*s", SV_prnt(type.name));
-            }
-            else {
-                sb_printf(&sb, "anonymous record", SV_prnt(type.name));
-            }
-            break;
-        case T_union:
-            if (type.name.begin) {
-                sb_printf(&sb, "union %.*s", SV_prnt(type.name));
-            }
-            else {
-                sb_printf(&sb, "anonymous record", SV_prnt(type.name));
-            }
-            break;
-        case T_enum:
-            if (type.name.begin) {
-                sb_printf(&sb, "enum %.*s", SV_prnt(type.name));
-            }
-            else {
-                sb_printf(&sb, "anonymous enum", SV_prnt(type.name));
-            }
-            break;
-        default:
-            NOT_IMPLEMENTED("Dumping type kind %d is not implemented yet.\n", type.kind);
-            break;
+    if (type.kind == Type::T_function) {
+        sb_puts(sb, "fn (");
+        let args = type.T_function.argument_types;
+        for (let i = 0; i < args.len; i++) {
+            sb_puts(sb, get_type_name_r(child_print_buf, args[i]));
+            if (i < args.len - 1) sb_puts(sb, ", ");
+        }
+        sb_puts(sb, $") :{get_type_name_r(child_print_buf, type.T_function.return_type)}");
+    }
+    else if (type.kind == Type::T_reference) {
+        sb_puts(sb, $"{get_type_name_r(child_print_buf, type.T_reference.target_type)} &");
+    }
+    else if (type.kind == Type::T_enumerator) {
+        sb_puts(sb, $"{get_type_name_r(child_print_buf, type.T_enumerator.target_type)}::enumerator");
+    }
+    else if (type.kind == Type::T_array) {
+        print_array_type(sb, type);
+    }
+    else if (type.kind == Type::T_struct) {
+        /*
+        if (is_slice_type(type)) {
+             sb_puts(sb, "%s[]", get_type_name_r(child_print_buf, dereferenced_type(type.T_struct.members[0].type)));
+        }
+        else */ if (type.name.begin) {
+            sb_puts(sb, $"struct {type.name}");
+        }
+        else {
+            sb_puts(sb, "anonymous struct");
+        }
+    }
+    else if (type.kind == Type::T_record) {
+        if (type.name.begin) {
+            sb_puts(sb, $"record {type.name}");
+        }
+        else {
+            sb_puts(sb, "anonymous record");
+        }
+    }
+    else if (type.kind == Type::T_union) {
+        if (type.name.begin) {
+            sb_puts(sb, $"union {type.name}");
+        }
+        else {
+            sb_puts(sb, "anonymous union");
+        }
+    }
+    else if (type.kind == Type::T_enum) {
+        if (type.name.begin) {
+            sb_puts(sb, $"enum {type.name}");
+        }
+        else {
+            sb_puts(sb, "anonymous enum");
+        }
+    }
+    else {
+        NOT_IMPLEMENTED(__LOCATION__, $"Dumping type kind {type.kind.name} is not implemented yet.\n");
     }
 
     return sb.buffer;
 }
 
-*/
+fn is_void_kind(t: Type&) : bool {
+    return t && t.kind == Type::T_void;
+}
 
-fn is_boolean_kind(t: Type&) {
+fn is_boolean_kind(t: Type&) : bool {
     return t && t.kind == Type::T_boolean;
 }
 
-fn is_integer_kind(t: Type&) {
+fn is_integer_kind(t: Type&) : bool {
     return t && t.kind == Type::T_integer;
 }
 
-fn is_signed_integer(t: Type&) {
+fn is_signed_integer(t: Type&) : bool {
     return t && t.kind == Type::T_integer && t.T_integer.signed;
 }
 
-fn is_array_kind(t: Type&) {
+fn is_array_kind(t: Type&) : bool {
     return t && t.kind == Type::T_array;
 }
 
-fn is_struct_kind(t: Type&) {
+fn is_struct_kind(t: Type&) : bool {
     return t && t.kind == Type::T_struct;
 }
 
-fn is_record_kind(t: Type&) {
+fn is_record_kind(t: Type&) : bool {
     return t && t.kind == Type::T_record;
 }
 
-fn is_union_kind(t: Type&) {
+fn is_union_kind(t: Type&) : bool {
     return t && t.kind == Type::T_union;
 }
 
-fn is_enum_kind(t: Type&) {
+fn is_enum_kind(t: Type&) : bool {
     return t && t.kind == Type::T_enum;
 }
 
-fn is_enumerator_kind(t: Type&) {
+fn is_enumerator_kind(t: Type&) : bool {
     return t && t.kind == Type::T_enumerator;
 }
 
-fn is_reference_kind(t: Type&) {
+fn is_reference_kind(t: Type&) : bool {
     return t && t.kind == Type::T_reference;
 }
 
-fn is_function_kind(t: Type&) {
+fn is_function_kind(t: Type&) : bool {
     return t && t.kind == Type::T_function;
 }
 
-fn is_function_reference(t: Type&) {
+fn is_function_reference(t: Type&) : bool {
     return is_reference_kind(t) &&
         is_function_kind(dereferenced_type(t));
 }
@@ -318,78 +324,78 @@ fn types_are_equivalent(t1: Type&, t2: Type&) : bool {
     return false;
 }
 
-fn is_castable_to_integer(t: Type&) {
+fn is_castable_to_integer(t: Type&) : bool {
     return t.kind == Type::T_integer |== Type::T_integer |== Type::T_boolean;
 }
 
-fn is_castable_to(to: Type&, from: Type&, cache: TypeCache&) {
+fn is_castable_to(cache: TypeCache&, to: Type&, from: Type&, ) {
     return
         if (is_integer_kind(to))
             is_castable_to_integer(from)
         else if (is_boolean_kind(to))
             from.kind == Type::T_integer |== Type::T_boolean |== Type::T_reference
         else
-            types_equal(to, cache.builtin_u8_slice) && (is_record_kind(from) || is_struct_kind(from) || is_union_kind(from))
+            types_equal(to, get_slice_type(cache, cache.builtin_u8)) && (is_record_kind(from) || is_struct_kind(from) || is_union_kind(from))
 }
 
-/*
-size_t get_member_offset(Type *_struct, size_t index) {
-    ASSERT(_struct.kind == Type::T_struct || _struct.kind == Type::T_record,
+
+fn get_member_offset(_struct: Type&, index) {
+    ASSERT(_struct.kind == Type::T_struct |== Type::T_record,
         "get_member_offset() called on something that is not a struct or record.\n")
-    ASSERT(index < _struct._struct.num_members, "Index out of range.\n");
+    ASSERT(index < _struct.T_struct.num_members, "Index out of range.\n");
 
-    size_t offset = 0;
-    for (int i = 0; i < index; i++) {
-        StructMember *member = &_struct._struct.members[i];
+    let offset = 0;
+    for (let i = 0; i < index; i++) {
+        let member => &_struct.T_struct.members[i];
 
-        offset += member.type.storage_size;
+        offset = offset + member.type.storage_size;
     }
 
     return offset;
 }
 
-Type *get_member_type_and_offset_by_name(t: Type&, SV *member_name, size_t *out_offset) {
-    ASSERT(!sv_compare_cstr(member_name, "_"), "get_member_type_and_offset() called on '_'.\n" )
+fn get_member_type_and_offset_by_name(cache: TypeCache&, t: Type&, member_name: u8[], out_offset: i64&) : Type& {
+    ASSERT(!sv_equal(member_name, "_"), "get_member_type_and_offset() called on '_'.\n" )
 
-    if (is_reference_kind(t)) t = dereferenced_type(t);
-    ASSERT(t.kind == Type::T_struct || t.kind == Type::T_record || t.kind == Type::T_union,
+    if (is_reference_kind(t)) t => dereferenced_type(t);
+    ASSERT(t.kind == Type::T_struct |== Type::T_record |== Type::T_union,
         "get_member_type_and_offset() called on something that is not a struct or a struct reference.\n")
 
-    if (t.kind == Type::T_struct || t.kind == Type::T_record) {
-        size_t offset = 0;
-        for (int i = 0; i < t._struct.num_members; i++) {
-            StructMember *member = &t._struct.members[i];
+    if (t.kind == Type::T_struct |== Type::T_record) {
+        let offset = 0;
+        for (let i = 0; i < t.T_struct.num_members; i++) {
+            let member => &t.T_struct.members[i];
 
             if (sv_equal(&member.name, member_name)) {
-                if (out_offset) *out_offset = offset;
+                if (out_offset) out_offset = offset;
                 return member.type;
             }
-            offset += member.type.storage_size;
+            offset = offset + member.type.storage_size;
         }
     }
     else if (t.kind == Type::T_union) {
-        size_t offset = 0;
-        if (t._union.enumarator_name.begin) {
-            if (sv_equal(&t._union.enumarator_name, member_name)) {
+        let offset = 0;
+        if (t.T_union.enumarator_name.begin) {
+            if (sv_equal(&t.T_union.enumarator_name, member_name)) {
                 if (out_offset) *out_offset = 0;
-                return get_enumerator_type_for(t);
+                return get_enumerator_type_for(cache, t);
             }
-            offset += 8;
+            offset = offset + 8;
         }
-        for (int i = 0; i < t._union.num_members; i++) {
-            UnionMember *member = &t._union.members[i];
+        for (let i = 0; i < t.T_union.num_members; i++) {
+            let member => t.T_union.members[i];
 
-            if (member.name.begin == nullptr) {
+            if (!member.name.begin) {
                 if (is_struct_kind(member.type)) {
-                    Type *mt = get_member_type_and_offset_by_name(member.type, member_name, out_offset);
+                    let mt => get_member_type_and_offset_by_name(cache, member.type, member_name, out_offset);
                     if (mt) {
-                        if (out_offset) *out_offset += offset;
+                        if (out_offset) *out_offset = *out_offset + offset;
                         return mt;
                     }
                 }
-                else NOT_IMPLEMENTED("Unnanmed things in unions but structs are not implemented yet.\n")
+                else NOT_IMPLEMENTED(__LOCATION__, "Unnanmed things in unionsexcept structs\n")
 
-                offset += member.type.storage_size;
+                offset = offset + member.type.storage_size;
             }
 
             if (sv_equal(&member.name, member_name)) {
@@ -399,12 +405,13 @@ Type *get_member_type_and_offset_by_name(t: Type&, SV *member_name, size_t *out_
         }
     }
 
-    return nullptr;
+    return null;
 }
 
-bool get_enum_member_value (t: Type&, SV *member_name, int64_t *enum_value) {
-    for (int i = 0; i < t._enum.num_members; i++) {
-        EnumMember *member = &t._enum.members[i];
+
+fn get_enum_member_value (t: Type&, member_name: u8[], enum_value: i64&) : bool {
+    for (let i = 0; i < t.T_enum.num_members; i++) {
+        let member => &t.T_enum.members[i];
 
         if (sv_equal(&member.name, member_name)) {
             if (enum_value) *enum_value = member.value;
@@ -414,9 +421,9 @@ bool get_enum_member_value (t: Type&, SV *member_name, int64_t *enum_value) {
     return false;
 }
 
-bool get_union_member_value (t: Type&, SV *member_name, int64_t *enum_value) {
-    for (int i = 0; i < t._union.num_members; i++) {
-        UnionMember *member = &t._union.members[i];
+fn get_union_member_value (t: Type&, member_name: u8[], enum_value: i64&) : bool {
+    for (let i = 0; i < t.T_union.num_members; i++) {
+        let member => &t.T_union.members[i];
 
         if (sv_equal(&member.name, member_name)) {
             if (enum_value) *enum_value = member.value;
@@ -426,33 +433,32 @@ bool get_union_member_value (t: Type&, SV *member_name, int64_t *enum_value) {
     return false;
 }
 
-void calculate_storage_size(Type *container) {
-    char buf[1024];
+fn calculate_storage_size(container: Type&) : void {
     if (is_struct_kind(container)) {
-        size_t offset = 0;
-        for (int i = 0; i < container._struct.num_members; i++) {
-            StructMember *member = &container._struct.members[i];
-            offset += member.type.storage_size;
+        let offset = 0;
+        for (let i = 0; i < container.T_struct.num_members; i++) {
+            let member => container.T_struct.members[i];
+            offset = offset + member.type.storage_size;
         }
         container.storage_size = offset;
     }
     else if (is_record_kind(container)) {
-        size_t offset = 0;
-        for (int i = 0; i < container._struct.num_members; i++) {
-            StructMember *member = &container._struct.members[i];
-            offset += member.type.storage_size;
+        let offset = 0;
+        for (let i = 0; i < container.T_struct.num_members; i++) {
+            let member => container.T_struct.members[i];
+            offset = offset + member.type.storage_size;
         }
         container.storage_size = offset;
     }
     else if (is_union_kind(container)) {
-        size_t offset = 0;
-        if (container._union.enumarator_name.begin) offset += 8;
-        size_t max_member_size = 0;
-        for (int i = 0; i < container._union.num_members; i++) {
-            UnionMember *member = &container._union.members[i];
-            size_t sz = member.type.storage_size;
-            if (member.name.begin == nullptr) {
-                offset += sz;
+        let offset = 0;
+        if (container.T_union.enumarator_name.begin) offset = offset + 8;
+        let max_member_size = 0;
+        for (let i = 0; i < container.T_union.num_members; i++) {
+            let member => container.T_union.members[i];
+            let sz = member.type.storage_size;
+            if (!member.name.begin) {
+                offset = offset + sz;
             }
             else {
                 if (sz > max_member_size) max_member_size = sz;
@@ -462,130 +468,147 @@ void calculate_storage_size(Type *container) {
         container.storage_size = offset + max_member_size;
 
     }
-    else NOT_IMPLEMENTED("calculate_storage_size() for %s is not implemented.\n", get_type_name_r(buf, container));
+    else NOT_IMPLEMENTED(__LOCATION__, $"calculate_storage_size() for {container.kind.name}");
 }
+
+/*
 
 size_t get_function_arguments_size(t: Type&) {
     if (is_reference_kind(t)) t = dereferenced_type(t);
     ASSERT(t.kind == Type::T_function,"get_function_arguments_size() called on something that is not a function.\n")
-    size_t size = 0;
-    for (int i = 0; i < t.T_function.num_arguments; i++) {
-        Type *arg = t.T_function.argument_types[i];
+    let size = 0;
+    for (let i = 0; i < t.T_function.num_arguments; i++) {
+        let arg = t.T_function.argument_types[i];
         size += arg.storage_size;
         if (size % 8) size += 8 - (size % 8);
     }
     return size;
 }
 
-static Type *make_ref_type_for(t: Type&) {
-    Type *ref = type_alloc(T_reference);
-    ref.reference.target_type = t;
+*/
+
+fn find_type_in_array(arr: TypeRefArr&, predicate: fn (Type&, any&, any&) : bool, arg1: any&, arg2: any&) : Type& {
+    for (let i = 0; i < arr.arr.len; i++)
+        if (predicate(arr.arr[i], arg1, arg2))
+            return arr.arr[i];
+    return null;
+}
+
+fn make_ref_type_for(cache: TypeCache&, t: Type&) : Type& {
+    let ref => type_alloc(cache, Type::T_reference);
+    ref.T_reference.target_type => t;
     ref.storage_size = 8;
     return ref;
 }
 
-Dyn_array ref_types;
+fn check_ref_type_matches(ref: Type&, target_type: Type&, _: any&) {
+    return types_equal(ref.T_reference.target_type, target_type)
+}
 
-Type *get_ref_type_for(t: Type&) {
-    if (t == &builtin_u8) return &builtin_u8_reference;
+fn get_ref_type_for(cache: TypeCache&, t: Type&) {
+    let ref => find_type_in_array(cache.ref_types, check_ref_type_matches, t, null)
+    if (ref) return ref;
 
-    if (ref_types.capacity == 0)
-        dyn_array_init(&ref_types, sizeof(Type*), 16);
-
-    for (int i = 0; i < ref_types.count; i++) {
-        Type *ref = ((Type**)ref_types.data)[i];
-        if (ref.reference.target_type == t) return ref;
-    }
-    Type *ref = make_ref_type_for(t);
-    dyn_array_push_p(&ref_types, ref);
+    ref => make_ref_type_for(cache, t);
+    TypeRefArr_push(cache.ref_types, ref);
     return ref;
 }
 
-static Type *make_enumerator_type_for(t: Type&) {
-    Type *enumerator = type_alloc(T_enumerator);
-    enumerator.enumerator.target_type = t;
+fn make_enumerator_type_for(cache: TypeCache&, t: Type&) {
+    let enumerator => type_alloc(cache, Type::T_enumerator);
+    enumerator.T_enumerator.target_type => t;
     enumerator.storage_size = 8;
     return enumerator;
 }
 
-Dyn_array enumerator_types;
+fn check_enumerator_type_matches(enumerator: Type&, target_type: Type&, _: any&) {
+    return types_equal(enumerator.T_enumerator.target_type, target_type)
+}
 
-Type *get_enumerator_type_for(t: Type&) {
-    if (enumerator_types.capacity == 0)
-        dyn_array_init(&enumerator_types, sizeof(Type*), 16);
+fn get_enumerator_type_for(cache: TypeCache&, t: Type&) : Type& {
+    let enumerator => find_type_in_array(cache.ref_types, check_ref_type_matches, t, null)
+    if (enumerator) return enumerator;
 
-    for (int i = 0; i < enumerator_types.count; i++) {
-        Type *enumerator = ((Type**)enumerator_types.data)[i];
-        if (enumerator.enumerator.target_type == t) return enumerator;
-    }
-    Type *enumerator = make_enumerator_type_for(t);
-    dyn_array_push_p(&enumerator_types, enumerator);
+    enumerator => make_enumerator_type_for(cache, t);
+    TypeRefArr_push(cache.enumerator_types, enumerator);
     return enumerator;
 }
 
-static Type *make_array_type(Type *element_type, size_t n_elements) {
-    Type *array_t = type_alloc(T_array);
+/*
+fn make_array_type(cache: TypeCache&, Type *element_type, size_t n_elements) {
+    let array_t => type_alloc(cache, Type::T_array);
     array_t._array.element_type = element_type;
     array_t._array.n_elements = n_elements;
     array_t.storage_size = element_type.storage_size * n_elements;
     return array_t;
 }
 
-Dyn_array array_types;
 
-Type *get_array_type(Type *element_type, size_t n_elements) {
+
+fn get_array_type(cache: TypeCache&, Type *element_type, size_t n_elements) {
     if (array_types.capacity == 0)
         dyn_array_init(&array_types, sizeof(Type*), 16);
 
-    for (int i = 0; i < array_types.count; i++) {
-        Type *arr = ((Type**)array_types.data)[i];
+    for (let i = 0; i < array_types.count; i++) {
+        let arr = ((Type**)array_types.data)[i];
         if (arr._array.element_type == element_type
             && arr._array.n_elements == n_elements) return arr;
     }
-    Type *ref = make_array_type(element_type, n_elements);
+    let ref = make_array_type(element_type, n_elements);
     dyn_array_push_p(&array_types, ref);
     return ref;
 }
 
-static Type *make_slice_type(Type *element_type) {
-    Type *slice_t = type_alloc(T_struct);
-    slice_t._struct.num_members = 2;
-
-    size_t size = 2 * sizeof(StructMember);
-    slice_t._struct.members = malloc(size);
-    slice_t._struct.members[0].type = get_ref_type_for(element_type);
-    slice_t._struct.members[0].name = mkSV("begin");
-    slice_t._struct.members[1].type = &builtin_i64;
-    slice_t._struct.members[1].name = mkSV("len");
-
-    calculate_storage_size(slice_t);
-    return slice_t;
-}
-
-Dyn_array slice_types;
 
 */
 
-fn get_sclice_type(element_type: Type&, cache: TypeCache) : Type& {
-    NOT_IMPLEMENTED(__LOCATION__, "get_sclice_type");
-    return null;
-    /*
-    if (element_type == cache.builtin_u8) return chache.builtin_u8_slice;
-    
-    if (slice_types.capacity == 0)
-        dyn_array_init(&slice_types, sizeof(Type*), 16);
+fn make_slice_type(cache: TypeCache&, element_type: Type&) : Type& {
+    let slice_t => type_alloc(cache, Type::T_struct);
+    slice_t.T_struct.num_members = 2;
+/*
+    let members = endlos_begin~StructMember(cache.endlos);
+    let m1 => members++;
+    let m2 => members++;
 
-    for (int i = 0; i < slice_types.count; i++) {
-        Type *slice = ((Type**)slice_types.data)[i];
-        if (slice._struct.members[0].type == get_ref_type_for(element_type))
-            return slice;
-    }
-    Type *slice = make_slice_type(element_type);
-    dyn_array_push_p(&slice_types, slice);
-    return slice;
+    m1.type = get_ref_type_for(cache, element_type);
+    m1.name = "begin";
+    m2.type = cache.builtin_i64;
+    m2.name = "len";
+
+    slice_t.T_struct.members = endlos_ripp_off~StructMember(cache.endlos, members);
+
+    calculate_storage_size(slice_t);
+    return slice_t;
     */
+    return null;
 }
 
+fn check_is_slice_of_type(slice: Type&, ref_type: Type&, _: any&) {
+    return types_equal(slice.T_struct.members[0].type, ref_type)
+}
+
+fn get_slice_type(cache: TypeCache&, element_type: Type&) : Type& {
+    let slice => find_type_in_array(cache.slice_types, check_is_slice_of_type, get_ref_type_for(cache, element_type), null);
+    if (slice) return slice;
+
+    slice => make_slice_type(cache, element_type);
+    TypeRefArr_push(cache.slice_types, slice);
+    return slice;
+}
+
+fn check_types_equal(t1: Type&, t2: Type&, _: any&) {
+    return types_equal(t1, t2)
+}
+
+fn is_slice_type(cache: TypeCache&, t: Type&) : bool {
+    let ref => find_type_in_array(cache.slice_types, check_types_equal, t, null);
+    return ref; // as bool
+}
+
+fn get_slice_element_type(cache: TypeCache&, t: Type&) : Type& {
+    ASSERT(is_slice_type(cache, t), "Tried to get slice element type for non slice type.\n");
+    return dereferenced_type(t.T_struct.members[0].type);
+}
 
 fn check_fn_args_equal(a: Type&[], b: Type&[]) : bool {
     if (a.len != b.len) return false;
@@ -594,16 +617,16 @@ fn check_fn_args_equal(a: Type&[], b: Type&[]) : bool {
     return true;
 }
 
+fn check_fn_type_matches(fn_type: Type&, ret_type: Type&, arg_types: Type&[]&) {
+    return types_equal(fn_type.T_function.return_type, ret_type)
+        && check_fn_args_equal(fn_type.T_function.argument_types, arg_types)
+}
+
 fn get_function_type(cache: TypeCache&, ret_type: Type&, arg_types: Type&[]) : Type& {
-    for (let i = 0; i < cache.function_types.arr.len; i++) {
-        let fn_type => cache.function_types.arr[i];
-        
-        if (types_equal(fn_type.T_function.return_type, ret_type)
-                && check_fn_args_equal(fn_type.T_function.argument_types, arg_types))
-            return fn_type;
-    }
-    let new_fun => cache.type_roll++;
-    new_fun.kind = Type::T_function;
+    let fn_type => find_type_in_array(cache.function_types, check_fn_type_matches, ret_type, arg_types);
+    if (fn_type) return fn_type;
+
+    let new_fun => type_alloc(cache, Type::T_function);
     new_fun.T_function.return_type => ret_type;
     
     let args = type_ref_roll_take(cache, arg_types.len);
@@ -614,23 +637,6 @@ fn get_function_type(cache: TypeCache&, ret_type: Type&, arg_types: Type&[]) : T
 
     TypeRefArr_push(cache.function_types, new_fun);
     return new_fun;
-}
-
-fn is_slice_type(t: Type&, cache: TypeCache&) {
-    if (types_equal(t, cache.builtin_u8_slice)) return true;
-    
-    /*
-    for (int i = 0; i < slice_types.count; i++) {
-        Type *slice = ((Type**)slice_types.data)[i];
-        if (t == slice) return true;
-    }
-    */
-    return false;
-}
-
-fn get_slice_element_type(t: Type&, cache: TypeCache&) : Type& {
-    ASSERT(is_slice_type(t, cache), "Tried to get slice element type for non slice type.\n");
-    return dereferenced_type(t.T_struct.members[0].type);
 }
 
 /*
@@ -649,14 +655,14 @@ int64_t get_max_enum_value (t: Type&) {
     int64_t max = -0x8000000000000000;
  
     if (is_enum_kind(t)) {
-        for (size_t i = 0; i < t._enum.num_members; i++) {
+        for (let i = 0; i < t._enum.num_members; i++) {
             if (t._enum.members[i].value > max) max = t._enum.members[i].value;
         }
     }
     else if (is_enumerator_kind(t) && is_union_kind(t.enumerator.target_type)) {
-        Type *u = t.enumerator.target_type;
-        for (size_t i = 0; i < u._union.num_members; i++) {
-            if (u._union.members[i].value > max) max = u._union.members[i].value;
+        let u = t.enumerator.target_type;
+        for (let i = 0; i < u.T_union.num_members; i++) {
+            if (u.T_union.members[i].value > max) max = u.T_union.members[i].value;
         }
     } else NOT_IMPLEMENTED("get_max_enum_value")
     return max;
@@ -666,14 +672,14 @@ int64_t get_min_enum_value (t: Type&) {
     int64_t min = 0x7fffffffffffffff;
 
     if (is_enum_kind(t)) {
-        for (size_t i = 0; i < t._enum.num_members; i++) {
+        for (let i = 0; i < t._enum.num_members; i++) {
             if (t._enum.members[i].value < min) min = t._enum.members[i].value;
         }
     }
     else if (is_enumerator_kind(t) && is_union_kind(t.enumerator.target_type)) {
-        Type *u = t.enumerator.target_type;
-        for (size_t i = 0; i < u._union.num_members; i++) {
-            if (u._union.members[i].value < min) min = u._union.members[i].value;
+        let u = t.enumerator.target_type;
+        for (let i = 0; i < u.T_union.num_members; i++) {
+            if (u.T_union.members[i].value < min) min = u.T_union.members[i].value;
         }
     } else NOT_IMPLEMENTED("get_min_enum_value")
 
@@ -682,14 +688,14 @@ int64_t get_min_enum_value (t: Type&) {
 
 SV *get_enum_member_name_by_value(t: Type&, int64_t value) {
     if (is_enum_kind(t)) {
-        for (size_t i = 0; i < t._enum.num_members; i++) {
+        for (let i = 0; i < t._enum.num_members; i++) {
             if (t._enum.members[i].value == value) return &t._enum.members[i].name;
         }
     }
     else if (is_enumerator_kind(t) && is_union_kind(t.enumerator.target_type)) {
-        Type *u = t.enumerator.target_type;
-        for (size_t i = 0; i < u._union.num_members; i++) {
-            if (u._union.members[i].value == value) return &u._union.members[i].name;
+        let u = t.enumerator.target_type;
+        for (let i = 0; i < u.T_union.num_members; i++) {
+            if (u.T_union.members[i].value == value) return &u.T_union.members[i].name;
         }
     } else NOT_IMPLEMENTED("get_enum_member_name_by_value")
 

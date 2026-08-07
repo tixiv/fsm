@@ -11,12 +11,16 @@ enum TokenKind {
     TOK_keyword_while,
     TOK_keyword_for,
     TOK_keyword_struct,
+    TOK_keyword_record,
     TOK_keyword_enum,
+    TOK_keyword_union,
+    TOK_keyword_generic,
     TOK_keyword_import,
     TOK_keyword_true,
     TOK_keyword_false,
     TOK_keyword_null,
     TOK_keyword_fsm_debug,
+    TOK_magic_location,
     TOK_lparen,
     TOK_rparen,
     TOK_lbrace,
@@ -50,6 +54,7 @@ enum TokenKind {
     TOK_colon_colon,
     TOK_ampersand,
     TOK_exclam,
+    TOK_tilde,
     TOK_identifier,
     TOK_string,
     TOK_number,
@@ -58,6 +63,72 @@ enum TokenKind {
     TOK_builder_string_begin,
     TOK_builder_string_end,
 }
+
+fn token_kind_printable(kind: TokenKind) : u8[] {
+    if (kind == TokenKind::TOK_null) return("(null token)");
+    if (kind == TokenKind::TOK_keyword_fn) return("'fn'");
+    if (kind == TokenKind::TOK_keyword_let) return("'let'");
+    if (kind == TokenKind::TOK_keyword_return) return("'return'");
+    if (kind == TokenKind::TOK_keyword_if) return("'if'");
+    if (kind == TokenKind::TOK_keyword_else) return("'else'");
+    if (kind == TokenKind::TOK_keyword_while) return("'while'");
+    if (kind == TokenKind::TOK_keyword_for) return("'for'");
+    if (kind == TokenKind::TOK_keyword_struct) return("'struct'");
+    if (kind == TokenKind::TOK_keyword_record) return("'record'");
+    if (kind == TokenKind::TOK_keyword_enum) return("'enum'");
+    if (kind == TokenKind::TOK_keyword_union) return("'union'");
+    if (kind == TokenKind::TOK_keyword_generic) return("'generic'");
+    if (kind == TokenKind::TOK_keyword_import) return("'import'");
+    if (kind == TokenKind::TOK_keyword_true) return("'true'");
+    if (kind == TokenKind::TOK_keyword_false) return("'false'");
+    if (kind == TokenKind::TOK_keyword_null) return("'null'");
+    if (kind == TokenKind::TOK_keyword_fsm_debug) return("'fsm_debug'");
+    if (kind == TokenKind::TOK_magic_location) return("'__LOCATION__'");
+    if (kind == TokenKind::TOK_lparen) return("'('");
+    if (kind == TokenKind::TOK_rparen) return("')'");
+    if (kind == TokenKind::TOK_lbrace) return("'{'");
+    if (kind == TokenKind::TOK_rbrace) return("'}'");
+    if (kind == TokenKind::TOK_lbracket) return("'['");
+    if (kind == TokenKind::TOK_rbracket) return("']'");
+    if (kind == TokenKind::TOK_plus) return("'+'");
+    if (kind == TokenKind::TOK_minus) return("'-'");
+    if (kind == TokenKind::TOK_plus_plus) return("'++'");
+    if (kind == TokenKind::TOK_minus_minus) return("'--'");
+    if (kind == TokenKind::TOK_asterisk) return("'*'");
+    if (kind == TokenKind::TOK_slash) return("'/'");
+    if (kind == TokenKind::TOK_percent) return("'%'");
+    if (kind == TokenKind::TOK_up_arrow) return("'^'");
+    if (kind == TokenKind::TOK_equal_assign) return("'='");
+    if (kind == TokenKind::TOK_bind_ref) return("'=>'");
+    if (kind == TokenKind::TOK_equal) return("'=='");
+    if (kind == TokenKind::TOK_unequal) return("'!='");
+    if (kind == TokenKind::TOK_or_equal_to) return("'|=='");
+    if (kind == TokenKind::TOK_and_not_equal_to) return("'&!='");
+    if (kind == TokenKind::TOK_greater) return("'>'");
+    if (kind == TokenKind::TOK_lower) return("'<'");
+    if (kind == TokenKind::TOK_greater_equal) return("'>='");
+    if (kind == TokenKind::TOK_lower_equal) return("'<='");
+    if (kind == TokenKind::TOK_boolean_and) return("'&&'");
+    if (kind == TokenKind::TOK_boolean_or) return("'||'");
+    if (kind == TokenKind::TOK_komma) return("','");
+    if (kind == TokenKind::TOK_colon) return("':'");
+    if (kind == TokenKind::TOK_semicolon) return("';'");
+    if (kind == TokenKind::TOK_dot) return("'.'");
+    if (kind == TokenKind::TOK_colon_colon) return "'::'";
+    if (kind == TokenKind::TOK_ampersand) return("'&'");
+    if (kind == TokenKind::TOK_exclam) return("'!'");
+    if (kind == TokenKind::TOK_tilde) return("'~'");
+    if (kind == TokenKind::TOK_identifier) return("identifier");
+    if (kind == TokenKind::TOK_string) return("string constant");
+    if (kind == TokenKind::TOK_number) return("number");
+    if (kind == TokenKind::TOK_char_constant) return ("char constant");
+    if (kind == TokenKind::TOK_eof) return("EOF");
+    if (kind == TokenKind::TOK_builder_string_begin) return "'$\"'";
+    if (kind == TokenKind::TOK_builder_string_end)  return "'\"'";
+
+    return kind.name;
+}
+
 
 struct Location { line: i32; col: i32; }
 

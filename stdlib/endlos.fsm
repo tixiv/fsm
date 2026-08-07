@@ -84,3 +84,8 @@ generic T fn EndlosArr_free(arr: EndlosArr<T>&, allocator: EndlosAllocator&) : v
     a.len = arr.arr.len + arr.arr.alloc.len;
     endlos_ripp_off~T(allocator, a);
 }
+
+generic T fn EndlosArr_push_ref(arr: EndlosArr<T>&, ref: T) : void {
+    arr.alloc++ => ref;
+    arr.arr.len++;
+}
