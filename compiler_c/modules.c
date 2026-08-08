@@ -66,10 +66,10 @@ void compile_module(const char *filename) {
     memset(current_module->filename, 0,1024);
     strncpy(current_module->filename, filename, 1023);
 
-    current_filename = filename;
+    current_filename = current_module->filename;
     SV input;
-    read_file(&input, filename);
-    tokenizer(&input);
+    read_file(&input, current_module->filename);
+    tokenizer(&input, current_module->filename);
 
     if(debug_tokens)
         dump_tokens();

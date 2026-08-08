@@ -72,9 +72,9 @@ typedef struct {
 
 typedef struct AST_node_s {
     struct AST_node_s *next;
-    AST_kind kind;
-    int line_number;
     Type *type;
+    const Location *location;
+    AST_kind kind;
     bool addressable;
     bool result_used;
     union {
@@ -311,7 +311,7 @@ typedef struct AST_node_s {
     };
 } AST_node;
 
-AST_node *ast_alloc(AST_kind kind, int line_number);
+AST_node *ast_alloc(AST_kind kind, const Location *location);
 
 AST_node *get_last_in_chain(AST_node *n);
 void ast_insert_node(AST_node *at, AST_node *new_node);

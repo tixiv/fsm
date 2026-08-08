@@ -23,3 +23,4 @@ typedef struct {
 extern Module *current_module;
 
 extern const char *debug_ast;
+extern bool debug_tokens;

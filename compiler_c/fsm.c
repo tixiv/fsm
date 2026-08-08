@@ -25,26 +25,31 @@ bool debug_opcodes = false;
 
 static struct option long_options[] = {
     {"help",             no_argument, 0, 'h'},
+    {"debug-tokens",     no_argument, 0, 't'},
     {"debug-ast",  required_argument, 0, 'a'},
-    {"debug_opcodes",    no_argument, 0, 'p'},
+    {"debug-opcodes",    no_argument, 0, 'p'},
     {0, 0, 0, 0}
 };
 
 static void usage(const char *prg) {
     fprintf(stderr, "Usage: %s [options] <input.fsm>\n", prg);
-    fprintf(stderr, "  -a --debug_ast <n> : Debug the AST at different points\n");
-    fprintf(stderr, "  -p --debug_opcodes : Debug the generated opcodes\n");
+    fprintf(stderr, "  -t --debug-tokens  : Debug the tokens\n");
+    fprintf(stderr, "  -a --debug-ast <n> : Debug the AST at different points\n");
+    fprintf(stderr, "  -p --debug-opcodes : Debug the generated opcodes\n");
 }
 
 int main (int argc, char **argv) {
     int option_index = 0;
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "ha:p", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "hta:p", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'h':
                 usage(argv[0]);
                 return 0;
+            case 't':
+                debug_tokens = true;
+                break;
             case 'a':
                 debug_ast = optarg;
                 break;

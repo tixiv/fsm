@@ -10,11 +10,13 @@
 #include <stddef.h>
 #include <string.h>
 
-static void type_resolver_error(int line_number, const char * fmt, ...) {
+static void type_resolver_error(const Location *location, const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "[FSM Type Resolver] %s:%d Error: ", current_filename, line_number);
+    ASSERT(location, "Tried to report error with null location.\n");
+
+    fprintf(stderr, "[FSM Type Resolver] %s:%d Error: ", location->filename, location->line);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
 
@@ -24,8 +26,7 @@ static void type_resolver_error(int line_number, const char * fmt, ...) {
 
 typedef struct {
     Type *type;
-    const char *source_file;
-    int source_line;
+    const Location *location;
 } NamedType;
 
 Dyn_array named_types; // <NamedType>
@@ -70,37 +71,36 @@ Type *get_type_by_name(const SV *name) {
     return nullptr;
 }
 
-static void type_resolver_push_symbol(Symbol *s, int line_number) {
+static void type_resolver_push_symbol(Symbol *s, const Location *location) {
     Symbol *conflicting = get_symbol_by_name(&global_symbols,  &s->name);
     if (conflicting) {
-        type_resolver_error(line_number, "Symbol '%.*s' redefined\n", SV_prnt(s->name));
+        type_resolver_error(location, "Symbol '%.*s' redefined\n", SV_prnt(s->name));
         return;
     }
 
     dyn_array_push_p(&global_symbols, s);
 }
 
-void push_named_type(SV name, Type * t, int line_number) {
+void push_named_type(SV name, Type * t, const Location *location) {
     NamedType *nt = get_named_type_by_name(&name);
     if (nt) {
-        type_resolver_error(line_number, "Tried to redefine type '%.*s' which was previously defined in %s:%d\n", SV_prnt(name), nt->source_file, nt->source_line);
+        type_resolver_error(location, "Tried to redefine type '%.*s' which was previously defined in %s:%d\n", SV_prnt(name), nt->location->filename, nt->location->line);
     }
 
     if (get_builtin_type_by_name(&name)) {
-        type_resolver_error(line_number, "Tried to redefine builtin type '%.*s'", SV_prnt(name));
+        type_resolver_error(location, "Tried to redefine builtin type '%.*s'", SV_prnt(name));
     }
 
     t->name = name;
     nt = dyn_array_push(&named_types);
-    nt->source_file = current_filename;
-    nt->source_line = line_number;
+    nt->location = location;
     nt->type = t;
 
-    Symbol *s = alloc_symbol(SYM_type, name);
+    Symbol *s = alloc_symbol(SYM_type, name, location);
     s->name = name;
     s->type = t;
 
-    type_resolver_push_symbol(s, line_number);
+    type_resolver_push_symbol(s, location);
 }
 
 void type_lookup_visitor(AST_node *n, void *) {
@@ -110,19 +110,19 @@ void type_lookup_visitor(AST_node *n, void *) {
             t->_struct.kind = SL_struct;
             if (n->_struct.is_record)
                 t->_struct.kind = SL_record;
-            push_named_type(n->_struct.name, t, n->line_number);
+            push_named_type(n->_struct.name, t, n->location);
             break;
         }
         
         case AST_enum: {
             Type * t =  type_alloc(T_enum);
             t->storage_size = 8;
-            push_named_type(n->_enum.name, t, n->line_number);
+            push_named_type(n->_enum.name, t, n->location);
             break;
         }
 
         case AST_union:
-            push_named_type(n->_union.name, type_alloc(T_union), n->line_number);
+            push_named_type(n->_union.name, type_alloc(T_union), n->location);
             break;
 
         default:
@@ -223,7 +223,7 @@ void type_resolver_struct_visitor(AST_node *n, StructResolverState *srs) {
             member->name = n->struct_member_def.name;
             ast_visit_children(n, (AstVisitor)type_resolver_visitor, srs->trs);
             if (n->struct_member_def._typedef) {
-                if (!n->struct_member_def._typedef->type) type_resolver_error(n->line_number, "The type for struct member '%.*s' could not be resolved.\n", SV_prnt(member->name));
+                if (!n->struct_member_def._typedef->type) type_resolver_error(n->location, "The type for struct member '%.*s' could not be resolved.\n", SV_prnt(member->name));
                 n->type = n->struct_member_def._typedef->type;
             }
             else {
@@ -246,7 +246,7 @@ void type_resolver_union_visitor(AST_node *n, UnionResolverState *urs) {
             member->name = n->union_member_def.name;
             ast_visit_children(n, (AstVisitor)type_resolver_union_visitor, urs);
             if (n->union_member_def._typedef) {
-                if (!n->union_member_def._typedef->type) type_resolver_error(n->line_number, "The type for union member '%.*s' could not be resolved.\n", SV_prnt(member->name));
+                if (!n->union_member_def._typedef->type) type_resolver_error(n->location, "The type for union member '%.*s' could not be resolved.\n", SV_prnt(member->name));
                 n->type = n->union_member_def._typedef->type;
             }
             else {
@@ -308,7 +308,7 @@ void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
             }
             else
                 n->type = get_type_by_name(&n->_typename.name);
-            if (!n->type) type_resolver_error(n->line_number, "The typename '%.*s' could not be resolved.\n", SV_prnt(n->_typename.name));
+            if (!n->type) type_resolver_error(n->location, "The typename '%.*s' could not be resolved.\n", SV_prnt(n->_typename.name));
             break;
         }
 

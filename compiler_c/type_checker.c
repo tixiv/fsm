@@ -18,13 +18,14 @@
 
 static AST_node *ast_root;
 
-static void type_checker_error(int line_number, const char * fmt, ...) {
+static void type_checker_error(const Location *location, const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
+    ASSERT(location, "Tried to report error with null location.\n");
     // ast_dump_tree(ast_root);
 
-    fprintf(stderr, "[FSM Type Checker] %s:%d Error: ", current_filename, line_number);
+    fprintf(stderr, "[FSM Type Checker] %s:%d Error: ", location->filename, location->line);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
 
@@ -32,12 +33,13 @@ static void type_checker_error(int line_number, const char * fmt, ...) {
     va_end(args);
 }
 
-static void type_checker_warning(int line_number, const char * fmt, ...) {
+static void type_checker_warning(const Location *location, const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "[FSM Type Checker] %s:%d Warning: ", current_filename, line_number);
-    vfprintf(stderr, fmt, args);
+    ASSERT(location, "Tried to report error with null location.\n");
+
+    fprintf(stderr, "[FSM Type Checker] %s:%d Warning: ", location->filename, location->line);
     fprintf(stderr, "\n");
 
     va_end(args);
@@ -49,7 +51,7 @@ void annotate_used_visitor(AST_node *n, void* used) {
 
     switch (n->kind) {
         case AST_scope:
-            if (used) type_checker_error(n->line_number, "Using the result of a scope is not implemented yet.\n");
+            if (used) type_checker_error(n->location, "Using the result of a scope is not implemented yet.\n");
             ast_visit_children(n, (AstVisitor)annotate_used_visitor, (void*)false);
             break;
 
@@ -59,7 +61,7 @@ void annotate_used_visitor(AST_node *n, void* used) {
             break;
         
         case AST_return:
-            if (used) type_checker_error(n->line_number, "The 'return' statement has no value and therefore can't be used in an expression.\n");
+            if (used) type_checker_error(n->location, "The 'return' statement has no value and therefore can't be used in an expression.\n");
             ast_visit_children(n, (AstVisitor)annotate_used_visitor, (void*)true);
             break;
         
@@ -70,7 +72,7 @@ void annotate_used_visitor(AST_node *n, void* used) {
             break;
 
         case AST_while:
-            if (used) type_checker_error(n->line_number, "The 'while' statement has no value and therefore can't be used in an expression.\n");
+            if (used) type_checker_error(n->location, "The 'while' statement has no value and therefore can't be used in an expression.\n");
             annotate_used_visitor(n->_while.condition, (void*)true);
             annotate_used_visitor(n->_while.body, false);
             break;
@@ -98,8 +100,8 @@ void annotate_used_visitor(AST_node *n, void* used) {
         case AST_builder_string:
             // unused builder string implies handing it to 'puts'
             if (!used) {
-                AST_node *ast_call = ast_alloc(AST_call, n->line_number);
-                AST_node *ast_symbol = ast_alloc(AST_symbol, n->line_number);
+                AST_node *ast_call = ast_alloc(AST_call, n->location);
+                AST_node *ast_symbol = ast_alloc(AST_symbol, n->location);
                 ast_symbol->symbol.name = mkSV("puts");
                 ast_symbol->symbol.symbol = get_symbol_by_name(&builtin_functions, &mkSV("puts"));
                 ast_call->call.target = ast_symbol;
@@ -117,7 +119,7 @@ void annotate_used_visitor(AST_node *n, void* used) {
 
 void insert_dereference(AST_node *n) {
     ASSERT (is_reference_kind(n->type), "Trying to insert dereference for something that is not a reference.\n")
-    AST_node *deref = ast_alloc(AST_dereference, n->line_number);
+    AST_node *deref = ast_alloc(AST_dereference, n->location);
     deref->type = dereferenced_type(n->type);
     deref->addressable = true;
     ast_insert_node(n, deref);
@@ -129,7 +131,7 @@ void auto_dereference(AST_node *n) {
 }
 
 void insert_take_reference(AST_node *n) {
-    AST_node *ref = ast_alloc(AST_reference, n->line_number);
+    AST_node *ref = ast_alloc(AST_reference, n->location);
     ref->type = get_ref_type_for(n->type);
     ref->addressable = false;
     ast_insert_node(n, ref);
@@ -157,7 +159,7 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
 
     if (target_type == &builtin_bool && is_reference_kind(original_type)) {
         if (dereferenced_type(original_type) == &builtin_bool) {
-            type_checker_warning(n->line_number,
+            type_checker_warning(n->location,
                 "Using 'bool&' in boolean context will dereference the target and not perform a null reference check. "
                 "Suggest to either dereference, when the value is what you want, or to write '... != null' if you wanted "
                 "to perform a null reference check.");
@@ -174,13 +176,13 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
     
     if (is_slice_kind(target_type) && is_array_kind(n->type)) {
         if (get_slice_element_type(target_type) == n->type->_array.element_type) {
-            AST_node *conv = ast_alloc(AST_array_to_slice, n->line_number);
+            AST_node *conv = ast_alloc(AST_array_to_slice, n->location);
             conv->type = get_sclice_type(n->type->_array.element_type);
             ast_insert_node(n, conv);
             return;
         }
         else {
-            type_checker_error(n->line_number, "Can't convert %s of type '%s' to '%s'.\n",
+            type_checker_error(n->location, "Can't convert %s of type '%s' to '%s'.\n",
                 desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
         }
     }
@@ -195,7 +197,7 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
 
     if (target_type == get_ref_type_for(&builtin_any)) {
         if (!is_reference_kind(original_type)) {
-            if (n->addressable == false) type_checker_error(n->line_number, "Can't convert %s of type '%s' to '%s' because it is not addressable.\n",
+            if (n->addressable == false) type_checker_error(n->location, "Can't convert %s of type '%s' to '%s' because it is not addressable.\n",
                     desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
             
             insert_take_reference(n);
@@ -204,7 +206,7 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
     }
 
     if (is_reference_kind(target_type) && !is_reference_kind(original_type)) {
-        if (n->addressable == false) type_checker_error(n->line_number, "Can't convert %s of type '%s' to '%s' because it is not addressable.\n",
+        if (n->addressable == false) type_checker_error(n->location, "Can't convert %s of type '%s' to '%s' because it is not addressable.\n",
                 desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
         insert_take_reference(n);
     }
@@ -235,10 +237,10 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
     const char *warning;
     if (is_castable_to(target_type, n->type, &warning)) {
         ast_insert_node(n, make_cast(target_type, n->type));
-        if (warning) type_checker_warning(n->line_number, warning);
+        if (warning) type_checker_warning(n->location, warning);
     }
     else {
-        type_checker_error(n->line_number, "Can't convert %s of type '%s' to '%s'.\n",
+        type_checker_error(n->location, "Can't convert %s of type '%s' to '%s'.\n",
             desc, get_type_name_r(buf_1, original_type), get_type_name_r(buf_2, target_type));
     }
 }
@@ -250,7 +252,7 @@ void type_propagate_binary_operator(AST_node *n) {
 
     if (tk == TOK_bind_ref) {
         if (!is_reference_kind(n->binary.left->type)) {
-            type_checker_error(n->line_number, "Operator %s requires a reference type on the left side. Have '%s' and '%s'.\n",
+            type_checker_error(n->location, "Operator %s requires a reference type on the left side. Have '%s' and '%s'.\n",
                 token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
         }
 
@@ -259,7 +261,7 @@ void type_propagate_binary_operator(AST_node *n) {
         else
         {
             if (!is_reference_kind(n->binary.right->type)) {
-                if (!n->binary.right->addressable) type_checker_error(n->line_number, "Operator %s requires either another reference or something addressable on the right side. Have '%s' and '%s'.\n",
+                if (!n->binary.right->addressable) type_checker_error(n->location, "Operator %s requires either another reference or something addressable on the right side. Have '%s' and '%s'.\n",
                     token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
                 insert_take_reference(n->binary.right);
             }
@@ -267,7 +269,7 @@ void type_propagate_binary_operator(AST_node *n) {
             Type *any_ref = get_ref_type_for(&builtin_any);
 
             if (n->binary.left->type != n->binary.right->type && n->binary.left->type != any_ref && n->binary.right->type != any_ref) {
-                type_checker_error(n->line_number, "Operator %s requires the type on the right side to be referenceable by the left type. Have '%s' and '%s'.\n",
+                type_checker_error(n->location, "Operator %s requires the type on the right side to be referenceable by the left type. Have '%s' and '%s'.\n",
                     token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
             }
         }
@@ -317,7 +319,7 @@ void type_propagate_binary_operator(AST_node *n) {
                 auto_dereference(n->binary.right);
                 bool okay = n->binary.left->type == n->binary.right->type || (is_integer_kind(n->binary.left->type) && is_integer_kind(n->binary.right->type));
                 if (!okay) {
-                    type_checker_error(n->line_number, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
+                    type_checker_error(n->location, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
                         token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
                 }
                 n->type = &builtin_bool;
@@ -332,7 +334,7 @@ void type_propagate_binary_operator(AST_node *n) {
                             || (is_null_kind(n->binary.left->type) && is_reference_kind(n->binary.right->type))
                             || (is_reference_kind(n->binary.left->type) && is_null_kind(n->binary.right->type));
                 if (!okay) {
-                    type_checker_error(n->line_number, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
+                    type_checker_error(n->location, "Operator %s can't accept arguments with different types. Have '%s' and '%s'.\n",
                         token_kind_printable(tk), get_type_name_r(buf_1, n->binary.left->type), get_type_name_r(buf_2, n->binary.right->type));
                 }
                 n->type = &builtin_bool;
@@ -382,7 +384,7 @@ void type_check_variadic_operator (AST_node *n){
             }
 
             if (!all_same_type && !all_integer) {
-                type_checker_error(n->line_number, "Chained operator %s can't accept arguments with different types.",
+                type_checker_error(n->location, "Chained operator %s can't accept arguments with different types.",
                     token_kind_printable(n->variadic_operator.members[0].token_kind));
             }
             n->type = &builtin_bool;
@@ -420,16 +422,16 @@ void type_check_function_call(AST_node *n_call, PropagationVisitorData *) {
     Type *fn_type = n_call->call.target->type;
     if (is_reference_kind(fn_type)) fn_type = dereferenced_type(fn_type);
 
-    if (!is_function_kind(fn_type)) type_checker_error(n_call->line_number,
+    if (!is_function_kind(fn_type)) type_checker_error(n_call->location,
             "Trying to call something that is not a function. have '%s'", get_type_name_r(buf, n_call->call.target->type));
 
     size_t num_args_expected = fn_type->fun.num_arguments;
     size_t num_args = ast_count_chain(n_call->call.args);
 
-    if (num_args < num_args_expected) type_checker_error(n_call->line_number,
+    if (num_args < num_args_expected) type_checker_error(n_call->location,
             "Not enough arguments to function call. Expected %d, got %d.\n", num_args_expected, num_args);
     
-    if (num_args > num_args_expected) type_checker_error(n_call->line_number,
+    if (num_args > num_args_expected) type_checker_error(n_call->location,
             "Too many arguments to function call. Expected %d, got %d.\n", num_args_expected, num_args);
 
     AST_node *arg = n_call->call.args;
@@ -441,7 +443,7 @@ void type_check_function_call(AST_node *n_call, PropagationVisitorData *) {
     }
     
     n_call->type = fn_type->fun.return_type;
-    if (!n_call->type) type_checker_error(n_call->line_number,
+    if (!n_call->type) type_checker_error(n_call->location,
         "Trying to call function that doesn't have a resolved return type yet. "
         "Please define the function's return type when it's definition follows the call.\n");
 }
@@ -520,7 +522,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) ;
 
 Symbol *get_speciated_function_symbol(AST_node *n, Symbol *g, PropagationVisitorData *prop) {
     if (!g->source) {
-        type_checker_error(n->line_number, "Cannot speciate non generic function '%.*s'.\n", SV_prnt(g->name));
+        type_checker_error(n->location, "Cannot speciate non generic function '%.*s'.\n", SV_prnt(g->name));
     }
     ASSERT(g->source->kind == AST_generic, "Speciate called on wrong kind of node.\n");
     ASSERT(g->source->generic.body->kind == AST_function, "Speciate called on wrong kind of node.\n");
@@ -547,7 +549,7 @@ Symbol *get_speciated_function_symbol(AST_node *n, Symbol *g, PropagationVisitor
     type_propagation_visitor(ast_generic->generic.body, &prop_child);
 
 
-    AST_node *ast_implementation = ast_alloc(AST_generic_implementation, ast_generic->line_number);
+    AST_node *ast_implementation = ast_alloc(AST_generic_implementation, ast_generic->location);
     ast_implementation->generic_implementation.body = ast_generic->generic.body;
 
     ast_link_to_chain(&prop->program->program.body, ast_implementation);
@@ -561,7 +563,7 @@ void type_check_user_cast(AST_node *n) {
     if (is_integer_kind(t_to) && (is_reference_kind(t_from) || is_integer_kind(t_from) || is_boolean_kind(t_from) || is_enumerator_kind(t_from) || is_enum_kind(t_from))) return;
     if (is_reference_kind(t_to) && (is_reference_kind(t_from) || is_integer_kind(t_from) || is_null_kind(t_from))) return;
     if (is_boolean_kind(t_to) && (is_integer_kind(t_from) || is_boolean_kind(t_from))) return;
-    type_checker_error(n->line_number, "Can't cast '%s' to '%s'.", get_type_name_r(buf_1, t_from), get_type_name_r(buf_2, t_to));
+    type_checker_error(n->location, "Can't cast '%s' to '%s'.", get_type_name_r(buf_1, t_from), get_type_name_r(buf_2, t_to));
 }
 
 void type_check_symbol(AST_node *n, PropagationVisitorData *prop)
@@ -577,7 +579,7 @@ void type_check_symbol(AST_node *n, PropagationVisitorData *prop)
 
         // Still no return type?
         if (!n->symbol.symbol->type->fun.return_type) {
-            type_checker_error(n->line_number,
+            type_checker_error(n->location,
                 "The return type for function '%.*s()' can't be determined automatically in recursive use. Please specify it!",
                 SV_prnt(n->symbol.name));
         }
@@ -589,7 +591,7 @@ void type_check_symbol(AST_node *n, PropagationVisitorData *prop)
             n->symbol.name = n->symbol.symbol->name;
         }
         else {
-            type_checker_error(n->line_number, "Generic speciation not allowed for %s\n", symbol_kind_name(n->symbol.symbol->kind));
+            type_checker_error(n->location, "Generic speciation not allowed for %s\n", symbol_kind_name(n->symbol.symbol->kind));
         }
     }
     n->type = n->symbol.symbol->type;
@@ -665,11 +667,11 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                 if (n->var_decl.initializer_operator == TOK_equal_assign) {
                     t = n->var_decl.initializer->type;
                     if (t == &builtin_void) {
-                        type_checker_error(n->line_number, "Can't initialize variable with 'void' type.\n");
+                        type_checker_error(n->location, "Can't initialize variable with 'void' type.\n");
                     }
                     int ord = get_ref_order(t);
                     if (ord >= 2) {
-                        type_checker_error(n->line_number, "Can't dereference references of order >1 in value initialization. Have '%'",
+                        type_checker_error(n->location, "Can't dereference references of order >1 in value initialization. Have '%'",
                             get_type_name_r(buf_1, t));
                     }
                     else if (ord) {
@@ -678,10 +680,10 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                     }
                 } else if (n->var_decl.initializer_operator == TOK_bind_ref) {
                     if (n->var_decl.initializer->type == &builtin_void) {
-                        type_checker_error(n->line_number, "Can't bind a reference to 'void' type target.\n");
+                        type_checker_error(n->location, "Can't bind a reference to 'void' type target.\n");
                     }
                     if (!is_reference_kind(n->var_decl.initializer->type)) {
-                        if (!n->var_decl.initializer->addressable) type_checker_error(n->line_number, "Can't bind a reference to a non addressable target.\n");
+                        if (!n->var_decl.initializer->addressable) type_checker_error(n->location, "Can't bind a reference to a non addressable target.\n");
                         t = get_ref_type_for(n->var_decl.initializer->type);
                         insert_take_reference(n->var_decl.initializer);
                     }
@@ -740,7 +742,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                 prop->current_function_ret_type = ret_type;
             } else {
                 if (prop->current_function_ret_type_decl && prop->current_function_ret_type_decl != &builtin_void) {
-                    if (ret_type == &builtin_void) type_checker_error(n->line_number, "'return' without a value in function returning non void.\n");
+                    if (ret_type == &builtin_void) type_checker_error(n->location, "'return' without a value in function returning non void.\n");
                     try_convert_to_type_if_necessary(n->ret.body, prop->current_function_ret_type_decl, "Return argument");
                 }
                 else if (is_reference_kind(prop->current_function_ret_type) && ret_type == &builtin_null) {
@@ -749,7 +751,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                     prop->current_function_ret_type = ret_type;
                 }
                 else if (!types_are_equivalent(prop->current_function_ret_type, ret_type)) {
-                    type_checker_error(n->line_number, "Returning different types from the same function. Have '%s' and '%s'. Please declare a return type!\n",
+                    type_checker_error(n->location, "Returning different types from the same function. Have '%s' and '%s'. Please declare a return type!\n",
                         get_type_name_r(buf_1, prop->current_function_ret_type), get_type_name_r(buf_2, ret_type));
                 }
             }
@@ -784,7 +786,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             Type *_if_type = n->_if.if_clause->type;
             Type *_else_type = n->_if.else_clause ? n->_if.else_clause->type : &builtin_void;
             if (n->result_used && _if_type != _else_type) {
-                type_checker_error(n->line_number,
+                type_checker_error(n->location,
                     "When the result of 'if' is used then it has to have an 'else', and both branches must have the same type. Have '%s' and '%s'.\n",
                     get_type_name_r(buf_1, _if_type), get_type_name_r(buf_2, _else_type));
             }
@@ -813,14 +815,14 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                 n->type = get_ref_type_for(get_slice_element_type(n->_array.array->type));
             }
             else {
-                type_checker_error(n->line_number,
+                type_checker_error(n->location,
                     "Invalid use of [] operator on something that is not an array or a slice. Have '%s'.\n",
                     get_type_name_r(buf_1, n->_array.array->type));
             }
 
 
             if (!is_integer_kind(n->_array.index->type)) {
-                type_checker_error(n->line_number,
+                type_checker_error(n->location,
                     "Invalid use of non integer type '%s' as an array index.\n",
                     get_type_name_r(buf_1, n->_array.index->type));
 
@@ -831,7 +833,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
         case AST_dereference:
             if (!is_reference_kind(n->deref.body->type)) {
-                    type_checker_error(n->line_number,
+                    type_checker_error(n->location,
                         "Dereferencing something that is not a reference. Have '%s'.\n",
                         get_type_name_r(buf_1, n->deref.body->type));
             } else {
@@ -841,7 +843,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_reference:
-            if (!n->reference.body->addressable) type_checker_error(n->line_number, "Can't take reference to something that is not addressable.\n");
+            if (!n->reference.body->addressable) type_checker_error(n->location, "Can't take reference to something that is not addressable.\n");
             n->type = get_ref_type_for(n->reference.body->type);
             n->addressable = false;
             break;
@@ -869,7 +871,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                 n->type = n->plus_plus.body->type;
             }
             else{
-                type_checker_error(n->line_number, "Operator '++' needs integer or slice type argument. Have '%s'",
+                type_checker_error(n->location, "Operator '++' needs integer or slice type argument. Have '%s'",
                     get_type_name_r(buf_1, original_type));
             }
             
@@ -880,7 +882,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             Type * original_type = n->minus_minus.body->type;
             auto_dereference(n->minus_minus.body);
             if (!is_integer_kind(n->minus_minus.body->type)) {
-                type_checker_error(n->line_number, "Operator '--' needs integer type argument. Have '%s'",
+                type_checker_error(n->location, "Operator '--' needs integer type argument. Have '%s'",
                     get_type_name_r(buf_1, original_type));
             }
             n->type = n->minus_minus.body->type;
@@ -903,7 +905,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             if (is_structlike_kind(container) || is_union_kind(container)) {
                 size_t offset;
                 Type *t = get_member_type_and_offset_by_name(container, &n->member_access.name, &offset);
-                if (!t) type_checker_error(n->line_number, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->member_access.name),
+                if (!t) type_checker_error(n->location, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->member_access.name),
                         get_type_name_r(buf_1, container));
 
                 if (!is_reference_kind(n->member_access.body->type))
@@ -915,7 +917,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
                 // We need to insert a dereference node now at this point in the tree.
                 // copy the current node to a new one:
-                AST_node *ast_member_access = ast_alloc(AST_member_access, n->line_number);
+                AST_node *ast_member_access = ast_alloc(AST_member_access, n->location);
                 memcpy(ast_member_access, n, sizeof(AST_node));
                 ast_member_access->next = nullptr; // clear next pointer in case it was used
 
@@ -932,7 +934,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                     n->type = &builtin_i64;
                 }
                 else {
-                    type_checker_error(n->line_number, "Tried to access non existent member '%.*s' on array type. Arrays only have the member 'len' available.\n",
+                    type_checker_error(n->location, "Tried to access non existent member '%.*s' on array type. Arrays only have the member 'len' available.\n",
                             SV_prnt(n->member_access.name));
                 }
             }
@@ -942,12 +944,12 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                     n->type = &builtin_u8_slice;
                 }
                 else {
-                    type_checker_error(n->line_number, "Tried to access non existent member '%.*s' on enum type. Enums only have the member 'name' available.\n",
+                    type_checker_error(n->location, "Tried to access non existent member '%.*s' on enum type. Enums only have the member 'name' available.\n",
                             SV_prnt(n->member_access.name));
                 }
             }
             else {
-                type_checker_error(n->line_number, "Tried to access a member in something that can't have members. Have '%s'.\n",
+                type_checker_error(n->location, "Tried to access a member in something that can't have members. Have '%s'.\n",
                         get_type_name_r(buf_1, container));
             }
 
@@ -959,7 +961,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             if (t->kind == T_enum) {
                 if (!get_enum_member_value (t, &n->namespace_access.name, &n->namespace_access.enum_value))
                 {
-                    type_checker_error(n->line_number, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->namespace_access.name),
+                    type_checker_error(n->location, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->namespace_access.name),
                         get_type_name_r(buf_1, t));
                 }
                 n->type = t;
@@ -968,14 +970,14 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             else if (t->kind == T_union) {
                 if (!get_union_member_value (t, &n->namespace_access.name, &n->namespace_access.enum_value))
                 {
-                    type_checker_error(n->line_number, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->namespace_access.name),
+                    type_checker_error(n->location, "Member '%.*s' not found in '%s'.\n", SV_prnt(n->namespace_access.name),
                         get_type_name_r(buf_1, t));
                 }
                 n->type = get_enumerator_type_for(t);
                 n->addressable = false;
             }
             else {
-                type_checker_error(n->line_number, "Namespace access on type '%s' is not supported.\n", get_type_name_r(buf_1, t));
+                type_checker_error(n->location, "Namespace access on type '%s' is not supported.\n", get_type_name_r(buf_1, t));
             }
             break;
         }

@@ -4,6 +4,7 @@
 #include "sv.h"
 #include "dyn_array.h"
 #include "modules.h"
+#include "location.h"
 
 #define TOKEN_LIST \
     X(TOK_null) \
@@ -78,13 +79,13 @@ typedef enum {
 typedef struct {
     TokenKind kind;
     SV value;
-    int line_number;
+    Location location;
 } Token;
 
 const char *token_kind_name(TokenKind kind);
 const char *token_kind_printable(TokenKind kind);
 void dump_tokens();
-void tokenizer(SV *code);
+void tokenizer(SV *code, const char *filename);
 
 #define num_tokens (current_module->tokens_dyn.count)
 #define tokens ((Token*)current_module->tokens_dyn.data)

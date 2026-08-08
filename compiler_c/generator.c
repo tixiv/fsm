@@ -82,30 +82,42 @@ void output_asm(const char *asm_file_name) {
     
     for (size_t i=0; i<num_opcodes; i++) {
         Opcode *op = &opcodes[i];
+        size_t size = 0;
+        if (op->kind == OP_call || op->kind == OP_icall) {
+            size = get_function_arguments_size(op->type);
+        }
+        else if (op->type) {
+            size = op->type->storage_size;
+        }
 
-        fprintf(file,"; ------- %s ---------\n", opcode_name(op->kind));
+        if (op->location)
+            fprintf(file,"; ------- %s:%d %s ---------\n", op->location->filename, op->location->line, opcode_name(op->kind));
+        else
+            fprintf(file,"; ------- %s ---------\n", opcode_name(op->kind));
 
         switch(op->kind) {
-            case OP_begin_fn:
+            case OP_begin_fn: {
+                size_t local_vars_size = op->i64_value[0];
                 fprintf(file,"fn_" SV_FMT ":\n", SV_prnt(op->string_value));
                 fprintf(file, "\t" "push rbp\n");
                 fprintf(file, "\t" "mov rbp, rsp\n");
-                if (op->size) {
-                    ASSERT(op->size % 8 == 0, "Can't work with local var sizes not divisible by 8.\n");
-                    fprintf(file, "\t" "sub rsp, %lu\n", op->size);
-                    fprintf(file, "\t" "mov rcx, %lu\n", op->size / 8);
-                    fprintf(file, "\t" "lea rdi, [rbp - %lu]\n", op->size);
+                if (local_vars_size) {
+                    ASSERT(local_vars_size % 8 == 0, "Can't work with local var sizes not divisible by 8.\n");
+                    fprintf(file, "\t" "sub rsp, %lu\n", local_vars_size);
+                    fprintf(file, "\t" "mov rcx, %lu\n", local_vars_size / 8);
+                    fprintf(file, "\t" "lea rdi, [rbp - %lu]\n", local_vars_size);
                     fprintf(file, "\t" "xor rax, rax\n");
                     fprintf(file, "\t" "rep stosq\n");
                 }
                 break;
+            }
             case OP_return:
-                if      (op->size == 0);
-                else if (op->size <= 8) fprintf(file, "\t" "pop rax\n");
-                else if (op->size <= 16) {
+                if      (size == 0);
+                else if (size <= 8) fprintf(file, "\t" "pop rax\n");
+                else if (size <= 16) {
                     fprintf(file, "\t" "pop rax\n");
                     fprintf(file, "\t" "pop rdx\n");
-                } else NOT_IMPLEMENTED("Generating OP_return with storage size %lu is not implemented yet.\n", op->size)
+                } else NOT_IMPLEMENTED("Generating OP_return with storage size %lu is not implemented yet.\n", size)
                 fprintf(file, "\t" "mov rsp, rbp\n");
                 fprintf(file, "\t" "pop rbp\n");
                 fprintf(file, "\t" "ret\n");
@@ -180,7 +192,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file, "\t" "pop rbx\n");
                 fprintf(file, "\t" "cmp rax, rbx\n");
                 fprintf(file, "\t" "cmove rcx, rdx\n");
-                if (op->u64_value) fprintf(file, "\t" "push rbx\n"); // chaining value: left operand
+                if (op->i64_value[0]) fprintf(file, "\t" "push rbx\n"); // chaining value: left operand
                 fprintf(file, "\t" "push rcx\n");
                 break;
             case OP_unequal:
@@ -190,7 +202,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file, "\t" "pop rbx\n");
                 fprintf(file, "\t" "cmp rax, rbx\n");
                 fprintf(file, "\t" "cmove rcx, rdx\n");
-                if (op->u64_value) fprintf(file, "\t" "push rbx\n"); // chaining value: left operand
+                if (op->i64_value[0]) fprintf(file, "\t" "push rbx\n"); // chaining value: left operand
                 fprintf(file, "\t" "push rcx\n");
                 break;
             case OP_compare_GT:
@@ -200,7 +212,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file, "\t" "pop rax\n");
                 fprintf(file, "\t" "cmp rax, rbx\n");
                 fprintf(file, "\t" "cmovg rcx, rdx\n");
-                if (op->u64_value) fprintf(file, "\t" "push rbx\n"); // chaining value: right operand
+                if (op->i64_value[0]) fprintf(file, "\t" "push rbx\n"); // chaining value: right operand
                 fprintf(file, "\t" "push rcx\n");
                 break;
             case OP_compare_LT:
@@ -210,7 +222,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file, "\t" "pop rax\n");
                 fprintf(file, "\t" "cmp rax, rbx\n");
                 fprintf(file, "\t" "cmovl rcx, rdx\n");
-                if (op->u64_value) fprintf(file, "\t" "push rbx\n"); // chaining value: right operand
+                if (op->i64_value[0]) fprintf(file, "\t" "push rbx\n"); // chaining value: right operand
                 fprintf(file, "\t" "push rcx\n");
                 break;
             case OP_compare_GE:
@@ -220,7 +232,7 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file, "\t" "pop rax\n");
                 fprintf(file, "\t" "cmp rax, rbx\n");
                 fprintf(file, "\t" "cmovge rcx, rdx\n");
-                if (op->u64_value) fprintf(file, "\t" "push rbx\n"); // chaining value: right operand
+                if (op->i64_value[0]) fprintf(file, "\t" "push rbx\n"); // chaining value: right operand
                 fprintf(file, "\t" "push rcx\n");
                 break;
             case OP_compare_LE:
@@ -230,17 +242,17 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file, "\t" "pop rax\n");
                 fprintf(file, "\t" "cmp rax, rbx\n");
                 fprintf(file, "\t" "cmovle rcx, rdx\n");
-                if (op->u64_value) fprintf(file, "\t" "push rbx\n"); // chaining value: right operand
+                if (op->i64_value[0]) fprintf(file, "\t" "push rbx\n"); // chaining value: right operand
                 fprintf(file, "\t" "push rcx\n");
                 break;
             case OP_push_literal:
-                fprintf(file, "\t" "mov rax,%lu\n", op->string_value.begin ? strtoul(op->string_value.begin, 0, 0) : op->u64_value);
+                fprintf(file, "\t" "mov rax,%lu\n", op->string_value.begin ? strtoul(op->string_value.begin, 0, 0) : (uint64_t)op->i64_value[0]);
                 fprintf(file, "\t" "push rax\n");
                 break;
             case OP_push_string_literal:
                 fprintf(file, "\t" "mov rax, %lu\n", unescaped_string_len(op->string_value));
                 fprintf(file, "\t" "push rax\n");
-                fprintf(file, "\t" "mov rax, string_literal_%lu\n", op->u64_value);
+                fprintf(file, "\t" "mov rax, string_literal_%lu\n", op->i64_value[0]);
                 fprintf(file, "\t" "push rax\n");
                 break;
             case OP_push_char_literal:
@@ -249,53 +261,53 @@ void output_asm(const char *asm_file_name) {
                 break;
             case OP_call:
                 fprintf(file, "\t" "call fn_" SV_FMT "\n", SV_prnt(op->string_value));
-                if (op->size) fprintf(file, "\t" "add rsp, %lu\n", op->size);
+                if (size) fprintf(file, "\t" "add rsp, %lu\n", size);
                 break;
             case OP_icall:
                 fprintf(file, "\t" "pop rax\n");
                 fprintf(file, "\t" "call rax\n");
-                if (op->size) fprintf(file, "\t" "add rsp, %lu\n", op->size);
+                if (size) fprintf(file, "\t" "add rsp, %lu\n", size);
                 break;
             case OP_push_result:
-                if      (op->size == 0);
-                else if (op->size <= 8) fprintf(file, "\t" "push rax\n");
-                else if (op->size <= 16) {
+                if      (size == 0);
+                else if (size <= 8) fprintf(file, "\t" "push rax\n");
+                else if (size <= 16) {
                     fprintf(file, "\t" "push rdx\n");
                     fprintf(file, "\t" "push rax\n");
-                } else NOT_IMPLEMENTED("Generating OP_push_result with storage size %lu is not implemented yet.\n", op->size)
+                } else NOT_IMPLEMENTED("Generating OP_push_result with storage size %lu is not implemented yet.\n", size)
                 break;
             case OP_push_arg:
-                if (op->size <= 8) {
-                    fprintf(file, "\t" "%s [rbp+%lu]\n", make_movx("rax", op->size, op->_signed), 16 + op->u64_value);
+                if (size <= 8) {
+                    fprintf(file, "\t" "%s [rbp+%lu]\n", make_movx("rax", size, is_signed_integer(op->type)), 16 + op->i64_value[0]);
                     fprintf(file, "\t" "push rax\n");
                 }
-                else if (op->size <= 16) {
-                    fprintf(file, "\t" "mov rax, [rbp+%lu]\n", 16 + 8 + op->u64_value);
+                else if (size <= 16) {
+                    fprintf(file, "\t" "mov rax, [rbp+%lu]\n", 16 + 8 + op->i64_value[0]);
                     fprintf(file, "\t" "push rax\n");
-                    fprintf(file, "\t" "mov rax, [rbp+%lu]\n", 16 + op->u64_value);
+                    fprintf(file, "\t" "mov rax, [rbp+%lu]\n", 16 + op->i64_value[0]);
                     fprintf(file, "\t" "push rax\n");
                 }
-                else NOT_IMPLEMENTED("OP_push_local_var is not implemented yet for storage size %lu.\n", op->size);
+                else NOT_IMPLEMENTED("OP_push_local_var is not implemented yet for storage size %lu.\n", size);
                 break;
             case OP_push_local_var:
-                if (op->size <= 8) {
-                    fprintf(file, "\t" "%s [rbp-%lu]\n", make_movx("rax", op->size, op->_signed) , op->u64_value);
+                if (size <= 8) {
+                    fprintf(file, "\t" "%s [rbp-%lu]\n", make_movx("rax", size, is_signed_integer(op->type)) , op->i64_value[0]);
                     fprintf(file, "\t" "push rax\n");
                 }
-                else if (op->size <= 16) {
-                    fprintf(file, "\t" "mov rax, [rbp-%lu]\n", op->u64_value - 8);
+                else if (size <= 16) {
+                    fprintf(file, "\t" "mov rax, [rbp-%lu]\n", op->i64_value[0] - 8);
                     fprintf(file, "\t" "push rax\n");
-                    fprintf(file, "\t" "mov rax, [rbp-%lu]\n", op->u64_value);
+                    fprintf(file, "\t" "mov rax, [rbp-%lu]\n", op->i64_value[0]);
                     fprintf(file, "\t" "push rax\n");
                 }
-                else NOT_IMPLEMENTED("OP_push_local_var is not implemented yet for storage size %lu.\n", op->size);
+                else NOT_IMPLEMENTED("OP_push_local_var is not implemented yet for storage size %lu.\n", size);
                 break;
             case OP_push_arg_address:
-                fprintf(file, "\t" "lea rax, [rbp+%lu]\n", 16 + op->u64_value);
+                fprintf(file, "\t" "lea rax, [rbp+%lu]\n", 16 + op->i64_value[0]);
                 fprintf(file, "\t" "push rax\n");
                 break;
             case OP_push_local_var_address:
-                fprintf(file, "\t" "lea rax, [rbp-%lu]\n", op->u64_value);
+                fprintf(file, "\t" "lea rax, [rbp-%lu]\n", op->i64_value[0]);
                 fprintf(file, "\t" "push rax\n");
                 break;
             case OP_push_global_address:
@@ -306,99 +318,99 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file, "\t" "pop rax\n");
                 fprintf(file, "\t" "or rax, rax\n");
                 fprintf(file, "\t" "jne @f\n");
-                if (op->u32_value[1])
-                    fprintf(file, "\t" "jmp else_%u\n", op->u32_value[0]);
+                if (op->i64_value[1])
+                    fprintf(file, "\t" "jmp else_%ld\n", op->i64_value[0]);
                 else
-                    fprintf(file, "\t" "jmp end_if_%u\n", op->u32_value[0]);
+                    fprintf(file, "\t" "jmp end_if_%ld\n", op->i64_value[0]);
                 fprintf(file,"@@:\n");
                 break;
             case OP_else:
-                fprintf(file, "\t" "jmp end_if_%u\n", op->u32_value[0]);
-                fprintf(file,"else_%u:\n", op->u32_value[0]);
+                fprintf(file, "\t" "jmp end_if_%ld\n", op->i64_value[0]);
+                fprintf(file,"else_%ld:\n", op->i64_value[0]);
                 break;
             case OP_end_if:
-                fprintf(file,"end_if_%u:\n", op->u32_value[0]);
+                fprintf(file,"end_if_%ld:\n", op->i64_value[0]);
                 break;
             case OP_while_loop:
-                fprintf(file,"while_loop_%lu:\n", op->u64_value);
+                fprintf(file,"while_loop_%ld:\n", op->i64_value[0]);
                 break;
             case OP_while_check:
                 fprintf(file, "\t" "pop rax\n");
                 fprintf(file, "\t" "or rax, rax\n");
                 fprintf(file, "\t" "jne @f\n");
-                fprintf(file, "\t" "jmp end_while_%lu\n", op->u64_value);
+                fprintf(file, "\t" "jmp end_while_%lu\n", op->i64_value[0]);
                 fprintf(file,"@@:\n");
                 break;
             case OP_while_end:
-                fprintf(file, "\t" "jmp while_loop_%lu\n", op->u64_value);
-                fprintf(file,"end_while_%lu:\n", op->u64_value);
+                fprintf(file, "\t" "jmp while_loop_%lu\n", op->i64_value[0]);
+                fprintf(file,"end_while_%lu:\n", op->i64_value[0]);
                 break;
             case OP_array_access:
                 fprintf(file, "\t" "pop rax\n"); // index
-                if (op->size != 1) { // storage size 1: don't need to multiply with element size
-                    fprintf(file, "\t" "mov rbx, %lu\n", op->size);
+                if (size != 1) { // storage size 1: don't need to multiply with element size
+                    fprintf(file, "\t" "mov rbx, %lu\n", size);
                     fprintf(file, "\t" "mul QWORD rbx\n");
                 }
                 fprintf(file, "\t" "add [rsp], rax\n"); // add to pointer
                 break;
             case OP_member_access:
-                fprintf(file, "\t" "mov rax, %lu\n", op->u64_value); // offset
+                fprintf(file, "\t" "mov rax, %lu\n", op->i64_value[0]); // offset
                 fprintf(file, "\t" "add [rsp], rax\n"); // add to pointer
                 break;
             case OP_load:
                 fprintf(file, "\t" "pop rbx\n");
                 fprintf(file, "\t" "xor rax, rax\n");
-                if      (op->size == 1) fprintf(file, "\t" "mov  al, [rbx]\n");
-                else if (op->size == 2) fprintf(file, "\t" "mov  ax, [rbx]\n");
-                else if (op->size == 4) fprintf(file, "\t" "mov eax, [rbx]\n");
-                else if (op->size == 8) fprintf(file, "\t" "mov rax, [rbx]\n");
-                else if (op->size == 16) {
+                if      (size == 1) fprintf(file, "\t" "mov  al, [rbx]\n");
+                else if (size == 2) fprintf(file, "\t" "mov  ax, [rbx]\n");
+                else if (size == 4) fprintf(file, "\t" "mov eax, [rbx]\n");
+                else if (size == 8) fprintf(file, "\t" "mov rax, [rbx]\n");
+                else if (size == 16) {
                     fprintf(file, "\t" "mov rcx, [rbx]\n");
                     fprintf(file, "\t" "mov rax, [rbx+8]\n");
                 }
-                else NOT_IMPLEMENTED("Generating asm for OP_load with storages size %lu is not implemented.\n", op->size);
+                else NOT_IMPLEMENTED("Generating asm for OP_load with storages size %lu is not implemented.\n", size);
 
                 fprintf(file, "\t" "push rax\n");
-                if (op->size == 16) fprintf(file, "\t" "push rcx\n");
+                if (size == 16) fprintf(file, "\t" "push rcx\n");
                 break;
             case OP_store:
-                if      (op->size == 16) fprintf(file, "\t" "pop rcx\n");
+                if      (size == 16) fprintf(file, "\t" "pop rcx\n");
                 fprintf(file, "\t" "pop rax\n");
                 fprintf(file, "\t" "pop rbx\n");
-                if      (op->size == 1) fprintf(file, "\t" "mov [rbx],  al\n");
-                else if (op->size == 2) fprintf(file, "\t" "mov [rbx],  ax\n");
-                else if (op->size == 4) fprintf(file, "\t" "mov [rbx], eax\n");
-                else if (op->size == 8) fprintf(file, "\t" "mov [rbx], rax\n");
-                else if (op->size == 16) {
+                if      (size == 1) fprintf(file, "\t" "mov [rbx],  al\n");
+                else if (size == 2) fprintf(file, "\t" "mov [rbx],  ax\n");
+                else if (size == 4) fprintf(file, "\t" "mov [rbx], eax\n");
+                else if (size == 8) fprintf(file, "\t" "mov [rbx], rax\n");
+                else if (size == 16) {
                     fprintf(file, "\t" "mov [rbx], rcx\n");
                     fprintf(file, "\t" "mov [rbx+8], rax\n");
                 }
-                else NOT_IMPLEMENTED("Generating asm for OP_store with storages size %lu is not implemented.\n", op->size);
+                else NOT_IMPLEMENTED("Generating asm for OP_store with storages size %lu is not implemented.\n", size);
                 break;
 
             case OP_integer_plus_plus:
                 fprintf(file, "\t" "pop rbx\n");
-                if (op->u64_value == 2) { // post increment: push value first
+                if (op->i64_value[0] == 2) { // post increment: push value first
                     fprintf(file, "\t" "xor rax, rax\n");
-                    if      (op->size == 1) fprintf(file, "\t" "mov  al, [rbx]\n");
-                    else if (op->size == 2) fprintf(file, "\t" "mov  ax, [rbx]\n");
-                    else if (op->size == 4) fprintf(file, "\t" "mov eax, [rbx]\n");
-                    else if (op->size == 8) fprintf(file, "\t" "mov rax, [rbx]\n");
+                    if      (size == 1) fprintf(file, "\t" "mov  al, [rbx]\n");
+                    else if (size == 2) fprintf(file, "\t" "mov  ax, [rbx]\n");
+                    else if (size == 4) fprintf(file, "\t" "mov eax, [rbx]\n");
+                    else if (size == 8) fprintf(file, "\t" "mov rax, [rbx]\n");
                     fprintf(file, "\t" "push rax\n");
                 }
 
-                if      (op->size == 1) fprintf(file, "\t" "inc BYTE [rbx]\n");
-                else if (op->size == 2) fprintf(file, "\t" "inc WORD [rbx]\n");
-                else if (op->size == 4) fprintf(file, "\t" "inc DWORD [rbx]\n");
-                else if (op->size == 8) fprintf(file, "\t" "inc QWORD [rbx]\n");
-                else NOT_IMPLEMENTED("Generating asm for OP_integer_plus_plus with storages size %lu is not implemented.\n", op->size);
+                if      (size == 1) fprintf(file, "\t" "inc BYTE [rbx]\n");
+                else if (size == 2) fprintf(file, "\t" "inc WORD [rbx]\n");
+                else if (size == 4) fprintf(file, "\t" "inc DWORD [rbx]\n");
+                else if (size == 8) fprintf(file, "\t" "inc QWORD [rbx]\n");
+                else NOT_IMPLEMENTED("Generating asm for OP_integer_plus_plus with storages size %lu is not implemented.\n", size);
 
-                if (op->u64_value == 1) { // pre increment: push value after
+                if (op->i64_value[0] == 1) { // pre increment: push value after
                                         fprintf(file, "\t" "xor rax, rax\n");
-                    if      (op->size == 1) fprintf(file, "\t" "mov  al, [rbx]\n");
-                    else if (op->size == 2) fprintf(file, "\t" "mov  ax, [rbx]\n");
-                    else if (op->size == 4) fprintf(file, "\t" "mov eax, [rbx]\n");
-                    else if (op->size == 8) fprintf(file, "\t" "mov rax, [rbx]\n");
+                    if      (size == 1) fprintf(file, "\t" "mov  al, [rbx]\n");
+                    else if (size == 2) fprintf(file, "\t" "mov  ax, [rbx]\n");
+                    else if (size == 4) fprintf(file, "\t" "mov eax, [rbx]\n");
+                    else if (size == 8) fprintf(file, "\t" "mov rax, [rbx]\n");
                     fprintf(file, "\t" "push rax\n");
 
                 }
@@ -406,27 +418,27 @@ void output_asm(const char *asm_file_name) {
 
             case OP_integer_minus_minus:
                 fprintf(file, "\t" "pop rbx\n");
-                if (op->u64_value == 2) { // post decrement: push value first
+                if (op->i64_value[0] == 2) { // post decrement: push value first
                     fprintf(file, "\t" "xor rax, rax\n");
-                    if      (op->size == 1) fprintf(file, "\t" "mov  al, [rbx]\n");
-                    else if (op->size == 2) fprintf(file, "\t" "mov  ax, [rbx]\n");
-                    else if (op->size == 4) fprintf(file, "\t" "mov eax, [rbx]\n");
-                    else if (op->size == 8) fprintf(file, "\t" "mov rax, [rbx]\n");
+                    if      (size == 1) fprintf(file, "\t" "mov  al, [rbx]\n");
+                    else if (size == 2) fprintf(file, "\t" "mov  ax, [rbx]\n");
+                    else if (size == 4) fprintf(file, "\t" "mov eax, [rbx]\n");
+                    else if (size == 8) fprintf(file, "\t" "mov rax, [rbx]\n");
                     fprintf(file, "\t" "push rax\n");
                 }
                 
-                if      (op->size == 1) fprintf(file, "\t" "dec BYTE [rbx]\n");
-                else if (op->size == 2) fprintf(file, "\t" "dec WORD [rbx]\n");
-                else if (op->size == 4) fprintf(file, "\t" "dec DWORD [rbx]\n");
-                else if (op->size == 8) fprintf(file, "\t" "dec QWORD [rbx]\n");
-                else NOT_IMPLEMENTED("Generating asm for OP_integer_plus_plus with storages size %lu is not implemented.\n", op->size);
+                if      (size == 1) fprintf(file, "\t" "dec BYTE [rbx]\n");
+                else if (size == 2) fprintf(file, "\t" "dec WORD [rbx]\n");
+                else if (size == 4) fprintf(file, "\t" "dec DWORD [rbx]\n");
+                else if (size == 8) fprintf(file, "\t" "dec QWORD [rbx]\n");
+                else NOT_IMPLEMENTED("Generating asm for OP_integer_plus_plus with storages size %lu is not implemented.\n", size);
 
-                if (op->u64_value == 1) { // pre decrement: push value after
+                if (op->i64_value[0] == 1) { // pre decrement: push value after
                     fprintf(file, "\t" "xor rax, rax\n");
-                    if      (op->size == 1) fprintf(file, "\t" "mov  al, [rbx]\n");
-                    else if (op->size == 2) fprintf(file, "\t" "mov  ax, [rbx]\n");
-                    else if (op->size == 4) fprintf(file, "\t" "mov eax, [rbx]\n");
-                    else if (op->size == 8) fprintf(file, "\t" "mov rax, [rbx]\n");
+                    if      (size == 1) fprintf(file, "\t" "mov  al, [rbx]\n");
+                    else if (size == 2) fprintf(file, "\t" "mov  ax, [rbx]\n");
+                    else if (size == 4) fprintf(file, "\t" "mov eax, [rbx]\n");
+                    else if (size == 8) fprintf(file, "\t" "mov rax, [rbx]\n");
                     fprintf(file, "\t" "push rax\n");
 
                 }
@@ -434,17 +446,17 @@ void output_asm(const char *asm_file_name) {
 
             case OP_slice_plus_plus:
                 fprintf(file, "\t" "pop rbx\n");
-                if (op->u64_value == 2) { // post increment: push value first
+                if (op->i64_value[0] == 2) { // post increment: push value first
                     fprintf(file, "\t" "mov rax, [rbx]\n");
                     fprintf(file, "\t" "push rax\n");
                 }
                 fprintf(file, "\t" "cmp QWORD [rbx+8], 0\n");
                 fprintf(file, "\t" "\n");
                 fprintf(file, "\t" "jle @f\n");
-                fprintf(file, "\t" "add QWORD [rbx], %lu\n", op->size);
+                fprintf(file, "\t" "add QWORD [rbx], %lu\n", size);
                 fprintf(file, "\t" "dec QWORD [rbx+8]\n");
                 fprintf(file,"@@:\n");
-                if (op->u64_value == 1) { // pre increment: push value after
+                if (op->i64_value[0] == 1) { // pre increment: push value after
                     fprintf(file, "\t" "mov rax, [rbx]\n");
                     fprintf(file, "\t" "push rax\n");
                 }
@@ -452,10 +464,10 @@ void output_asm(const char *asm_file_name) {
 
             case OP_sign_extend:
                 fprintf(file, "\t" "pop  rax\n");
-                if      (op->size == 1) fprintf(file, "\t" "movsx  rax,  al\n");
-                else if (op->size == 2) fprintf(file, "\t" "movsx  rax,  ax\n");
-                else if (op->size == 4) fprintf(file, "\t" "movsxd rax, eax\n");
-                else NOT_IMPLEMENTED("Generating asm for OP_sign_extend with storages size %lu is not implemented.\n", op->size);
+                if      (size == 1) fprintf(file, "\t" "movsx  rax,  al\n");
+                else if (size == 2) fprintf(file, "\t" "movsx  rax,  ax\n");
+                else if (size == 4) fprintf(file, "\t" "movsxd rax, eax\n");
+                else NOT_IMPLEMENTED("Generating asm for OP_sign_extend with storages size %lu is not implemented.\n", size);
                 fprintf(file, "\t" "push  rax\n");
                 break;
              
@@ -582,7 +594,7 @@ void output_asm(const char *asm_file_name) {
 
             SV str = op->string_value;
 
-            fprintf(file, "string_literal_%lu: db ", op->u64_value);
+            fprintf(file, "string_literal_%lu: db ", op->i64_value[0]);
 
             while(str.len) {
                 if (*str.begin == '\\') {

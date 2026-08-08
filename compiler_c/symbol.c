@@ -10,11 +10,12 @@ Dyn_array global_symbols;
 
 Dyn_array builtin_type_symbols;
 
-Symbol *alloc_symbol(SymbolKind kind, SV name) {
+Symbol *alloc_symbol(SymbolKind kind, SV name, const Location *location) {
     Symbol *s = malloc(sizeof(Symbol));
     memset(s, 0, sizeof(Symbol));
     s->kind = kind;
     s->name = name;
+    s->location = location;
     return s;
 }
 
@@ -23,11 +24,11 @@ Symbol *get_symbol(Dyn_array *arr, size_t index) {
     return ((Symbol**)arr->data)[index];
 }
 
-Symbol *make_type_symbol(SV *name) {
+Symbol *make_type_symbol(SV *name, const Location *location) {
     Type *t = get_type_by_name(name);
     if (!t) return nullptr;
 
-    Symbol *s = alloc_symbol(SYM_type, *name);
+    Symbol *s = alloc_symbol(SYM_type, *name, location);
     s->type = t;
     return s;
 }

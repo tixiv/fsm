@@ -1,6 +1,7 @@
 
 #include "sv.h"
 #include "dyn_array.h"
+#include "location.h"
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -69,13 +70,9 @@ const char *opcode_name(enum Op_Kind kind);
 typedef struct {
     int kind;
     SV string_value;
-    union {
-        struct Type_s *type;
-        uint64_t u64_value;
-        uint32_t u32_value[2];
-    };
-    uint64_t size;
-    bool _signed;
+    int64_t i64_value[2];
+    struct Type_s *type;
+    const Location *location;
 } Opcode;
 
 extern Dyn_array opcodes_dyn;
@@ -85,7 +82,5 @@ extern Dyn_array opcodes_dyn;
 
 void dump_opcodes();
 
-size_t push_opcode(int kind, SV *value, uint64_t u64_value);
-size_t push_opcode_sz(int kind, SV *value, uint64_t u64_value, uint64_t size);
-size_t push_opcode_sz_sgn(int kind, SV *value, uint64_t u64_value, uint64_t size, bool _signed);
-size_t push_opcode_tp(int kind, SV *value, struct Type_s *type);
+size_t push_opcode(int kind, SV *value, int64_t i64_value, struct Type_s *type, const Location *location);
+size_t push_opcode_2(int kind, SV *value, int64_t i64_value_0, int64_t i64_value_1,  struct Type_s *type, const Location *location);

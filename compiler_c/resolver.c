@@ -9,11 +9,13 @@
 #include <string.h>
 #include <stdarg.h>
 
-static void resolver_error(int line_number, const char * fmt, ...) {
+static void resolver_error(const Location *location, const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "[FSM Resolver] %s:%d Error: ", current_filename, line_number);
+    ASSERT(location, "Tried to report error with null location.\n");
+
+    fprintf(stderr, "[FSM Resolver] %s:%d Error: ", location->filename, location->line);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
 
@@ -32,13 +34,13 @@ typedef struct {
     Type *current_generic_type;
 } Resolver;
 
-static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, bool do_undefined_error);
+static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, const Location *location, bool do_undefined_error);
 
-static void push_symbol(Resolver *res, Dyn_array *arr, Symbol *s, int line_number) {
+static void push_symbol(Resolver *res, Dyn_array *arr, Symbol *s) {
     if (s->name.len) {
-        Symbol *conflicting = resolver_lookup_symbol(res,  &s->name, line_number, false);
+        Symbol *conflicting = resolver_lookup_symbol(res,  &s->name, s->location, false);
         if (conflicting) {
-            resolver_error(line_number, "Symbol '%.*s' redefined\n", SV_prnt(s->name));
+            resolver_error(s->location, "Symbol '%.*s' redefined\n", SV_prnt(s->name));
             return;
         }
     }
@@ -49,7 +51,7 @@ static void push_symbol(Resolver *res, Dyn_array *arr, Symbol *s, int line_numbe
 Dyn_array builtin_functions; // Dyn_array<Symbol*>
 
 void declare_builtin_fn(SV name, Type *return_type, size_t num_args, Type *arg_types[]) {
-    Symbol *s = alloc_symbol(SYM_function, name);
+    Symbol *s = alloc_symbol(SYM_function, name, nullptr);
     s->type = get_function_type(return_type, arg_types, num_args);
     dyn_array_push_p(&builtin_functions, s);
 }
@@ -83,7 +85,7 @@ void init_builtin_functions() {
     declare_builtin_fn(mkSV("bitnot"), &builtin_u64, 1, (Type*[]){&builtin_u64});
 }
 
-static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, bool do_undefined_error) {
+static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, const Location *location, bool do_undefined_error) {
     // locals
     Symbol *s = get_symbol_by_name(&res->local_symbols, name);
     if (s) return s;
@@ -97,7 +99,7 @@ static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, 
     if (s) return s;
 
     // bultin types
-    s = make_type_symbol(name);
+    s = make_type_symbol(name, location);
     if (s) {
         dyn_array_push_p(&global_symbols, s);
         return s;
@@ -108,7 +110,7 @@ static Symbol *resolver_lookup_symbol(Resolver *res, SV *name, int line_number, 
     }
 
     if(do_undefined_error)
-        resolver_error(line_number, "Undefined symbol %.*s", SV_prnt(*name));
+        resolver_error(location, "Undefined symbol %.*s", SV_prnt(*name));
     
     return nullptr;
 }
@@ -126,8 +128,8 @@ static void resolver_leave_function(Resolver *res) {
     res->local_symbols.count = 0;
 }
 
-static void resolver_enter_scope(Resolver *res, int line_number) {
-    if (res->locals_stack_pointer >= 99) resolver_error(line_number, "Scope stack overflow. More than 100 levels nested. What are you doing?.\n");
+static void resolver_enter_scope(Resolver *res, const Location *location) {
+    if (res->locals_stack_pointer >= 99) resolver_error(location, "Scope stack overflow. More than 100 levels nested. What are you doing?.\n");
     res->locals_stack[res->locals_stack_pointer++] = res->local_symbols.count;
 }
 
@@ -139,9 +141,9 @@ static void resolver_leave_scope(Resolver *res) {
 static void resolve_globals_visitor (AST_node *n, Resolver *res) {
     switch (n->kind) {
         case AST_function: {
-            Symbol *s_fun = alloc_symbol(SYM_function, n->fun.name);
+            Symbol *s_fun = alloc_symbol(SYM_function, n->fun.name, n->location);
             s_fun->source = res->current_generic;
-            push_symbol(res, &global_symbols, s_fun, n->line_number);
+            push_symbol(res, &global_symbols, s_fun);
             n->fun.symbol = s_fun;
             break;
         }
@@ -168,23 +170,23 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
 
         case AST_arg_decl: {
             ASSERT(res->current_function, "Found function argument declaration for '%.*s' outside of function\n", SV_prnt(n->arg_decl.name));
-            Symbol *s_arg = alloc_symbol(SYM_arg, n->arg_decl.name);
-            push_symbol(res, &res->local_symbols, s_arg, n->line_number);
+            Symbol *s_arg = alloc_symbol(SYM_arg, n->arg_decl.name, n->location);
+            push_symbol(res, &res->local_symbols, s_arg);
             n->arg_decl.symbol = s_arg;
             break;
         }
 
         case AST_var_decl: {
             ASSERT(res->current_function, "Found local variable declaration for '%.*s' outside of function\n", SV_prnt(n->var_decl.name));
-            Symbol *s_var = alloc_symbol(SYM_local, n->var_decl.name);
-            push_symbol(res, &res->local_symbols, s_var, n->line_number);
+            Symbol *s_var = alloc_symbol(SYM_local, n->var_decl.name, n->location);
+            push_symbol(res, &res->local_symbols, s_var);
             n->var_decl.symbol = s_var;
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             break;
         }
 
         case AST_symbol:
-            n->symbol.symbol = resolver_lookup_symbol(res, &n->symbol.name, n->line_number, true);
+            n->symbol.symbol = resolver_lookup_symbol(res, &n->symbol.name, n->location, true);
             break;
 
         case AST_call:
@@ -196,20 +198,20 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
             break;
 
         case AST_scope:
-            resolver_enter_scope(res, n->line_number);
+            resolver_enter_scope(res, n->location);
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             resolver_leave_scope(res);
             break;
 
         case AST_for:
-            resolver_enter_scope(res, n->line_number);
+            resolver_enter_scope(res, n->location);
             ast_visit_children(n, (AstVisitor)resolver_visitor, res);
             resolver_leave_scope(res);
             break;
 
         case AST_generic:
             res->current_generic = n;
-            res->generic_symbol = alloc_symbol(SYM_type, n->generic.parameter_name);
+            res->generic_symbol = alloc_symbol(SYM_type, n->generic.parameter_name, n->location);
             if (res->current_generic_type)
                 res->generic_symbol->type = res->current_generic_type;
             else

@@ -9,11 +9,11 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
-static void tokenizer_error(int line_number, const char * fmt, ...) {
+static void tokenizer_error(Location location, const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "[FSM Tokenizer] %s:%d Error: ", current_filename, line_number);
+    fprintf(stderr, "[FSM Tokenizer] %s:%d Error: ", location.filename, location.line);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
 
@@ -36,7 +36,7 @@ void skip_whitespace(SV *sv) {
 
 typedef struct {
     SV code;
-    int line_number;
+    Location location;
     bool inside_builder_string;
 } Tokenizer;
 
@@ -64,7 +64,7 @@ void read_number(SV *num, SV *input) {
     }
 }
 
-void read_string(SV *str, SV *input, int *line_number) {
+void read_string(SV *str, SV *input, Location *location) {
     sv_pop(input); // initial '"'
     str->begin = input->begin;
     str->len = 0;
@@ -73,19 +73,19 @@ void read_string(SV *str, SV *input, int *line_number) {
             str->len += 2; sv_pop(input); sv_pop(input);
         }
         else {
-            if ('\n' == sv_pop(input)) (*line_number)++;
+            if ('\n' == sv_pop(input)) location->line++;
             str->len++;
         }
     }
     if (input->len) {
         sv_pop(input); // closing '"'
     } else {
-        tokenizer_error(*line_number,  "Error: unmatched '\"'. Quitting.");
+        tokenizer_error(*location,  "Error: unmatched '\"'. Quitting.");
         exit(EXIT_FAILURE);
     }
 }
 
-void read_char_constant(SV *str, SV *input, int *line_number) {
+void read_char_constant(SV *str, SV *input, Location *location) {
     sv_pop(input); // initial '
 
     str->begin = input->begin;
@@ -99,13 +99,13 @@ void read_char_constant(SV *str, SV *input, int *line_number) {
             sv_pop(input);
             return;
         }
-        if ('\n' == sv_pop(input)) (*line_number)++;
+        if ('\n' == sv_pop(input)) location->line++;
         str->len++;
     }
     if (input->len) {
         sv_pop(input); // closing '''
     } else {
-        tokenizer_error(*line_number,  "Error: unmatched '\''. Quitting.");
+        tokenizer_error(*location,  "Error: unmatched '\''. Quitting.");
         exit(EXIT_FAILURE);
     }
 }
@@ -188,73 +188,73 @@ const char *token_kind_printable(TokenKind kind) {
     return token_kind_name(kind);
 }
 
-void push_token(int kind, SV *value, int line_number) {
+void push_token(int kind, SV *value, Location location) {
     Token *token = (Token*) dyn_array_push(&current_module->tokens_dyn);
 
     token->kind = kind;
     if (value)
         token->value = *value;
     
-    token->line_number = line_number;
+    token->location = location;
 }
 
-void handle_word(SV *word, int line_number) {
+void handle_word(SV *word, Location location) {
     if (sv_compare_cstr(word, "fn")) {
-        push_token(TOK_keyword_fn, nullptr, line_number);
+        push_token(TOK_keyword_fn, nullptr, location);
     }
     else if (sv_compare_cstr(word, "let")) {
-        push_token(TOK_keyword_let, nullptr, line_number);
+        push_token(TOK_keyword_let, nullptr, location);
     }
     else if (sv_compare_cstr(word, "return")) {
-        push_token(TOK_keyword_return, nullptr, line_number);
+        push_token(TOK_keyword_return, nullptr, location);
     }
     else if (sv_compare_cstr(word, "if")) {
-        push_token(TOK_keyword_if, nullptr, line_number);
+        push_token(TOK_keyword_if, nullptr, location);
     }
     else if (sv_compare_cstr(word, "else")) {
-        push_token(TOK_keyword_else, nullptr, line_number);
+        push_token(TOK_keyword_else, nullptr, location);
     }
     else if (sv_compare_cstr(word, "while")) {
-        push_token(TOK_keyword_while, nullptr, line_number);
+        push_token(TOK_keyword_while, nullptr, location);
     }
     else if (sv_compare_cstr(word, "for")) {
-        push_token(TOK_keyword_for, nullptr, line_number);
+        push_token(TOK_keyword_for, nullptr, location);
     }
     else if (sv_compare_cstr(word, "struct")) {
-        push_token(TOK_keyword_struct, nullptr, line_number);
+        push_token(TOK_keyword_struct, nullptr, location);
     }
     else if (sv_compare_cstr(word, "record")) {
-        push_token(TOK_keyword_record, nullptr, line_number);
+        push_token(TOK_keyword_record, nullptr, location);
     }
     else if (sv_compare_cstr(word, "enum")) {
-        push_token(TOK_keyword_enum, nullptr, line_number);
+        push_token(TOK_keyword_enum, nullptr, location);
     }
     else if (sv_compare_cstr(word, "union")) {
-        push_token(TOK_keyword_union, nullptr, line_number);
+        push_token(TOK_keyword_union, nullptr, location);
     }
     else if (sv_compare_cstr(word, "generic")) {
-        push_token(TOK_keyword_generic, nullptr, line_number);
+        push_token(TOK_keyword_generic, nullptr, location);
     }
     else if (sv_compare_cstr(word, "import")) {
-        push_token(TOK_keyword_import, nullptr, line_number);
+        push_token(TOK_keyword_import, nullptr, location);
     }
     else if (sv_compare_cstr(word, "true")) {
-        push_token(TOK_keyword_true, nullptr, line_number);
+        push_token(TOK_keyword_true, nullptr, location);
     }
     else if (sv_compare_cstr(word, "false")) {
-        push_token(TOK_keyword_false, nullptr, line_number);
+        push_token(TOK_keyword_false, nullptr, location);
     }
     else if (sv_compare_cstr(word, "null")) {
-        push_token(TOK_keyword_null, nullptr, line_number);
+        push_token(TOK_keyword_null, nullptr, location);
     }
     else if (sv_compare_cstr(word, "fsm_debug")) {
-        push_token(TOK_keyword_fsm_debug, nullptr, line_number);
+        push_token(TOK_keyword_fsm_debug, nullptr, location);
     }
     else if (sv_compare_cstr(word, "__LOCATION__")) {
-        push_token(TOK_magic_location, nullptr, line_number);
+        push_token(TOK_magic_location, nullptr, location);
     }
     else {
-        push_token(TOK_identifier, word, line_number);
+        push_token(TOK_identifier, word, location);
     }
 }
 
@@ -263,7 +263,7 @@ void tokenize_fsm (Tokenizer *tok);
 void read_builder_string(Tokenizer *tokenizer) {
     sv_pop(&tokenizer->code); sv_pop(&tokenizer->code); // skip $"
 
-    push_token(TOK_builder_string_begin, nullptr, tokenizer->line_number);
+    push_token(TOK_builder_string_begin, nullptr, tokenizer->location);
 
     SV str;
     str.begin = tokenizer->code.begin;
@@ -279,11 +279,11 @@ void read_builder_string(Tokenizer *tokenizer) {
             char c = sv_pop(&tokenizer->code);
 
             if (c == '\n') {
-                tokenizer->line_number++;
+                tokenizer->location.line++;
                 str.len++;
             }
             else if (c == '{') {
-                push_token(TOK_string, &str, tokenizer->line_number);
+                push_token(TOK_string, &str, tokenizer->location);
                 tokenizer->inside_builder_string = true;
                 tokenize_fsm(tokenizer);
                 tokenizer->inside_builder_string = false;
@@ -297,72 +297,73 @@ void read_builder_string(Tokenizer *tokenizer) {
         }
     }
 
-    if (str.len) push_token(TOK_string, &str, tokenizer->line_number);
+    if (str.len) push_token(TOK_string, &str, tokenizer->location);
 
     if (tokenizer->code.len) {
         sv_pop(&tokenizer->code); // closing '"'
     } else {
-        tokenizer_error(tokenizer->line_number,  "Error: unmatched '\"'. Quitting.");
+        tokenizer_error(tokenizer->location,  "Error: unmatched '\"'. Quitting.");
     }
 
-    push_token(TOK_builder_string_end, nullptr, tokenizer->line_number);
+    push_token(TOK_builder_string_end, nullptr, tokenizer->location);
 }
 
 void tokenize_fsm (Tokenizer *tok) {
     SV *code = &tok->code;
+
     while (code->len) {
         char c = *code->begin;
         
         if (is_numeric(c)) {
             SV num;
             read_number(&num, code);
-            push_token(TOK_number, &num, tok->line_number);
+            push_token(TOK_number, &num, tok->location);
         }
         else if (is_whitespace(c)) {
             sv_pop(code);
         }
         else if ('\n' == c) {
             sv_pop(code);
-            tok->line_number++;
+            tok->location.line++;
         }
         else if ('(' == c) {
             sv_pop(code);
-            push_token(TOK_lparen, nullptr, tok->line_number);
+            push_token(TOK_lparen, nullptr, tok->location);
         }
         else if (')' == c) {
             sv_pop(code);
-            push_token(TOK_rparen, nullptr, tok->line_number);
+            push_token(TOK_rparen, nullptr, tok->location);
         }
         else if ('{' == c) {
             sv_pop(code);
-            push_token(TOK_lbrace, nullptr, tok->line_number);
+            push_token(TOK_lbrace, nullptr, tok->location);
         }
         else if ('}' == c) {
             sv_pop(code);
             if (tok->inside_builder_string) {
                 return;
             }
-            push_token(TOK_rbrace, nullptr, tok->line_number);
+            push_token(TOK_rbrace, nullptr, tok->location);
         }
         else if ('[' == c) {
             sv_pop(code);
-            push_token(TOK_lbracket, nullptr, tok->line_number);
+            push_token(TOK_lbracket, nullptr, tok->location);
         }
         else if (']' == c) {
             sv_pop(code);
-            push_token(TOK_rbracket, nullptr, tok->line_number);
+            push_token(TOK_rbracket, nullptr, tok->location);
         }
         else if (sv_starts_with(code, "::")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_colon_colon, nullptr, tok->line_number);
+            push_token(TOK_colon_colon, nullptr, tok->location);
         }
         else if (sv_starts_with(code, "++")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_plus_plus, nullptr, tok->line_number);
+            push_token(TOK_plus_plus, nullptr, tok->location);
         }
         else if (sv_starts_with(code, "--")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_minus_minus, nullptr, tok->line_number);
+            push_token(TOK_minus_minus, nullptr, tok->location);
         }
         else if (sv_starts_with(code, "//")) {
             while(code->len && *code->begin != '\n')
@@ -370,152 +371,153 @@ void tokenize_fsm (Tokenizer *tok) {
         }
         else if (sv_starts_with(code, "/*")) {
             while(code->len && !sv_starts_with(code, "*/")) {
-                if ('\n' == sv_pop(code)) tok->line_number++;
+                if ('\n' == sv_pop(code)) tok->location.line++;
             }
             sv_pop(code); sv_pop(code);
         }
         else if (sv_starts_with(code, "*/")) {
-            tokenizer_error(tok->line_number, "Encountered '*/' outside of comment.\n");
+            tokenizer_error(tok->location, "Encountered '*/' outside of comment.\n");
         }
         else if (sv_starts_with(code, "=>")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_bind_ref, nullptr, tok->line_number);
+            push_token(TOK_bind_ref, nullptr, tok->location);
         }
         else if (sv_starts_with(code, "<==>")) {
             sv_pop(code);  sv_pop(code); sv_pop(code);  sv_pop(code);
-            push_token(TOK_reference_target_equal, nullptr, tok->line_number);
+            push_token(TOK_reference_target_equal, nullptr, tok->location);
         }
         else if (sv_starts_with(code, "<!=>")) {
             sv_pop(code);  sv_pop(code); sv_pop(code);  sv_pop(code);
-            push_token(TOK_reference_target_unequal, nullptr, tok->line_number);
+            push_token(TOK_reference_target_unequal, nullptr, tok->location);
         }
         else if (sv_starts_with(code, "==")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_equal, nullptr, tok->line_number);
+            push_token(TOK_equal, nullptr, tok->location);
         }
         else if (sv_starts_with(code, "|==")) {
             sv_pop(code);  sv_pop(code); sv_pop(code);
-            push_token(TOK_or_equal_to, nullptr, tok->line_number);
+            push_token(TOK_or_equal_to, nullptr, tok->location);
         }
         else if (sv_starts_with(code, "&!=")) {
             sv_pop(code);  sv_pop(code); sv_pop(code);
-            push_token(TOK_and_not_equal_to, nullptr, tok->line_number);
+            push_token(TOK_and_not_equal_to, nullptr, tok->location);
         }
         else if (sv_starts_with(code, "!=")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_unequal, nullptr, tok->line_number);
+            push_token(TOK_unequal, nullptr, tok->location);
         }
         else if (sv_starts_with(code, ">=")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_greater_equal, nullptr, tok->line_number);
+            push_token(TOK_greater_equal, nullptr, tok->location);
         }
         else if (sv_starts_with(code, "<=")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_lower_equal, nullptr, tok->line_number);
+            push_token(TOK_lower_equal, nullptr, tok->location);
         }
         else if (sv_starts_with(code, "&&")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_boolean_and, nullptr, tok->line_number);
+            push_token(TOK_boolean_and, nullptr, tok->location);
         }
         else if (sv_starts_with(code, "||")) {
             sv_pop(code);  sv_pop(code);
-            push_token(TOK_boolean_or, nullptr, tok->line_number);
+            push_token(TOK_boolean_or, nullptr, tok->location);
         }
         else if ('+' == c) {
             sv_pop(code);
-            push_token(TOK_plus, nullptr, tok->line_number);
+            push_token(TOK_plus, nullptr, tok->location);
         }
         else if ('-' == c) {
             sv_pop(code);
-            push_token(TOK_minus, nullptr, tok->line_number);
+            push_token(TOK_minus, nullptr, tok->location);
         }
         else if ('*' == c) {
             sv_pop(code);
-            push_token(TOK_asterisk, nullptr, tok->line_number);
+            push_token(TOK_asterisk, nullptr, tok->location);
         }
         else if ('/' == c) {
             sv_pop(code);
-            push_token(TOK_slash, nullptr, tok->line_number);
+            push_token(TOK_slash, nullptr, tok->location);
         }
         else if ('%' == c) {
             sv_pop(code);
-            push_token(TOK_percent, nullptr, tok->line_number);
+            push_token(TOK_percent, nullptr, tok->location);
         }
         else if ('^' == c) {
             sv_pop(code);
-            push_token(TOK_up_arrow, nullptr, tok->line_number);
+            push_token(TOK_up_arrow, nullptr, tok->location);
         }
         else if (':' == c) {
             sv_pop(code);
-            push_token(TOK_colon, nullptr, tok->line_number);
+            push_token(TOK_colon, nullptr, tok->location);
         }
         else if (';' == c) {
             sv_pop(code);
-            push_token(TOK_semicolon, nullptr, tok->line_number);
+            push_token(TOK_semicolon, nullptr, tok->location);
         }
         else if ('.' == c) {
             sv_pop(code);
-            push_token(TOK_dot, nullptr, tok->line_number);
+            push_token(TOK_dot, nullptr, tok->location);
         }
         else if (',' == c) {
             sv_pop(code);
-            push_token(TOK_komma, nullptr, tok->line_number);
+            push_token(TOK_komma, nullptr, tok->location);
         }
         else if (c == '>') {
             sv_pop(code);
-            push_token(TOK_greater, nullptr, tok->line_number);
+            push_token(TOK_greater, nullptr, tok->location);
         }
         else if (c == '<') {
             sv_pop(code);
-            push_token(TOK_lower, nullptr, tok->line_number);
+            push_token(TOK_lower, nullptr, tok->location);
         }
         else if (c == '=') {
             sv_pop(code);
-            push_token(TOK_equal_assign, nullptr, tok->line_number);
+            push_token(TOK_equal_assign, nullptr, tok->location);
         }
         else if (c == '&') {
             sv_pop(code);
-            push_token(TOK_ampersand, nullptr, tok->line_number);
+            push_token(TOK_ampersand, nullptr, tok->location);
         }
         else if (c == '!') {
             sv_pop(code);
-            push_token(TOK_exclam, nullptr, tok->line_number);
+            push_token(TOK_exclam, nullptr, tok->location);
         }
         else if (c == '~') {
             sv_pop(code);
-            push_token(TOK_tilde, nullptr, tok->line_number);
+            push_token(TOK_tilde, nullptr, tok->location);
         }
         else if (sv_starts_with(code, "$\"")) {
             read_builder_string(tok);
         }
         else if ('"' == c) {
             SV str;
-            read_string(&str, code, &tok->line_number);
-            push_token(TOK_string, &str, tok->line_number);
+            read_string(&str, code, &tok->location);
+            push_token(TOK_string, &str, tok->location);
         }
         else if ('\'' == c) {
             SV str;
-            read_char_constant(&str, code, &tok->line_number);
-            push_token(TOK_char_constant, &str, tok->line_number);
+            read_char_constant(&str, code, &tok->location);
+            push_token(TOK_char_constant, &str, tok->location);
         }
         else if (is_allowed_at_start_of_identifier(c)) {
             SV word;
             read_word(&word, code);
-            handle_word(&word, tok->line_number);
+            handle_word(&word, tok->location);
         }
         else {
-            tokenizer_error(tok->line_number,  "encountered unhandled character '%c' = 0x%02X. Quitting.\n", c, c);
+            tokenizer_error(tok->location,  "encountered unhandled character '%c' = 0x%02X. Quitting.\n", c, c);
             exit(EXIT_FAILURE);
         }
     }
-    push_token(TOK_eof, nullptr, tok->line_number);
+    push_token(TOK_eof, nullptr, tok->location);
 }
 
-void tokenizer(SV *code) {
+void tokenizer(SV *code, const char *filename) {
     dyn_array_init(&current_module->tokens_dyn, sizeof(Token), 16);
-    Tokenizer tok;
+    Tokenizer tok = {0};
     tok.code = *code;
-    tok.line_number = 1;
+    tok.location.filename = filename;
+    tok.location.line = 1;
     tokenize_fsm(&tok);
 }
 
@@ -523,9 +525,9 @@ void dump_tokens() {
     for (size_t i=0; i<num_tokens; i++) {
         Token *t = &tokens[i];
         if (t->value.begin) {
-            printf("[%2d: %s, \"" SV_FMT "\"]\n", t->line_number, token_kind_name(t->kind), SV_prnt(t->value));
+            printf("[%s:%d: %s, \"" SV_FMT "\"]\n", t->location.filename, t->location.line, token_kind_name(t->kind), SV_prnt(t->value));
         } else {
-            printf("[%2d: %s]\n", t->line_number, token_kind_name(t->kind));
+            printf("[%s:%d: %s]\n", t->location.filename, t->location.line, token_kind_name(t->kind));
         }
     }
 }

@@ -12,11 +12,11 @@
 #include <string.h>
 #include <assert.h>
 
-AST_node *ast_alloc(AST_kind kind, int line_number) {
+AST_node *ast_alloc(AST_kind kind, const Location *location) {
     AST_node *node = malloc(sizeof(AST_node));
     memset(node, 0, sizeof(AST_node));
     node->kind = kind;
-    node->line_number = line_number;
+    node->location = location;
 
     return node;
 }
@@ -65,11 +65,11 @@ void ast_link_to_chain(AST_node **chain_p, AST_node *n) {
 void ast_insert_node(AST_node *at, AST_node *new_node) {
     // We overwrite the old node with the new one.
     // make a copy first.
-    AST_node *at_copy = ast_alloc(at->kind, at->line_number);
+    AST_node *at_copy = ast_alloc(at->kind, at->location);
     memcpy (at_copy, at, sizeof(AST_node));
     at_copy->next = nullptr; // zero chain pointer in case it was used
 
-    new_node->line_number = at->line_number;
+    new_node->location = at->location;
     new_node->next = at->next;
     new_node->result_used = at->result_used;
 
@@ -293,7 +293,7 @@ AST_node *ast_copy_chain(AST_node *n) {
 
 AST_node *ast_copy_tree(AST_node *n) {
     if (!n) return nullptr;
-    AST_node *nn = ast_alloc(n->kind, n->line_number);
+    AST_node *nn = ast_alloc(n->kind, n->location);
     memcpy(nn, n, sizeof(AST_node));
     nn->next = nullptr;
     switch (n->kind) {
@@ -451,6 +451,9 @@ static void ast_dump_visitor (AST_node *n, void *spaces_vp) {
     char buf[1024];
     char buf2[1024];
 
+    if (n->location)
+        printf("%s:%03d:", n->location->filename, n->location->line);
+
     switch (n->kind) {
         case AST_program:
         case AST_scope:
@@ -542,18 +545,7 @@ static void ast_dump_visitor (AST_node *n, void *spaces_vp) {
             break;
         case AST_if:
             printf("%.*s%s (%s)\n", (int)spaces, spc, kind_name, get_type_name_r(buf, n->type));
-            if (n->_if.condition) {
-                printf("%.*s  Condition:\n", (int)spaces, spc);
-                ast_dump_visitor(n->_if.condition, (void*)(spaces + 4));
-            }
-            if (n->_if.if_clause) {
-                printf("%.*s  If clause:\n", (int)spaces, spc);
-                ast_dump_visitor(n->_if.if_clause, (void*)(spaces + 4));
-            }
-            if (n->_if.else_clause) {
-                printf("%.*s  Else clause:\n", (int)spaces, spc);
-                ast_dump_visitor(n->_if.else_clause, (void*)(spaces + 4));
-            }
+            ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_binary:
             printf("%.*s%s %s (%s)\n", (int)spaces, spc, kind_name, token_kind_name(n->binary.token_kind), get_type_name_r(buf, n->type));
