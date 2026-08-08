@@ -61,26 +61,16 @@ struct Opcode {
     kind: Op_Kind;
     string_value: u8[];
     type: Type&;
-    u64_value: u64;
-    size;
-    _signed: bool;
+    u64_values: u64[2];
 }
 
 fn dump_opcodes(opcodes: Opcode[]) {
     for (let i = 0; i < opcodes.len; i++) {
         let op => opcodes[i];
-        if (op->string_value.begin) {
-            printf("[%s, \"" SV_FMT "\"]\n", opcode_name(op->kind), SV_prnt(op->string_value));
+        if (op.string_value.begin) {
+            $"[{op.kind}, \"{op.string_value}\", {op.u64_value[0]}, {op.u64_value[1]}, {get_type_name_r(buf, op.type)}]\n";
         } else {
-            switch (op->kind) {
-                case OP_push_local_var:
-                    printf("[%s, sz:%u, var:%u]\n", opcode_name(op->kind), op->u32_value[1], op->u32_value[0]);
-                    break;
-
-                default:
-                    printf("[%s, %lu]\n", opcode_name(op->kind), op->u64_value);
-                    break;
-            }
+            $"[{op.kind}, {op.u64_value[0]}, {op.u64_value[1]}, {get_type_name_r(buf, op.type)}]\n";
         }
     }
 }

@@ -191,8 +191,8 @@ or to perform a null reference check.");
         insert_dereference(type_checker, n);
     }
 
-    if (is_slice_type(type_checker.type_cache, target_type) && is_array_kind(n.type)) {
-        if (get_slice_element_type(type_checker.type_cache, target_type) <==> n.type.T_array.element_type) {
+    if (is_slice_kind(target_type) && is_array_kind(n.type)) {
+        if (get_slice_element_type(target_type) <==> n.type.T_array.element_type) {
             let conv => ast_alloc(type_checker.ast_allocator, AST_node::AST_array_to_slice, n.location);
             conv.type => get_slice_type(type_checker.type_cache, n.type.T_array.element_type);
             ast_insert_node(type_checker.ast_allocator, n, conv);
@@ -203,12 +203,9 @@ or to perform a null reference check.");
         }
     }
 
-    if (is_slice_type(type_checker.type_cache, target_type)
-      && types_equal(get_slice_element_type(type_checker.type_cache, target_type), type_checker.type_cache.builtin_u8)
-        && (
-            (is_struct_kind(n.type) && !is_slice_type(type_checker.type_cache, n.type))
-            || is_record_kind(n.type)
-            || is_union_kind(n.type)))
+    if (is_slice_kind(target_type)
+      && get_slice_element_type(target_type) <==> type_checker.type_cache.builtin_u8
+        && is_record_kind(n.type))
     {
         ast_insert_node(type_checker.ast_allocator, n, make_cast(type_checker, target_type, n.type));
         return;
@@ -764,8 +761,8 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
         if (is_array_kind(n.AST_array_access.array.type)) {
             n.type => get_ref_type_for(type_checker.type_cache, n.AST_array_access.array.type.T_array.element_type);    
         }
-        else if (is_slice_type(type_checker.type_cache, n.AST_array_access.array.type)) {
-            n.type => get_ref_type_for(type_checker.type_cache, get_slice_element_type(type_checker.type_cache, n.AST_array_access.array.type));
+        else if (is_slice_kind(n.AST_array_access.array.type)) {
+            n.type => get_ref_type_for(type_checker.type_cache, get_slice_element_type(n.AST_array_access.array.type));
         }
         else {
             type_checker_error(n,
@@ -813,7 +810,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
     else if (n.kind == AST_node::AST_plus_plus) {
         let  original_type => n.AST_plus_plus.body.type;
         auto_dereference(type_checker, n.AST_plus_plus.body);
-        if (is_slice_type(type_checker.type_cache, n.AST_plus_plus.body.type)) {
+        if (is_slice_kind(n.AST_plus_plus.body.type)) {
             n.type => n.AST_plus_plus.body.type.T_struct.members[0].type;
         }
         else if (is_integer_kind(n.AST_plus_plus.body.type)) {
@@ -847,7 +844,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
 
             if (is_reference_kind(container)) container => dereferenced_type(container);
             
-            if (is_struct_kind(container) || is_record_kind(container) || is_union_kind(container)) {
+            if (is_structlike_kind(container) || is_union_kind(container)) {
                 let offset;
                 let t => get_member_type_and_offset_by_name(type_checker.type_cache, container, &n.AST_member_access.name, &offset);
                 if (!t) type_checker_error(n, $"Member '{n.AST_member_access.name}' not found in '{get_type_name_r(buf_1, container)}'.\n");

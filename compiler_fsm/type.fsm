@@ -15,6 +15,12 @@ struct EnumMember {
     value;
 }
 
+enum StructlikeKind {
+    SL_struct,
+    SL_record,
+    SL_slice,
+}
+
 union Type enum kind {
     struct {
         name: u8[];
@@ -44,14 +50,7 @@ union Type enum kind {
     struct T_struct {
         num_members;
         members: StructMember[];
-    }
-    struct T_record {
-        num_members;
-        members: StructMember[];
-    }
-    struct T_slice {
-        num_members;
-        members: StructMember[];
+        kind: StructlikeKind;
     }
     struct T_enum {
         num_members;
@@ -89,10 +88,6 @@ fn TypeRefArr_init (arr: TypeRefArr&, allocator: EndlosAllocator&) {
     arr.alloc = endlos_begin~Type& (allocator);
     arr.arr = arr.alloc;
     arr.arr.len = 0;
-}
-
-fn types_equal(a: any&, b: any&) {
-    return <u64>a == <u64>b;
 }
 
 struct TypeCache {
@@ -174,20 +169,18 @@ fn print_array_type(sb: StringBuilder&, arr_t: Type&) : void {
     }
 }
 
-fn get_type_name_r(print_buf: u8[1024]&, type: Type&) : u8[] {
+fn get_type_name_r_impl(print_buf: u8[1024]&, type: Type&, encoded: bool) : u8[] {
     if (!type)                        return "(null type)";
     if (type.kind == Type::T_void)    return "void";
     if (type.kind == Type::T_null)    return "null";
     if (type.kind == Type::T_boolean) return "bool";
     if (type.kind == Type::T_any)     return "any";
-    if (type.kind == Type::T_integer && !type.T_integer.signed && type.T_integer.num_bits == 64) return "u64";
-    if (type.kind == Type::T_integer &&  type.T_integer.signed && type.T_integer.num_bits == 64) return "i64";
-    if (type.kind == Type::T_integer && !type.T_integer.signed && type.T_integer.num_bits == 32) return "u32";
-    if (type.kind == Type::T_integer &&  type.T_integer.signed && type.T_integer.num_bits == 32) return "i32";
-    if (type.kind == Type::T_integer && !type.T_integer.signed && type.T_integer.num_bits == 16) return "u16";
-    if (type.kind == Type::T_integer &&  type.T_integer.signed && type.T_integer.num_bits == 16) return "i16";
-    if (type.kind == Type::T_integer && !type.T_integer.signed && type.T_integer.num_bits == 8) return "u8";
-    if (type.kind == Type::T_integer &&  type.T_integer.signed && type.T_integer.num_bits == 8) return "i8";
+    if (type.kind == Type::T_integer) {
+        if (type.T_integer.num_bits == 64) return if (type.T_integer.signed) "i64" else "u64";
+        if (type.T_integer.num_bits == 32) return if (type.T_integer.signed) "i32" else "u32";
+        if (type.T_integer.num_bits == 16) return if (type.T_integer.signed) "i16" else "u16";
+        if (type.T_integer.num_bits == 8)  return if (type.T_integer.signed)  "i8" else  "u8";
+    }
 
     let sb: StringBuilder;
     sb_init(sb, print_buf);
@@ -213,23 +206,20 @@ fn get_type_name_r(print_buf: u8[1024]&, type: Type&) : u8[] {
         print_array_type(sb, type);
     }
     else if (type.kind == Type::T_struct) {
-        /*
-        if (is_slice_type(type)) {
-             sb_puts(sb, "%s[]", get_type_name_r(child_print_buf, dereferenced_type(type.T_struct.members[0].type)));
-        }
-        else */ if (type.name.begin) {
-            sb_puts(sb, $"struct {type.name}");
+        if (is_slice_kind(type)) {
+            sb_puts(sb, get_type_name_r_impl(child_print_buf, dereferenced_type(type.T_struct.members[0].type), encoded));
+            sb_puts(sb, if (encoded) "slice" else "[]");
         }
         else {
-            sb_puts(sb, "anonymous struct");
-        }
-    }
-    else if (type.kind == Type::T_record) {
-        if (type.name.begin) {
-            sb_puts(sb, $"record {type.name}");
-        }
-        else {
-            sb_puts(sb, "anonymous record");
+            let kind_name = "unknown ";
+            if (type.T_struct.kind == StructlikeKind::SL_struct) kind_name = "struct ";
+            if (type.T_struct.kind == StructlikeKind::SL_record) kind_name = "record ";
+            if (type.name.begin) {
+                sb_puts(sb, if(encoded) "" else kind_name); sb_puts(sb, type.name);
+            }
+            else {
+                sb_puts(sb, "anonymous "); sb_puts(sb, kind_name);
+            }
         }
     }
     else if (type.kind == Type::T_union) {
@@ -252,7 +242,11 @@ fn get_type_name_r(print_buf: u8[1024]&, type: Type&) : u8[] {
         NOT_IMPLEMENTED(__LOCATION__, $"Dumping type kind {type.kind.name} is not implemented yet.\n");
     }
 
-    return sb.buffer;
+    return sb.str;
+}
+
+fn get_type_name_r(print_buf: u8[1024]&, type: Type&) : u8[] {
+    return get_type_name_r_impl(print_buf, type, false);
 }
 
 fn is_void_kind(t: Type&) : bool {
@@ -275,12 +269,20 @@ fn is_array_kind(t: Type&) : bool {
     return t && t.kind == Type::T_array;
 }
 
-fn is_struct_kind(t: Type&) : bool {
+fn is_structlike_kind(t: Type&) : bool {
     return t && t.kind == Type::T_struct;
 }
 
+fn is_struct_kind(t: Type&) : bool {
+    return t && t.kind == Type::T_struct && t.T_struct.kind == StructlikeKind::SL_struct;
+}
+
 fn is_record_kind(t: Type&) : bool {
-    return t && t.kind == Type::T_record;
+    return t && t.kind == Type::T_struct && t.T_struct.kind == StructlikeKind::SL_record;
+}
+
+fn is_slice_kind(t: Type&) : bool {
+    return t && t.kind == Type::T_struct && t.T_struct.kind == StructlikeKind::SL_slice;
 }
 
 fn is_union_kind(t: Type&) : bool {
@@ -339,12 +341,12 @@ fn is_castable_to(cache: TypeCache&, to: Type&, from: Type&, ) {
         else if (is_boolean_kind(to))
             from.kind == Type::T_integer |== Type::T_boolean |== Type::T_reference
         else
-            types_equal(to, get_slice_type(cache, cache.builtin_u8)) && (is_record_kind(from) || is_struct_kind(from) || is_union_kind(from))
+            to <==> get_slice_type(cache, cache.builtin_u8) && (is_record_kind(from))
 }
 
 
 fn get_member_offset(_struct: Type&, index) {
-    ASSERT(_struct.kind == Type::T_struct |== Type::T_record,
+    ASSERT(_struct.kind == Type::T_struct,
         "get_member_offset() called on something that is not a struct or record.\n")
     ASSERT(index < _struct.T_struct.num_members, "Index out of range.\n");
 
@@ -362,10 +364,10 @@ fn get_member_type_and_offset_by_name(cache: TypeCache&, t: Type&, member_name: 
     ASSERT(!sv_equal(member_name, "_"), "get_member_type_and_offset() called on '_'.\n" )
 
     if (is_reference_kind(t)) t => dereferenced_type(t);
-    ASSERT(t.kind == Type::T_struct |== Type::T_record |== Type::T_union,
+    ASSERT(t.kind == Type::T_struct |== Type::T_union,
         "get_member_type_and_offset() called on something that is not a struct or a struct reference.\n")
 
-    if (t.kind == Type::T_struct |== Type::T_record) {
+    if (t.kind == Type::T_struct) {
         let offset = 0;
         for (let i = 0; i < t.T_struct.num_members; i++) {
             let member => &t.T_struct.members[i];
@@ -397,7 +399,7 @@ fn get_member_type_and_offset_by_name(cache: TypeCache&, t: Type&, member_name: 
                         return mt;
                     }
                 }
-                else NOT_IMPLEMENTED(__LOCATION__, "Unnanmed things in unionsexcept structs\n")
+                else NOT_IMPLEMENTED(__LOCATION__, "Unnanmed things in unions except structs\n")
 
                 offset = offset + member.type.storage_size;
             }
@@ -438,7 +440,7 @@ fn get_union_member_value (t: Type&, member_name: u8[], enum_value: i64&) : bool
 }
 
 fn calculate_storage_size(container: Type&) : void {
-    if (is_struct_kind(container)) {
+    if (is_struct_kind(container) || is_slice_kind(container)) {
         let offset = 0;
         for (let i = 0; i < container.T_struct.num_members; i++) {
             let member => container.T_struct.members[i];
@@ -506,7 +508,7 @@ fn make_ref_type_for(cache: TypeCache&, t: Type&) : Type& {
 }
 
 fn check_ref_type_matches(ref: Type&, target_type: Type&, _: any&) {
-    return types_equal(ref.T_reference.target_type, target_type)
+    return ref.T_reference.target_type <==> target_type;
 }
 
 fn get_ref_type_for(cache: TypeCache&, t: Type&) {
@@ -526,7 +528,7 @@ fn make_enumerator_type_for(cache: TypeCache&, t: Type&) {
 }
 
 fn check_enumerator_type_matches(enumerator: Type&, target_type: Type&, _: any&) {
-    return types_equal(enumerator.T_enumerator.target_type, target_type)
+    return enumerator.T_enumerator.target_type <==> target_type;
 }
 
 fn get_enumerator_type_for(cache: TypeCache&, t: Type&) : Type& {
@@ -588,7 +590,7 @@ fn make_slice_type(cache: TypeCache&, element_type: Type&) : Type& {
 }
 
 fn check_is_slice_of_type(slice: Type&, ref_type: Type&, _: any&) {
-    return types_equal(slice.T_struct.members[0].type, ref_type)
+    return slice.T_struct.members[0].type <==> ref_type;
 }
 
 fn get_slice_type(cache: TypeCache&, element_type: Type&) : Type& {
@@ -600,29 +602,20 @@ fn get_slice_type(cache: TypeCache&, element_type: Type&) : Type& {
     return slice;
 }
 
-fn check_types_equal(t1: Type&, t2: Type&, _: any&) {
-    return types_equal(t1, t2)
-}
-
-fn is_slice_type(cache: TypeCache&, t: Type&) : bool {
-    let ref => find_type_in_array(cache.slice_types, check_types_equal, t, null);
-    return ref; // as bool
-}
-
-fn get_slice_element_type(cache: TypeCache&, t: Type&) : Type& {
-    ASSERT(is_slice_type(cache, t), "Tried to get slice element type for non slice type.\n");
+fn get_slice_element_type(t: Type&) : Type& {
+    ASSERT(is_slice_kind(t), "Tried to get slice element type for non slice type.\n");
     return dereferenced_type(t.T_struct.members[0].type);
 }
 
 fn check_fn_args_equal(a: Type&[], b: Type&[]) : bool {
     if (a.len != b.len) return false;
     for (let i = 0; i < a.len; i++)
-        if (!types_equal(a[i], b[i])) return false;
+        if (a[i] <!=> b[i]) return false;
     return true;
 }
 
 fn check_fn_type_matches(fn_type: Type&, ret_type: Type&, arg_types: Type&[]&) {
-    return types_equal(fn_type.T_function.return_type, ret_type)
+    return fn_type.T_function.return_type <==> ret_type
         && check_fn_args_equal(fn_type.T_function.argument_types, arg_types)
 }
 
