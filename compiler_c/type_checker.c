@@ -417,7 +417,7 @@ typedef struct {
     AST_node *program;
 } PropagationVisitorData;
 
-void type_check_function_call(AST_node *n_call, PropagationVisitorData *) {
+void type_check_function_call(AST_node *n_call) {
     char buf[1024];
     Type *fn_type = n_call->call.target->type;
     if (is_reference_kind(fn_type)) fn_type = dereferenced_type(fn_type);
@@ -715,7 +715,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
             break;
 
         case AST_call:
-            type_check_function_call(n, prop);
+            type_check_function_call(n);
             n->addressable = false;
             break;
 

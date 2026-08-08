@@ -265,6 +265,10 @@ fn is_signed_integer(t: Type&) : bool {
     return t && t.kind == Type::T_integer && t.T_integer.signed;
 }
 
+fn is_unsigned_integer(t: Type&) : bool {
+    return t && t.kind == Type::T_integer && !t.T_integer.signed;
+}
+
 fn is_array_kind(t: Type&) : bool {
     return t && t.kind == Type::T_array;
 }

@@ -88,3 +88,9 @@ generic T fn EndlosArr_push_ref(arr: EndlosArr<T>&, ref: T) : void {
     *arr.alloc++ => ref;
     arr.arr.len++;
 }
+
+generic T fn EndlosArr_push(arr: EndlosArr<T>&) : T& {
+    let ret => arr.alloc++;
+    arr.arr.len++;
+    return ret;
+}

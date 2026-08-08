@@ -39,6 +39,8 @@ enum TokenKind {
     TOK_bind_ref,
     TOK_equal,
     TOK_unequal,
+    TOK_reference_target_equal,
+    TOK_reference_target_unequal,
     TOK_or_equal_to,
     TOK_and_not_equal_to,
     TOK_greater,

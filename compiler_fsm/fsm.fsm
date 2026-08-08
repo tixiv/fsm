@@ -4,6 +4,7 @@ import * from "parser";
 import * from "resolver";
 import * from "il_gen";
 import * from "type_checker";
+import * from "il_gen";
 
 fn main (argv: u8&[]) {
     let endlos: EndlosAllocator;
@@ -51,6 +52,15 @@ fn main (argv: u8&[]) {
 
     ast_dump_tree(root);
 
-    //run_il_gen(root);
+    let il_gen: IL_gen;
+    il_gen_init(il_gen, endlos, type_cache, resolver.global_symbols);
+
+    $"Going to run il gen...\n"
+    il_gen_run(il_gen, root);
+    $"il gen finished\n"
+
+    let opcodes = EndlosArr_finalize~Opcode(il_gen.opcodes, endlos);
+
+    dump_opcodes(opcodes);
 
 }

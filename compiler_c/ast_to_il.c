@@ -399,14 +399,14 @@ static void gen_plus_plus(AST_node *n, IL_gen *gen, bool result_used) {
 static void gen_for(AST_node *n, IL_gen *gen, bool result_used) {
     int while_num = num_whiles++;
     il_gen_visitor(n->_for.initializer, gen);
-    push_opcode(OP_while_loop, 0, while_num, nullptr, n->location);
+    push_opcode(OP_while_loop, nullptr, while_num, nullptr, n->location);
     if (n->_for.condition) {
         gen_value_visitor(n->_for.condition, gen);
-        push_opcode(OP_while_check, 0, while_num, nullptr, n->location);
+        push_opcode(OP_while_check, nullptr, while_num, nullptr, n->location);
     }
     il_gen_visitor(n->_for.body, gen);
     il_gen_visitor(n->_for.post_action, gen);
-    push_opcode(OP_while_end, 0, while_num, nullptr, n->location);
+    push_opcode(OP_while_end, nullptr, while_num, nullptr, n->location);
     if (result_used) gen_value_visitor(n->_for.result, gen);
     else il_gen_visitor(n->_for.result, gen);;
 }
@@ -523,7 +523,7 @@ static void gen_builder_string (AST_node *n, IL_gen *gen) {
         else if (is_struct_kind(arg->type) || is_record_kind(arg->type)){
             gen_builder_string_put_struct(s_sb, arg, gen);
         }
-        else NOT_IMPLEMENTED("Generating IL for type %s in builder string is not implemented yet.\n", get_type_name_r(buf, arg->type));
+        else NOT_IMPLEMENTED(" %s:%d Generating IL for type %s in builder string is not implemented yet.\n", n->location->filename, n->location->line, get_type_name_r(buf, arg->type));
     }
 
     push_opcode(OP_push_local_var_address, nullptr, s_sb->offset, nullptr, n->location);
@@ -711,11 +711,11 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
 
         case AST_while: {
             int while_num = num_whiles++;
-            push_opcode(OP_while_loop, 0, while_num, nullptr, n->location);
+            push_opcode(OP_while_loop, nullptr, while_num, nullptr, n->location);
             gen_value_visitor(n->_while.condition, gen);
-            push_opcode(OP_while_check, 0, while_num, nullptr, n->location);
+            push_opcode(OP_while_check, nullptr, while_num, nullptr, n->location);
             il_gen_visitor(n->_while.body, gen);
-            push_opcode(OP_while_end, 0, while_num, nullptr, n->location);
+            push_opcode(OP_while_end, nullptr, while_num, nullptr, n->location);
             break;
         }
 

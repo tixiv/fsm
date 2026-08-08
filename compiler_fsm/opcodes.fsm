@@ -1,7 +1,8 @@
 
-import * from "type"
+import * from "tokenizer";
+import * from "type";
 
-enum Op_Kind {
+enum OpKind {
     OP_begin_fn,
     OP_return,
     OP_add,
@@ -58,19 +59,21 @@ enum Op_Kind {
 
 
 struct Opcode {
-    kind: Op_Kind;
+    kind: OpKind;
     string_value: u8[];
     type: Type&;
-    u64_values: u64[2];
+    i64_value: u64[2];
+    location: Location&;
 }
 
 fn dump_opcodes(opcodes: Opcode[]) {
+    let buf: u8[1024];
     for (let i = 0; i < opcodes.len; i++) {
         let op => opcodes[i];
         if (op.string_value.begin) {
-            $"[{op.kind}, \"{op.string_value}\", {op.u64_value[0]}, {op.u64_value[1]}, {get_type_name_r(buf, op.type)}]\n";
+            $"[{op.kind.name}, \"{op.string_value}\", {op.i64_value[0]}, {op.i64_value[1]}, {get_type_name_r(buf, op.type)}]\n";
         } else {
-            $"[{op.kind}, {op.u64_value[0]}, {op.u64_value[1]}, {get_type_name_r(buf, op.type)}]\n";
+            $"[{op.kind.name}, {op.i64_value[0]}, {op.i64_value[1]}, {get_type_name_r(buf, op.type)}]\n";
         }
     }
 }
