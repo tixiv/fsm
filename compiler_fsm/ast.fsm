@@ -26,7 +26,6 @@ union AST_node enum kind {
 
     struct AST_variadic_operator {
         left: AST_node&;
-        num_members;
         members: VariadicOperatorMember[];
     }
 
@@ -447,7 +446,7 @@ fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
     }
     else if (n.kind == AST_node::AST_variadic_operator) {
         visit_non_null(n.AST_variadic_operator.left, visit, arg);
-        for (let i = 0; i < n.AST_variadic_operator.num_members; i++) {
+        for (let i = 0; i < n.AST_variadic_operator.members.len; i++) {
             visit_non_null(n.AST_variadic_operator.members[i].right, visit, arg);
         }
     }

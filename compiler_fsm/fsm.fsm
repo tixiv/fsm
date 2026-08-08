@@ -5,8 +5,7 @@ import * from "resolver";
 import * from "il_gen";
 import * from "type_checker";
 
-
-fn main () {
+fn main (argv: u8&[]) {
     let endlos: EndlosAllocator;
     endlos_init(endlos);
 
@@ -14,6 +13,8 @@ fn main () {
 
     let module: Module;
     module.filename = "foo.fsm";
+
+    if (argv.len > 1) module.filename = sv_of_c_string(argv[1])
 
     tokenizer.code = read_file (module.filename);
     tokenizer.location.module => module;
@@ -31,7 +32,7 @@ fn main () {
     let ast_allocator: AST_Node_Allocator;
     AST_Node_Allocator_init(ast_allocator);
 
-    let root => parse_program(tokens, ast_allocator)
+    let root => parse_program(tokens, ast_allocator, endlos)
 
     let resolver: Resolver;
     resolver_init(resolver, endlos, type_cache);

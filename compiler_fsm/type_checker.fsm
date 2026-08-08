@@ -343,7 +343,7 @@ fn type_check_variadic_operator (type_checker: TypeChecker&, n: AST_node&){
             |== TokenKind::TOK_greater_equal
             |== TokenKind::TOK_lower_equal)
     {
-        for (let i = 0; i < n.AST_variadic_operator.num_members; i++) {
+        for (let i = 0; i < n.AST_variadic_operator.members.len; i++) {
             try_convert_to_type_if_necessary(type_checker, n.AST_variadic_operator.left, type_checker.type_cache.builtin_i64, "Argument of variadic operator");
             try_convert_to_type_if_necessary(type_checker, n.AST_variadic_operator.members[i].right, type_checker.type_cache.builtin_i64, "Argument of variadic operator");                
         }
@@ -360,7 +360,7 @@ fn type_check_variadic_operator (type_checker: TypeChecker&, n: AST_node&){
         let all_same_type = true;
         let all_integer = is_integer_kind(left_type);
 
-        for (let i = 0; i < n.AST_variadic_operator.num_members; i++) {
+        for (let i = 0; i < n.AST_variadic_operator.members.len; i++) {
             auto_dereference(type_checker, n.AST_variadic_operator.members[i].right);
             if (left_type <!=> n.AST_variadic_operator.members[i].right.type) all_same_type = false;
             if (!is_integer_kind(n.AST_variadic_operator.members[i].right.type)) all_integer = false;

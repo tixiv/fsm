@@ -5,6 +5,7 @@ struct Parser {
     tokens: Token[];
     CT: Token&;
     allocator: AST_Node_Allocator&;
+    endlos: EndlosAllocator&;
 }
 
 fn parser_error(parser: Parser&, s: u8[]) {
@@ -262,27 +263,23 @@ fn parse_call_arguments(parser: Parser&) : AST_node& {
     return first;
 }
 
-/*
-
-fn AST_node& parse_postfix_operators(AST_node& n) {
+fn parse_postfix_operators(parser: Parser&, n: AST_node&) : AST_node& {
     if (parser.CT.kind == TokenKind::TOK_plus_plus) {
-        let  plus_plus => ast_alloc(parser.allocator, AST_node::AST_plus_plus, parser.CT.location);
-        plus_plus.plus_plus.body => n;
-        plus_plus.plus_plus.postfix = true;
+        let plus_plus => ast_alloc(parser.allocator, AST_node::AST_plus_plus, parser.CT.location);
+        plus_plus.AST_plus_plus.body => n;
+        plus_plus.AST_plus_plus.postfix = true;
         MOVE_NEXT(parser);
         return plus_plus;
     }
     else if (parser.CT.kind == TokenKind::TOK_minus_minus) {
-        let  minus_minus => ast_alloc(parser.allocator, AST_node::AST_minus_minus, parser.CT.location);
-        minus_minus.minus_minus.body => n;
-        minus_minus.minus_minus.postfix = true;
+        let minus_minus => ast_alloc(parser.allocator, AST_node::AST_minus_minus, parser.CT.location);
+        minus_minus.AST_minus_minus.body => n;
+        minus_minus.AST_minus_minus.postfix = true;
         MOVE_NEXT(parser);
         return minus_minus;
     }
     return n;
 }
-
-*/
 
 fn parse_primary(parser: Parser&) : AST_node&
 {
@@ -412,7 +409,7 @@ fn parse_primary(parser: Parser&) : AST_node&
         parser_error(parser, $"Expected expression but got {parser.CT.kind.name}");
     }
 
-    // n => parse_postfix_operators(n);
+    n => parse_postfix_operators(parser, n);
     return n;
 }
 
@@ -450,30 +447,26 @@ fn parse_binary_operators(parser: Parser&, prio) : AST_node& {
             if (parser.CT.kind == TokenKind::TOK_and_not_equal_to) parser_error(parser, "Operator '&!=' requires initial '!='.");
         }
 
-        /*
-        if (last && is_chainable(last.binary.token_kind, parser.CT.kind)) {
-            Dyn_array members;
-            #define MEMBERS ((VariadicOperatorMember*)members.data)
-            dyn_array_init(&members, sizeof(VariadicOperatorMember), 16);
-            VariadicOperatorMember *member = dyn_array_push(&members);
-            member.token_kind = last.binary.token_kind;
-            member.right = last.binary.right;
-            last.kind = AST_variadic_operator;
+        if (last && is_chainable(last.AST_binary.token_kind, parser.CT.kind)) {
+            let members = endlos_begin~VariadicOperatorMember(parser.endlos);
+
+            let member => members++;
+            member.token_kind = last.AST_binary.token_kind;
+            member.right => last.AST_binary.right;
+            last.kind = AST_node::AST_variadic_operator;
             
-            while (is_chainable(MEMBERS[members.count-1].token_kind, parser.CT.kind)) {
-                member = dyn_array_push(&members);
+            while (is_chainable(member.token_kind, parser.CT.kind)) {
+                member => members++;
                 member.token_kind = parser.CT.kind;
                 MOVE_NEXT(parser);
                 member.right => parse_binary_operators(parser, prio + 1);
             }
 
-            last.variadic_operator.members = members.data;
-            last.variadic_operator.num_members = members.count;
+            last.AST_variadic_operator.members = endlos_ripp_off~VariadicOperatorMember(parser.endlos, members);
             left => last;
             last => null;
         }
         else
-        */
         {
             let n => ast_alloc(parser.allocator, AST_node::AST_binary, parser.CT.location);
             n.AST_binary.left => left;
@@ -875,11 +868,12 @@ fn AST_node& parse_enum(parser: Parser&) {
 
 */
 
-fn parse_program(tokens: Token[], allocator: AST_Node_Allocator&) : AST_node& {
+fn parse_program(tokens: Token[], allocator: AST_Node_Allocator&, endlos: EndlosAllocator&) : AST_node& {
     let parser: Parser;
     parser.tokens = tokens;
     parser.CT => tokens.begin;
     parser.allocator => allocator;
+    parser.endlos => endlos;
 
     let root => ast_alloc(parser.allocator, AST_node::AST_program, parser.CT.location);
 
