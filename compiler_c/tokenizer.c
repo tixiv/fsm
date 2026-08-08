@@ -91,7 +91,7 @@ void read_char_constant(SV *str, SV *input, Location *location) {
     str->begin = input->begin;
     str->len = 0;
     while(input->len) {
-        if (sv_starts_with(input, "\\'")) {
+        if (sv_starts_with(input, "\\")) {
             sv_pop(input);
             str->len++;
         }

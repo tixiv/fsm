@@ -4,7 +4,9 @@ import * from "parser";
 import * from "resolver";
 import * from "il_gen";
 import * from "type_checker";
+import * from "calculate_stacks";
 import * from "il_gen";
+import * from "generator";
 
 fn main (argv: u8&[]) {
     let endlos: EndlosAllocator;
@@ -52,6 +54,8 @@ fn main (argv: u8&[]) {
 
     ast_dump_tree(root);
 
+    calculate_stacks(root, endlos);
+
     let il_gen: IL_gen;
     il_gen_init(il_gen, endlos, type_cache, resolver.global_symbols);
 
@@ -62,5 +66,7 @@ fn main (argv: u8&[]) {
     let opcodes = EndlosArr_finalize~Opcode(il_gen.opcodes, endlos);
 
     dump_opcodes(opcodes);
+
+    output_asm("out1.asm", opcodes);
 
 }

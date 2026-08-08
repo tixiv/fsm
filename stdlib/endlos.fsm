@@ -80,7 +80,7 @@ generic T fn EndlosArr_finalize(arr: EndlosArr<T>&, allocator: EndlosAllocator&)
 generic T fn EndlosArr_free(arr: EndlosArr<T>&, allocator: EndlosAllocator&) : void {
     let a: T[];
     a.begin => arr.arr.begin;
-    a.len = arr.arr.len + arr.arr.alloc.len;
+    a.len = arr.arr.len + arr.alloc.len;
     endlos_ripp_off~T(allocator, a);
 }
 

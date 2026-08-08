@@ -25,6 +25,7 @@ union Type enum kind {
     struct {
         name: u8[];
         storage_size;
+        speciation: Type&;
     }
 
     struct T_void {}
@@ -241,6 +242,10 @@ fn get_type_name_r_impl(print_buf: u8[1024]&, type: Type&, encoded: bool) : u8[]
     else {
         NOT_IMPLEMENTED(__LOCATION__, $"Dumping type kind {type.kind.name} is not implemented yet.\n");
     }
+
+    if (type.speciation)
+        sb_puts(sb, $"<{get_type_name_r_impl(child_print_buf, type.speciation, encoded)}>");
+
 
     return sb.str;
 }
@@ -481,21 +486,17 @@ fn calculate_storage_size(container: Type&) : void {
     else NOT_IMPLEMENTED(__LOCATION__, $"calculate_storage_size() for {container.kind.name}");
 }
 
-/*
-
-size_t get_function_arguments_size(t: Type&) {
-    if (is_reference_kind(t)) t = dereferenced_type(t);
+fn get_function_arguments_size(t: Type&) {
+    if (is_reference_kind(t)) t => dereferenced_type(t);
     ASSERT(t.kind == Type::T_function,"get_function_arguments_size() called on something that is not a function.\n")
     let size = 0;
-    for (let i = 0; i < t.T_function.num_arguments; i++) {
-        let arg = t.T_function.argument_types[i];
-        size += arg.storage_size;
-        if (size % 8) size += 8 - (size % 8);
+    for (let i = 0; i < t.T_function.argument_types.len; i++) {
+        let arg => t.T_function.argument_types[i];
+        size = size + arg.storage_size;
+        if (size % 8) size = size + 8 - (size % 8);
     }
     return size;
 }
-
-*/
 
 fn find_type_in_array(arr: TypeRefArr&, predicate: fn (Type&, any&, any&) : bool, arg1: any&, arg2: any&) : Type& {
     for (let i = 0; i < arr.arr.len; i++)
@@ -545,7 +546,7 @@ fn get_enumerator_type_for(cache: TypeCache&, t: Type&) : Type& {
 }
 
 /*
-fn make_array_type(cache: TypeCache&, Type *element_type, size_t n_elements) {
+fn make_array_type(cache: TypeCache&, Type *element_type, n_elements) {
     let array_t => type_alloc(cache, Type::T_array);
     array_t._array.element_type = element_type;
     array_t._array.n_elements = n_elements;
@@ -555,7 +556,7 @@ fn make_array_type(cache: TypeCache&, Type *element_type, size_t n_elements) {
 
 
 
-fn get_array_type(cache: TypeCache&, Type *element_type, size_t n_elements) {
+fn get_array_type(cache: TypeCache&, Type *element_type, n_elements) {
     if (array_types.capacity == 0)
         dyn_array_init(&array_types, sizeof(Type*), 16);
 
@@ -640,66 +641,60 @@ fn get_function_type(cache: TypeCache&, ret_type: Type&, arg_types: Type&[]) : T
     return new_fun;
 }
 
-/*
-
-size_t get_stack_offset_for(t: Type&) {
+fn get_stack_offset_for(t: Type&) {
     ASSERT(t, "get_stack_offset_for() called with nullptr.\n");
-    int size = t.storage_size;
-
-    //char buf[1024];
-    //printf("%s: %s %d %d", __FUNCTION__, get_type_name_r(buf, t), size, ((size + 7) / 8) * 8);
+    let size = t.storage_size;
 
     return ((size + 7) / 8) * 8;
 }
 
-int64_t get_max_enum_value (t: Type&) {
-    int64_t max = -0x8000000000000000;
+fn get_max_enum_value (t: Type&) {
+    let max = -0x8000000000000000;
  
     if (is_enum_kind(t)) {
-        for (let i = 0; i < t._enum.num_members; i++) {
-            if (t._enum.members[i].value > max) max = t._enum.members[i].value;
+        for (let i = 0; i < t.T_enum.num_members; i++) {
+            if (t.T_enum.members[i].value > max) max = t.T_enum.members[i].value;
         }
     }
-    else if (is_enumerator_kind(t) && is_union_kind(t.enumerator.target_type)) {
-        let u = t.enumerator.target_type;
+    else if (is_enumerator_kind(t) && is_union_kind(t.T_enumerator.target_type)) {
+        let u => t.T_enumerator.target_type;
         for (let i = 0; i < u.T_union.num_members; i++) {
             if (u.T_union.members[i].value > max) max = u.T_union.members[i].value;
         }
-    } else NOT_IMPLEMENTED("get_max_enum_value")
+    } else NOT_IMPLEMENTED(__LOCATION__, "get_max_enum_value")
     return max;
 }
 
-int64_t get_min_enum_value (t: Type&) {
-    int64_t min = 0x7fffffffffffffff;
+fn get_min_enum_value (t: Type&) {
+    let min = 0x7fffffffffffffff;
 
     if (is_enum_kind(t)) {
-        for (let i = 0; i < t._enum.num_members; i++) {
-            if (t._enum.members[i].value < min) min = t._enum.members[i].value;
+        for (let i = 0; i < t.T_enum.num_members; i++) {
+            if (t.T_enum.members[i].value < min) min = t.T_enum.members[i].value;
         }
     }
-    else if (is_enumerator_kind(t) && is_union_kind(t.enumerator.target_type)) {
-        let u = t.enumerator.target_type;
+    else if (is_enumerator_kind(t) && is_union_kind(t.T_enumerator.target_type)) {
+        let u => t.T_enumerator.target_type;
         for (let i = 0; i < u.T_union.num_members; i++) {
             if (u.T_union.members[i].value < min) min = u.T_union.members[i].value;
         }
-    } else NOT_IMPLEMENTED("get_min_enum_value")
+    } else NOT_IMPLEMENTED(__LOCATION__, "get_min_enum_value")
 
     return min;
 }
 
-SV *get_enum_member_name_by_value(t: Type&, int64_t value) {
+fn get_enum_member_name_by_value(t: Type&, int64_t value) : u8[]& {
     if (is_enum_kind(t)) {
-        for (let i = 0; i < t._enum.num_members; i++) {
-            if (t._enum.members[i].value == value) return &t._enum.members[i].name;
+        for (let i = 0; i < t.T_enum.num_members; i++) {
+            if (t.T_enum.members[i].value == value) return &t.T_enum.members[i].name;
         }
     }
-    else if (is_enumerator_kind(t) && is_union_kind(t.enumerator.target_type)) {
-        let u = t.enumerator.target_type;
+    else if (is_enumerator_kind(t) && is_union_kind(t.T_enumerator.target_type)) {
+        let u => t.T_enumerator.target_type;
         for (let i = 0; i < u.T_union.num_members; i++) {
             if (u.T_union.members[i].value == value) return &u.T_union.members[i].name;
         }
-    } else NOT_IMPLEMENTED("get_enum_member_name_by_value")
+    } else NOT_IMPLEMENTED(__LOCATION__, "get_enum_member_name_by_value")
 
-    return nullptr;
+    return null;
 }
-*/

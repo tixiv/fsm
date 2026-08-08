@@ -133,6 +133,9 @@ static const char *get_type_name_r_impl(char print_buf[1024], Type *type, bool e
             break;
     }
 
+    if (type->speciation)
+        sb_printf(&sb, "<%s>", get_type_name_r_impl(child_print_buf, type->speciation, encoded));
+
     return sb.buffer;
 }
 

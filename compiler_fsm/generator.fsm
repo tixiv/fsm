@@ -1,0 +1,665 @@
+
+import * from "std";
+import * from "tokenizer";
+import * from "type";
+import * from "opcodes";
+import * from "builtin_functions";
+
+fn unescaped_string_len(str: u8[]) : i64 {
+    let len = 0;
+    while (str.len) {
+        if (str.begin == '\\') str++;
+        str++
+        len++;
+    }
+    return len;
+}
+
+fn get_unescaped_char(c: u8) : u8 {
+    if (c == '\\') return '\\';
+    if (c == '{')  return '{';
+    if (c == '}')  return '}';
+    if (c == 'a')  return '\a';
+    if (c == 'b')  return '\b';
+    if (c == 'e')  return '\e';
+    if (c == 'n')  return '\n';
+    if (c == 'r')  return '\r';
+    if (c == 't')  return '\t';
+    if (c == '"')  return '"';
+    if (c == '0')  return 0;
+    if (c == '\'') return '\'';
+    
+    let s:u8[1]; s[0] = c;
+    NOT_IMPLEMENTED(__LOCATION__, $"Generating assembly for the escape sequence '\\{s}' = {c}");
+    return 0;
+}
+
+fn get_char_constant(str: u8[]) {
+    let c: u8;
+    if (str.len && str.begin == '\\') {
+        str++;
+        c = get_unescaped_char(str++);
+    } 
+    else {
+        c = str++;
+    }
+
+    return c;
+}
+
+fn make_movx(buf: u8[32]&, reg: u8[], size, _sigend: bool) :u8[] {
+    let sz = if(_sigend) "s" else "z";
+
+    let sb: StringBuilder;
+    sb_init(sb, buf);
+
+    if (size == 8) { sb_puts(sb, $"mov {reg}, "); }
+    else if (size == 4) {
+        if (_sigend) {
+            sb_puts(sb, $"movsxd {reg}, DWORD ");
+        }
+        else {
+            reg++;
+            sb_puts(sb, $"mov e{reg}, "); // moving to eRx zero extends into rRx automatically
+        }
+    }
+    else if (size == 2) { sb_puts(sb, $"mov{sz}x {reg}, WORD "); }
+    else if (size == 1) { sb_puts(sb, $"mov{sz}x {reg}, BYTE "); }
+    else NOT_IMPLEMENTED(__LOCATION__, $"make_movx for size {size}");
+
+    return sb.str;
+}
+
+fn output_asm(asm_file_name: u8[], opcodes: Opcode[]) {
+    let O_WRONLY = 1;
+    let O_CREAT = 64;
+    let O_TRUNC = 512;
+    let file = open(asm_file_name, O_WRONLY + O_CREAT + O_TRUNC);
+    if (file < 0) {
+        write(2, $"Failed to open '{asm_file_name}' for writing: {strerror(file)}\n")
+        exit(1);
+    }
+
+    // The print function and some other assembly snippets are copied
+    // from the Porth compiler https://gitlab.com/tsoding/porth which
+    // was also the main inspiration for me to start this project.
+
+    write(file, get_builtin_functions_asm());
+    
+    let buf: u8[32];
+
+    for (let i = 0; i < opcodes.len; i++) {
+        let op => opcodes[i];
+        let size = 0;
+        if (op.kind == OpKind::OP_call || op.kind == OpKind::OP_icall) {
+            size = get_function_arguments_size(op.type);
+        }
+        else if (op.type) {
+            size = op.type.storage_size;
+        }
+
+        if (op.location.module)
+            write(file,$"; ------- {op.location.module.filename}:{op.location.line} {op.kind.name} ---------\n")
+        else
+            write(file,$"; ------- {op.kind.name} ---------\n")
+
+        if (op.kind == OpKind::OP_begin_fn) {
+            let local_vars_size = op.i64_value[0];
+            write(file, $"fn_{op.string_value}:\n");
+            write(file,  "    push rbp\n");
+            write(file,  "    mov rbp, rsp\n");
+            if (local_vars_size) {
+                ASSERT(local_vars_size % 8 == 0, $"{__LOCATION__} Can't work with local var sizes not divisible by 8.\n");
+                write(file, $"    sub rsp, {local_vars_size}\n");
+                write(file, $"    mov rcx, {local_vars_size / 8}\n");
+                write(file, $"    lea rdi, [rbp - {local_vars_size}]\n");
+                write(file, "    xor rax, rax\n");
+                write(file, "    rep stosq\n");
+            }
+        }
+        else if (op.kind == OpKind::OP_return) {
+            if      (size == 0) {}
+            else if (size <= 8) write(file, "    pop rax\n")
+            else if (size <= 16) {
+                write(file, "    pop rax\n");
+                write(file, "    pop rdx\n");
+            } else NOT_IMPLEMENTED(__LOCATION__, $"Generating OP_return with storage size {size}")
+            write(file, "    mov rsp, rbp\n");
+            write(file, "    pop rbp\n");
+            write(file, "    ret\n");
+        }
+        else if (op.kind == OpKind::OP_add) {
+            write(file, "    pop rax\n");
+            write(file, "    add [rsp], rax\n");
+        }
+        else if (op.kind == OpKind::OP_sub) {
+            write(file, "    pop rax\n");
+            write(file, "    sub [rsp], rax\n");
+        }
+        else if (op.kind == OpKind::OP_mul) {
+            write(file, "    pop rax\n");
+            write(file, "    mul QWORD [rsp]\n");
+            write(file, "    mov [rsp], rax\n");
+        }
+        else if (op.kind == OpKind::OP_div) {
+            write(file, "    pop rbx\n");
+            write(file, "    pop rax\n");
+            write(file, "    cqo\n");
+            write(file, "    idiv rbx\n");
+            write(file, "    push rax\n");
+        }
+        else if (op.kind == OpKind::OP_mod) {
+            write(file, "    pop rbx\n");
+            write(file, "    pop rax\n");
+            write(file, "    cqo\n");
+            write(file, "    idiv rbx\n");
+            write(file, "    push rdx\n");
+        }
+        else if (op.kind == OpKind::OP_ipow) {
+            write(file, "rept 1 {\n");
+            write(file, "local loop\n");
+            write(file, "local skip_mul\n");
+            write(file, "local done\n");
+            write(file, "    pop rsi\n");
+            write(file, "    pop rdi\n");
+            write(file, "    mov rax, 1\n");
+            write(file, "    test rsi, rsi\n");
+            write(file, "    jz done\n");
+            write(file, "loop:\n");
+            write(file, "    test rsi, 1\n");
+            write(file, "    jz skip_mul\n");
+            write(file, "    imul rax, rdi\n");
+            write(file, "skip_mul:\n");
+            write(file, "    imul rdi, rdi\n");
+            write(file, "    shr rsi, 1\n");
+            write(file, "    jnz loop\n");
+            write(file, "done:\n");
+            write(file, "    push rax\n");
+            write(file, "}\n");
+        }
+        else if (op.kind == OpKind::OP_to_bool) {
+            write(file, "    mov rcx, 0\n");
+            write(file, "    mov rdx, 1\n");
+            write(file, "    pop rax\n");
+            write(file, "    or rax, rax\n");
+            write(file, "    cmovnz rcx, rdx\n");
+            write(file, "    push rcx\n");
+        }
+        else if (op.kind == OpKind::OP_not) {
+            write(file, "    xor QWORD [rsp], 1\n");
+        }
+        else if (op.kind == OpKind::OP_neg) {
+            write(file, "    neg QWORD [rsp]\n");
+        }
+        else if (op.kind == OpKind::OP_equal) {
+            write(file, "    mov rcx, 0\n");
+            write(file, "    mov rdx, 1\n");
+            write(file, "    pop rax\n");
+            write(file, "    pop rbx\n");
+            write(file, "    cmp rax, rbx\n");
+            write(file, "    cmove rcx, rdx\n");
+            if (op.i64_value[0]) write(file, "    push rbx\n"); // chaining value: left operand
+            write(file, "    push rcx\n");
+        }
+        else if (op.kind == OpKind::OP_unequal) {
+            write(file, "    mov rcx, 1\n");
+            write(file, "    mov rdx, 0\n");
+            write(file, "    pop rax\n");
+            write(file, "    pop rbx\n");
+            write(file, "    cmp rax, rbx\n");
+            write(file, "    cmove rcx, rdx\n");
+            if (op.i64_value[0]) write(file, "    push rbx\n"); // chaining value: left operand
+            write(file, "    push rcx\n");
+        }
+        else if (op.kind == OpKind::OP_compare_GT) {
+            write(file, "    mov rcx, 0\n");
+            write(file, "    mov rdx, 1\n");
+            write(file, "    pop rbx\n");
+            write(file, "    pop rax\n");
+            write(file, "    cmp rax, rbx\n");
+            write(file, "    cmovg rcx, rdx\n");
+            if (op.i64_value[0]) write(file, "    push rbx\n"); // chaining value: right operand
+            write(file, "    push rcx\n");
+        }
+        else if (op.kind == OpKind::OP_compare_LT) {
+            write(file, "    mov rcx, 0\n");
+            write(file, "    mov rdx, 1\n");
+            write(file, "    pop rbx\n");
+            write(file, "    pop rax\n");
+            write(file, "    cmp rax, rbx\n");
+            write(file, "    cmovl rcx, rdx\n");
+            if (op.i64_value[0]) write(file, "    push rbx\n"); // chaining value: right operand
+            write(file, "    push rcx\n");
+        }
+        else if (op.kind == OpKind::OP_compare_GE) {
+            write(file, "    mov rcx, 0\n");
+            write(file, "    mov rdx, 1\n");
+            write(file, "    pop rbx\n");
+            write(file, "    pop rax\n");
+            write(file, "    cmp rax, rbx\n");
+            write(file, "    cmovge rcx, rdx\n");
+            if (op.i64_value[0]) write(file, "    push rbx\n"); // chaining value: right operand
+            write(file, "    push rcx\n");
+        }
+        else if (op.kind == OpKind::OP_compare_LE) {
+            write(file, "    mov rcx, 0\n");
+            write(file, "    mov rdx, 1\n");
+            write(file, "    pop rbx\n");
+            write(file, "    pop rax\n");
+            write(file, "    cmp rax, rbx\n");
+            write(file, "    cmovle rcx, rdx\n");
+            if (op.i64_value[0]) write(file, "    push rbx\n"); // chaining value: right operand
+            write(file, "    push rcx\n");
+        }
+        else if (op.kind == OpKind::OP_push_literal) {
+            write(file, $"    mov rax, {if (op.string_value.begin) parse_integer(op.string_value) else op.i64_value[0]}\n");
+            write(file, "    push rax\n");
+        }
+        else if (op.kind == OpKind::OP_push_string_literal) {
+            write(file, $"    mov rax, {unescaped_string_len(op.string_value)}\n");
+            write(file, "    push rax\n");
+            write(file, $"    mov rax, string_literal_{ op.i64_value[0]}\n");
+            write(file, "    push rax\n");
+        }
+        else if (op.kind == OpKind::OP_push_char_literal) {
+            write(file, $"    mov rax, {get_char_constant(op.string_value)}\n");
+            write(file, "    push rax\n");
+        }
+        else if (op.kind == OpKind::OP_call) {
+            write(file, $"    call fn_{op.string_value}\n");
+            if (size) write(file, $"    add rsp, {size}\n");
+        }
+        else if (op.kind == OpKind::OP_icall) {
+            write(file, "    pop rax\n");
+            write(file, "    call rax\n");
+            if (size) write(file, $"    add rsp, {size}\n");
+        }
+        else if (op.kind == OpKind::OP_push_result) {
+            if      (size == 0) {}
+            else if (size <= 8) write(file, "    push rax\n")
+            else if (size <= 16) {
+                write(file, "    push rdx\n");
+                write(file, "    push rax\n");
+            } else NOT_IMPLEMENTED(__LOCATION__, $"Generating OP_push_result with storage size {size}")
+        }
+        else if (op.kind == OpKind::OP_push_arg) {
+            if (size <= 8) {
+                write(file, $"    {make_movx(buf, "rax", size, is_signed_integer(op.type))} [rbp+{16 + op.i64_value[0]}]\n");
+                write(file, "    push rax\n");
+            }
+            else if (size <= 16) {
+                write(file, $"    mov rax, [rbp+{16 + 8 + op.i64_value[0]}]\n");
+                write(file, "    push rax\n");
+                write(file, $"    mov rax, [rbp+{16 + op.i64_value[0]}]\n");
+                write(file, "    push rax\n");
+            }
+            else NOT_IMPLEMENTED(__LOCATION__, $"OP_push_local_var for storage size {size}");
+        }
+        else if (op.kind == OpKind::OP_push_local_var) {
+            if (size <= 8) {
+                write(file, $"    {make_movx(buf, "rax", size, is_signed_integer(op.type))} [rbp-{op.i64_value[0]}]\n");
+                write(file, "    push rax\n");
+            }
+            else if (size <= 16) {
+                write(file, $"    mov rax, [rbp-{op.i64_value[0] - 8}]\n");
+                write(file, "    push rax\n");
+                write(file, $"    mov rax, [rbp-{op.i64_value[0]}]\n");
+                write(file, "    push rax\n");
+            }
+            else NOT_IMPLEMENTED(__LOCATION__, $"OP_push_local_var for storage size {size}");
+        }
+        else if (op.kind == OpKind::OP_push_arg_address) {
+            write(file, $"    lea rax, [rbp+{16 + op.i64_value[0]}]\n");
+            write(file, "    push rax\n");
+        }
+        else if (op.kind == OpKind::OP_push_local_var_address) {
+            write(file, $"    lea rax, [rbp-{op.i64_value[0]}]\n");
+            write(file, "    push rax\n");
+        }
+        else if (op.kind == OpKind::OP_push_global_address) {
+            write(file, $"    mov rax, fn_{op.string_value}\n");
+            write(file, "    push rax\n");
+        }
+        else if (op.kind == OpKind::OP_if) {
+            write(file, "    pop rax\n");
+            write(file, "    or rax, rax\n");
+            write(file, "    jne @f\n");
+            if (op.i64_value[1])
+                write(file, $"    jmp else_{op.i64_value[0]}\n")
+            else
+                write(file, $"    jmp end_if_{op.i64_value[0]}\n")
+            write(file,"@@:\n");
+        }
+        else if (op.kind == OpKind::OP_else) {
+            write(file, $"    jmp end_if_{op.i64_value[0]}\n");
+            write(file, $"else_{op.i64_value[0]}:\n");
+        }
+        else if (op.kind == OpKind::OP_end_if) {
+            write(file, $"end_if_{op.i64_value[0]}:\n");
+        }
+        else if (op.kind == OpKind::OP_while_loop) {
+            write(file, $"while_loop_{op.i64_value[0]}:\n");
+        }
+        else if (op.kind == OpKind::OP_while_check) {
+            write(file, "    pop rax\n");
+            write(file, "    or rax, rax\n");
+            write(file, "    jne @f\n");
+            write(file, $"    jmp end_while_{op.i64_value[0]}\n");
+            write(file,"@@:\n");
+        }
+        else if (op.kind == OpKind::OP_while_end) {
+            write(file, $"    jmp while_loop_{op.i64_value[0]}\n");
+            write(file, $"end_while_{op.i64_value[0]}:\n");
+        }
+        else if (op.kind == OpKind::OP_array_access) {
+            write(file, "    pop rax\n"); // index
+            if (size != 1) { // storage size 1: don't need to multiply with element size
+                write(file, $"    mov rbx, {size}\n");
+                write(file, "    mul QWORD rbx\n");
+            }
+            write(file, "    add [rsp], rax\n"); // add to pointer
+        }
+        else if (op.kind == OpKind::OP_member_access) {
+            write(file, $"    mov rax, {op.i64_value[0]}\n"); // offset
+            write(file, "    add [rsp], rax\n"); // add to pointer
+        }
+        else if (op.kind == OpKind::OP_load) {
+            write(file, "    pop rbx\n");
+            write(file, "    xor rax, rax\n");
+            if      (size == 1) write(file, "    mov  al, [rbx]\n")
+            else if (size == 2) write(file, "    mov  ax, [rbx]\n")
+            else if (size == 4) write(file, "    mov eax, [rbx]\n")
+            else if (size == 8) write(file, "    mov rax, [rbx]\n")
+            else if (size == 16) {
+                write(file, "    mov rcx, [rbx]\n");
+                write(file, "    mov rax, [rbx+8]\n");
+            }
+            else NOT_IMPLEMENTED(__LOCATION__, $"Generating asm for OP_load with storages size {size}");
+
+            write(file, "    push rax\n");
+            if (size == 16) write(file, "    push rcx\n");
+        }
+        else if (op.kind == OpKind::OP_store) {
+            if      (size == 16) write(file, "    pop rcx\n");
+            write(file, "    pop rax\n");
+            write(file, "    pop rbx\n");
+            if      (size == 1) write(file, "    mov [rbx],  al\n")
+            else if (size == 2) write(file, "    mov [rbx],  ax\n")
+            else if (size == 4) write(file, "    mov [rbx], eax\n")
+            else if (size == 8) write(file, "    mov [rbx], rax\n")
+            else if (size == 16) {
+                write(file, "    mov [rbx], rcx\n");
+                write(file, "    mov [rbx+8], rax\n");
+            }
+            else NOT_IMPLEMENTED(__LOCATION__, $"Generating asm for OP_store with storages size {size}");
+        }
+
+        else if (op.kind == OpKind::OP_integer_plus_plus) {
+            write(file, "    pop rbx\n");
+            if (op.i64_value[0] == 2) { // post increment: push value first
+                write(file, "    xor rax, rax\n");
+                if      (size == 1) write(file, "    mov  al, [rbx]\n")
+                else if (size == 2) write(file, "    mov  ax, [rbx]\n")
+                else if (size == 4) write(file, "    mov eax, [rbx]\n")
+                else if (size == 8) write(file, "    mov rax, [rbx]\n")
+                write(file, "    push rax\n");
+            }
+
+            if      (size == 1) write(file, "    inc BYTE [rbx]\n")
+            else if (size == 2) write(file, "    inc WORD [rbx]\n")
+            else if (size == 4) write(file, "    inc DWORD [rbx]\n")
+            else if (size == 8) write(file, "    inc QWORD [rbx]\n")
+            else NOT_IMPLEMENTED(__LOCATION__, $"Generating asm for OP_integer_plus_plus with storages size {size}");
+
+            if (op.i64_value[0] == 1) { // pre increment: push value after
+                                    write(file, "    xor rax, rax\n");
+                if      (size == 1) write(file, "    mov  al, [rbx]\n")
+                else if (size == 2) write(file, "    mov  ax, [rbx]\n")
+                else if (size == 4) write(file, "    mov eax, [rbx]\n")
+                else if (size == 8) write(file, "    mov rax, [rbx]\n")
+                write(file, "    push rax\n");
+            }
+        }
+        else if (op.kind == OpKind::OP_integer_minus_minus) {
+            write(file, "    pop rbx\n");
+            if (op.i64_value[0] == 2) { // post decrement: push value first
+                write(file, "    xor rax, rax\n");
+                if      (size == 1) write(file, "    mov  al, [rbx]\n")
+                else if (size == 2) write(file, "    mov  ax, [rbx]\n")
+                else if (size == 4) write(file, "    mov eax, [rbx]\n")
+                else if (size == 8) write(file, "    mov rax, [rbx]\n")
+                write(file, "    push rax\n");
+            }
+            
+            if      (size == 1) write(file, "    dec BYTE [rbx]\n")
+            else if (size == 2) write(file, "    dec WORD [rbx]\n")
+            else if (size == 4) write(file, "    dec DWORD [rbx]\n")
+            else if (size == 8) write(file, "    dec QWORD [rbx]\n")
+            else NOT_IMPLEMENTED(__LOCATION__, $"Generating asm for OP_integer_plus_plus with storages size {size}");
+
+            if (op.i64_value[0] == 1) { // pre decrement: push value after
+                write(file, "    xor rax, rax\n");
+                if      (size == 1) write(file, "    mov  al, [rbx]\n")
+                else if (size == 2) write(file, "    mov  ax, [rbx]\n")
+                else if (size == 4) write(file, "    mov eax, [rbx]\n")
+                else if (size == 8) write(file, "    mov rax, [rbx]\n")
+                write(file, "    push rax\n");
+
+            }
+        }
+        else if (op.kind == OpKind::OP_slice_plus_plus) {
+            write(file, "    pop rbx\n");
+            if (op.i64_value[0] == 2) { // post increment: push value first
+                write(file, "    mov rax, [rbx]\n");
+                write(file, "    push rax\n");
+            }
+            write(file, "    cmp QWORD [rbx+8], 0\n");
+            write(file, "    \n");
+            write(file, "    jle @f\n");
+            write(file, $"    add QWORD [rbx], {size}\n");
+            write(file, "    dec QWORD [rbx+8]\n");
+            write(file,"@@:\n");
+            if (op.i64_value[0] == 1) { // pre increment: push value after
+                write(file, "    mov rax, [rbx]\n");
+                write(file, "    push rax\n");
+            }
+        }
+        else if (op.kind == OpKind::OP_sign_extend) {
+            write(file, "    pop  rax\n");
+            if      (size == 1) write(file, "    movsx  rax,  al\n")
+            else if (size == 2) write(file, "    movsx  rax,  ax\n")
+            else if (size == 4) write(file, "    movsxd rax, eax\n")
+            else NOT_IMPLEMENTED(__LOCATION__, $"Generating asm for OP_sign_extend with storages size {size}");
+            write(file, "    push  rax\n");
+        }   
+        else if (op.kind == OpKind::OP_bittest) {
+            write(file, "    pop rax\n"); // bit index
+            write(file, "    cqo\n");
+            write(file, "    mov rbx, 8\n");
+            write(file, "    div rbx\n"); // . rax: byte offset, rdx: bit index
+            write(file, "    pop rbx\n"); // rbx: mem address
+            write(file, "    add rbx, rax\n"); // rbx: byte address
+            write(file, "    bt [rbx], rdx\n"); // test the bit
+            write(file, "    setc al\n");
+            write(file, "    movzx rax, al\n");
+            write(file, "    push rax\n");
+        }
+        else if (op.kind == OpKind::OP_setbit) {
+            write(file, "    pop rdi\n"); // rdi: value
+            write(file, "    pop rax\n"); // bit index
+            write(file, "    cqo\n");
+            write(file, "    mov rbx, 8\n");
+            write(file, "    div rbx\n"); // . rax: byte offset, rdx: bit index
+            write(file, "    pop rsi\n"); // rsi: mem address
+            write(file, "    add rsi, rax\n"); // rsi: byte address
+            write(file, "    mov al, [rsi]\n"); // load the byte
+            write(file, "    mov rcx, rdx\n");
+            write(file, "    mov rdx, 1\n");
+            write(file, "    shl rdx, cl\n"); // make the mask
+
+            write(file, "    test rdi, rdi\n"); // set to 1?
+            write(file, "    jne @f\n");        // yes: jmp
+            write(file, "    xor dl, 0xff\n"); // invert the mask
+            write(file, "    and al, dl\n");   // clear the bit
+            write(file, "    mov dl, al\n");
+            write(file, "@@:");
+            write(file, "    or al, dl\n");
+            write(file, "    mov [rsi], al\n"); // write back
+        }
+        else if (op.kind == OpKind::OP_bitshift) { // only implemented for positive shift amounts (right shift) for now
+            write(file, "    pop rax\n"); // shift amount
+            write(file, "    cqo\n");
+            write(file, "    mov rbx, 64\n");
+            write(file, "    div rbx\n"); // . rax: QWORD offset, rdx: sub shift amount
+            write(file, "    shl rax, 3\n");
+            write(file, "    pop rsi\n"); // rsi: mem address
+            write(file, "    add rsi, rax\n"); // rsi: QWORD address
+            write(file, "    mov rax, [rsi]\n"); // load QWORD [0]
+            write(file, "    mov rcx, rdx\n");
+            write(file, "    shr rax, cl\n");
+            write(file, "    test rdx, rdx\n");
+            write(file, "    jz @f\n");
+            write(file, "    mov rbx, [rsi+8]\n"); // load QWORD [1]
+            write(file, "    mov rcx, 64\n");
+            write(file, "    sub rcx, rdx\n");
+            write(file, "    shl rbx, cl\n");
+            write(file, "    or rax, rbx\n");
+            write(file, "@@:");
+            write(file, "    push rax\n");
+        }
+        else if (op.kind == OpKind::OP_bitand) {
+            write(file, "    pop rax\n");
+            write(file, "    and QWORD [rsp], rax\n");
+        }
+        else if (op.kind == OpKind::OP_bitor) {
+            write(file, "    pop rax\n");
+            write(file, "    or QWORD [rsp], rax\n");
+        }
+        else if (op.kind == OpKind::OP_bitxor) {
+            write(file, "    pop rax\n");
+            write(file, "    xor QWORD [rsp], rax\n");
+        }
+        else if (op.kind == OpKind::OP_bitnot) {
+            write(file, "    mov rax,-1\n");
+            write(file, "    xor QWORD [rsp], rax\n");
+        }
+        else if (op.kind == OpKind::OP_pop) {
+            write(file, "    pop rax\n");
+        }
+        else if (op.kind == OpKind::OP_get_enum_member_name) {
+            let name = if(is_enum_kind(op.type)) op.type.name else op.type.T_enumerator.target_type.name;
+            write(file, "rept 1 {\n");
+            write(file, "local fail\n");
+            write(file, "local done\n");
+            write(file, $"    mov rbx, enum_names_{name}\n");
+            write(file, "    pop rax\n");
+            write(file, $"    sub rax, {get_min_enum_value(op.type)}\n");
+            write(file, "    jl fail\n");
+            write(file, $"    cmp rax, {get_max_enum_value(op.type) - get_min_enum_value(op.type)}\n");
+            write(file, "    jg fail\n");
+            write(file, "    shl rax, 4\n");
+            write(file, "    add rax, rbx\n");
+            write(file, "    push QWORD [rax+8]\n");
+            write(file, "    push QWORD [rax]\n");
+            write(file, "    jmp done\n");
+            write(file, "fail:\n");
+            write(file, "    xor rax, rax\n");
+            write(file, "    push rax\n");
+            write(file, "    push rax\n");
+            write(file, "done:\n");
+            write(file, "}\n");
+        }
+        else {
+            NOT_IMPLEMENTED(__LOCATION__, $"Generating {op.kind.name} opcode");
+        }
+    }
+
+    /*
+
+    Dyn_array enum_types_with_names;
+    dyn_array_init(&enum_types_with_names, sizeof(Type*), 8);
+
+    for (let i=0; i<num_opcodes; i++) {
+        Opcode *op = &opcodes[i];
+
+        if (op.kind == OP_push_string_literal) {
+
+            SV str = op.string_value;
+
+            write(file, "string_literal_{}: db ", op.i64_value[0]);
+
+            while(str.len) {
+                if (*str.begin == '\\') {
+                    sv_pop(&str);
+                    uint8_t c = get_unescaped_char(*str.begin);
+                    write(file, "%d", c);
+                    sv_pop(&str);
+                } else {
+                    write(file, "%d", *str.begin);
+                    sv_pop(&str);
+                }
+
+                write(file, ", ");
+            }
+
+            // terminating null byte for C compatability
+            write(file, "0");
+
+            write(file, "\n");
+        }
+         else if (op.kind == OP_get_enum_member_name)
+        {
+            bool found = false;
+            for (let i = 0; !found && i < enum_types_with_names.count; i++)
+                if(op.type == ((Type**)enum_types_with_names.data)[i])
+                    found = true;
+            
+            if(!found) dyn_array_push_p(&enum_types_with_names, op.type);
+        }
+
+    }
+
+    for (let i = 0; i < enum_types_with_names.count; i++) {
+        Type *t = ((Type**)enum_types_with_names.data)[i];
+        ASSERT(is_enum_kind(t) || is_enumerator_kind(t), "Tried to generate member names for something that is not an enum.\n");
+
+        SV name;
+        if (is_enum_kind(t)) name = t.name;
+        else if (is_enumerator_kind(t)) name = t.enumerator.target_type.name;
+        else NOT_IMPLEMENTED("Generating IL for enums");
+        
+        write(file, "align 8\n");
+        write(file, "enum_names_{}:\n", SV_prnt(name));
+        int64_t max_enum_value = get_max_enum_value(t);
+        int64_t min_enum_value = get_min_enum_value(t);
+        for (int j = min_enum_value; j <= max_enum_value; j++) {
+            SV *member_name = get_enum_member_name_by_value(t, j);
+            if (member_name) {
+                write(file, "dq enum_names_{}_{}\n", SV_prnt(name), SV_prnt(*member_name));
+                write(file, "dq {}\n", member_name.len);
+            }
+            else {
+                write(file, "dq 0\n");
+                write(file, "dq 0\n");
+            }
+        }
+
+        if (is_enum_kind(t)) {
+            for (let j = 0; j < t._enum.num_members; j++) {
+                write(file, "enum_names_{}_{}: db \"{}\"\n", SV_prnt(t.name),
+                        SV_prnt(t._enum.members[j].name), SV_prnt(t._enum.members[j].name));
+            }
+        }
+        else if (is_enumerator_kind(t) && is_union_kind(t.enumerator.target_type)) {
+            Type *u = t.enumerator.target_type;
+            for (let j = 0; j < u._union.num_members; j++) {
+                write(file, "enum_names_{}_{}: db \"{}\"\n", SV_prnt(u.name),
+                        SV_prnt(u._union.members[j].name), SV_prnt(u._union.members[j].name));
+            }
+        }
+        else NOT_IMPLEMENTED("Generating member names is not implemented for this type.\n")
+    }
+    */
+
+    close(file);
+}

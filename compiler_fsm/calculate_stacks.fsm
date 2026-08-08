@@ -1,0 +1,78 @@
+
+import * from "std";
+import * from "endlos";
+import * from "type";
+import * from "symbol";
+
+struct StackVisitor {
+    endlos: EndlosAllocator&;
+    var_symbols :EndlosArr<Symbol&>;
+    arg_symbols :EndlosArr<Symbol&>;
+    current_function :Symbol&;
+}
+
+fn calculate_function_stack(res: StackVisitor&, s_fun: Symbol&) {
+    {
+        let offset = 0;
+        for (let i = res.arg_symbols.arr.len - 1; i >= 0; i--) {
+            let s => res.arg_symbols.arr[i];
+            s.offset = offset;
+            offset = offset + get_stack_offset_for(s.type);
+        }
+    }
+    {
+        let offset = 0;
+        for (let i = 0; i < res.var_symbols.arr.len; i++) {
+            let s => res.var_symbols.arr[i];
+            if (s.kind == SymbolKind::SYM_local) {
+                offset = offset + get_stack_offset_for(s.type);
+                s.offset = offset;
+            }
+        }
+        s_fun.size = offset;
+    }
+}
+
+fn enter_function(res: StackVisitor&, s_fun: Symbol&) {
+    res.current_function => s_fun;
+    EndlosArr_begin~Symbol&(res.arg_symbols, res.endlos);
+    EndlosArr_begin~Symbol&(res.var_symbols, res.endlos);
+}
+
+fn leave_function(res: StackVisitor&) {
+    ASSERT(res.current_function, $"{__LOCATION__} leave function called without active function\n");
+    calculate_function_stack(res, res.current_function);
+    res.current_function => null;
+    EndlosArr_free~Symbol&(res.arg_symbols, res.endlos);
+    EndlosArr_free~Symbol&(res.var_symbols, res.endlos);
+}
+
+fn stack_calc_vistitor(n: AST_node&, res: StackVisitor&) : void {
+    if (n.kind == AST_node::AST_function) {
+        enter_function(res, n.AST_function.symbol);
+        ast_visit_children(n, stack_calc_vistitor, res);
+        leave_function(res);
+    }
+    else if (n.kind == AST_node::AST_arg_decl) {
+        ASSERT(res.current_function, $"Found function argument declaration for '{n.AST_arg_decl.name}' outside of function\n");
+        EndlosArr_push_ref~Symbol&(res.arg_symbols, n.AST_arg_decl.symbol);
+        ast_visit_children(n, stack_calc_vistitor, res);
+    }
+    else if (n.kind == AST_node::AST_var_decl) {
+        ASSERT(res.current_function, $"Found local variable declaration for '{n.AST_var_decl.name}' outside of function\n");
+        EndlosArr_push_ref~Symbol&(&res.var_symbols, n.AST_var_decl.symbol);
+        ast_visit_children(n, stack_calc_vistitor, res);
+    }
+    else if (n.kind == AST_node::AST_generic) {
+        // Don't calculate stacks for non speciated functions
+    }
+    else {
+        ast_visit_children(n, stack_calc_vistitor, res);
+    }
+}
+
+fn calculate_stacks(root: AST_node&, endlos: EndlosAllocator&) {
+    let v: StackVisitor;
+    v.endlos => endlos;
+    stack_calc_vistitor(root, v);
+}
