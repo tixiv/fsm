@@ -49,16 +49,13 @@ union Type enum kind {
         return_type: Type&;
     }
     struct T_struct {
-        num_members;
         members: StructMember[];
         kind: StructlikeKind;
     }
     struct T_enum {
-        num_members;
         members: EnumMember[];
     }
     struct T_union {
-        num_members;
         members: UnionMember[];
         enumarator_name: u8[];
     }
@@ -85,8 +82,8 @@ fn TypeRefArr_reset (arr: TypeRefArr&, len) {
     arr.arr.len = len;
 }
 
-fn TypeRefArr_init (arr: TypeRefArr&, allocator: EndlosAllocator&) {
-    arr.alloc = endlos_begin~Type& (allocator);
+fn TypeRefArr_init (arr: TypeRefArr&, endlos: EndlosAllocator&) {
+    arr.alloc = endlos_begin~Type& (endlos);
     arr.arr = arr.alloc;
     arr.arr.len = 0;
 }
@@ -116,15 +113,16 @@ struct TypeCache {
     builtin_i8: Type;
 }
 
-fn TypeCache_init(cache: TypeCache&, allocator: EndlosAllocator&) {
-    cache.type_roll = endlos_begin~Type(allocator);
-    cache.type_ref_roll = endlos_begin~Type&(allocator);
+fn TypeCache_init(cache: TypeCache&, endlos: EndlosAllocator&) {
+    cache.endlos => endlos;
+    cache.type_roll = endlos_begin~Type(endlos);
+    cache.type_ref_roll = endlos_begin~Type&(endlos);
 
-    TypeRefArr_init(cache.function_types,   allocator);
-    TypeRefArr_init(cache.ref_types,        allocator);
-    TypeRefArr_init(cache.enumerator_types, allocator);
-    TypeRefArr_init(cache.array_types,      allocator);
-    TypeRefArr_init(cache.slice_types,      allocator);
+    TypeRefArr_init(cache.function_types,   endlos);
+    TypeRefArr_init(cache.ref_types,        endlos);
+    TypeRefArr_init(cache.enumerator_types, endlos);
+    TypeRefArr_init(cache.array_types,      endlos);
+    TypeRefArr_init(cache.slice_types,      endlos);
 
     let t: Type&;
     t => cache.builtin_void;         t.kind = Type::T_void;
@@ -357,7 +355,7 @@ fn is_castable_to(cache: TypeCache&, to: Type&, from: Type&, ) {
 fn get_member_offset(_struct: Type&, index) {
     ASSERT(_struct.kind == Type::T_struct,
         "get_member_offset() called on something that is not a struct or record.\n")
-    ASSERT(index < _struct.T_struct.num_members, "Index out of range.\n");
+    ASSERT(index < _struct.T_struct.members.len, "Index out of range.\n");
 
     let offset = 0;
     for (let i = 0; i < index; i++) {
@@ -378,7 +376,7 @@ fn get_member_type_and_offset_by_name(cache: TypeCache&, t: Type&, member_name: 
 
     if (t.kind == Type::T_struct) {
         let offset = 0;
-        for (let i = 0; i < t.T_struct.num_members; i++) {
+        for (let i = 0; i < t.T_struct.members.len; i++) {
             let member => &t.T_struct.members[i];
 
             if (sv_equal(&member.name, member_name)) {
@@ -397,7 +395,7 @@ fn get_member_type_and_offset_by_name(cache: TypeCache&, t: Type&, member_name: 
             }
             offset = offset + 8;
         }
-        for (let i = 0; i < t.T_union.num_members; i++) {
+        for (let i = 0; i < t.T_union.members.len; i++) {
             let member => t.T_union.members[i];
 
             if (!member.name.begin) {
@@ -425,7 +423,7 @@ fn get_member_type_and_offset_by_name(cache: TypeCache&, t: Type&, member_name: 
 
 
 fn get_enum_member_value (t: Type&, member_name: u8[], enum_value: i64&) : bool {
-    for (let i = 0; i < t.T_enum.num_members; i++) {
+    for (let i = 0; i < t.T_enum.members.len; i++) {
         let member => &t.T_enum.members[i];
 
         if (sv_equal(&member.name, member_name)) {
@@ -437,7 +435,7 @@ fn get_enum_member_value (t: Type&, member_name: u8[], enum_value: i64&) : bool 
 }
 
 fn get_union_member_value (t: Type&, member_name: u8[], enum_value: i64&) : bool {
-    for (let i = 0; i < t.T_union.num_members; i++) {
+    for (let i = 0; i < t.T_union.members.len; i++) {
         let member => &t.T_union.members[i];
 
         if (sv_equal(&member.name, member_name)) {
@@ -451,7 +449,7 @@ fn get_union_member_value (t: Type&, member_name: u8[], enum_value: i64&) : bool
 fn calculate_storage_size(container: Type&) : void {
     if (is_struct_kind(container) || is_slice_kind(container)) {
         let offset = 0;
-        for (let i = 0; i < container.T_struct.num_members; i++) {
+        for (let i = 0; i < container.T_struct.members.len; i++) {
             let member => container.T_struct.members[i];
             offset = offset + member.type.storage_size;
         }
@@ -459,7 +457,7 @@ fn calculate_storage_size(container: Type&) : void {
     }
     else if (is_record_kind(container)) {
         let offset = 0;
-        for (let i = 0; i < container.T_struct.num_members; i++) {
+        for (let i = 0; i < container.T_struct.members.len; i++) {
             let member => container.T_struct.members[i];
             offset = offset + member.type.storage_size;
         }
@@ -469,7 +467,7 @@ fn calculate_storage_size(container: Type&) : void {
         let offset = 0;
         if (container.T_union.enumarator_name.begin) offset = offset + 8;
         let max_member_size = 0;
-        for (let i = 0; i < container.T_union.num_members; i++) {
+        for (let i = 0; i < container.T_union.members.len; i++) {
             let member => container.T_union.members[i];
             let sz = member.type.storage_size;
             if (!member.name.begin) {
@@ -575,23 +573,22 @@ fn get_array_type(cache: TypeCache&, Type *element_type, n_elements) {
 
 fn make_slice_type(cache: TypeCache&, element_type: Type&) : Type& {
     let slice_t => type_alloc(cache, Type::T_struct);
-    slice_t.T_struct.num_members = 2;
-/*
+    slice_t.T_struct.members.len = 2;
+
     let members = endlos_begin~StructMember(cache.endlos);
     let m1 => members++;
     let m2 => members++;
 
-    m1.type = get_ref_type_for(cache, element_type);
+    m1.type => get_ref_type_for(cache, element_type);
     m1.name = "begin";
-    m2.type = cache.builtin_i64;
+    m2.type => cache.builtin_i64;
     m2.name = "len";
 
     slice_t.T_struct.members = endlos_ripp_off~StructMember(cache.endlos, members);
 
     calculate_storage_size(slice_t);
+
     return slice_t;
-    */
-    return null;
 }
 
 fn check_is_slice_of_type(slice: Type&, ref_type: Type&, _: any&) {
@@ -652,13 +649,13 @@ fn get_max_enum_value (t: Type&) {
     let max = -0x8000000000000000;
  
     if (is_enum_kind(t)) {
-        for (let i = 0; i < t.T_enum.num_members; i++) {
+        for (let i = 0; i < t.T_enum.members.len; i++) {
             if (t.T_enum.members[i].value > max) max = t.T_enum.members[i].value;
         }
     }
     else if (is_enumerator_kind(t) && is_union_kind(t.T_enumerator.target_type)) {
         let u => t.T_enumerator.target_type;
-        for (let i = 0; i < u.T_union.num_members; i++) {
+        for (let i = 0; i < u.T_union.members.len; i++) {
             if (u.T_union.members[i].value > max) max = u.T_union.members[i].value;
         }
     } else NOT_IMPLEMENTED(__LOCATION__, "get_max_enum_value")
@@ -669,13 +666,13 @@ fn get_min_enum_value (t: Type&) {
     let min = 0x7fffffffffffffff;
 
     if (is_enum_kind(t)) {
-        for (let i = 0; i < t.T_enum.num_members; i++) {
+        for (let i = 0; i < t.T_enum.members.len; i++) {
             if (t.T_enum.members[i].value < min) min = t.T_enum.members[i].value;
         }
     }
     else if (is_enumerator_kind(t) && is_union_kind(t.T_enumerator.target_type)) {
         let u => t.T_enumerator.target_type;
-        for (let i = 0; i < u.T_union.num_members; i++) {
+        for (let i = 0; i < u.T_union.members.len; i++) {
             if (u.T_union.members[i].value < min) min = u.T_union.members[i].value;
         }
     } else NOT_IMPLEMENTED(__LOCATION__, "get_min_enum_value")
@@ -683,18 +680,34 @@ fn get_min_enum_value (t: Type&) {
     return min;
 }
 
-fn get_enum_member_name_by_value(t: Type&, int64_t value) : u8[]& {
+fn get_enum_member_name_by_value(t: Type&, value) : u8[]& {
     if (is_enum_kind(t)) {
-        for (let i = 0; i < t.T_enum.num_members; i++) {
+        for (let i = 0; i < t.T_enum.members.len; i++) {
             if (t.T_enum.members[i].value == value) return &t.T_enum.members[i].name;
         }
     }
     else if (is_enumerator_kind(t) && is_union_kind(t.T_enumerator.target_type)) {
         let u => t.T_enumerator.target_type;
-        for (let i = 0; i < u.T_union.num_members; i++) {
+        for (let i = 0; i < u.T_union.members.len; i++) {
             if (u.T_union.members[i].value == value) return &u.T_union.members[i].name;
         }
     } else NOT_IMPLEMENTED(__LOCATION__, "get_enum_member_name_by_value")
+
+    return null;
+}
+
+fn get_builtin_type_by_name(cache: TypeCache&, name: u8[]) : Type& {
+    if (sv_equal(name,"void")) return cache.builtin_void;
+    if (sv_equal(name,"any")) return cache.builtin_any;
+    if (sv_equal(name,"bool")) return cache.builtin_bool;
+    if (sv_equal(name,"u64")) return cache.builtin_u64;
+    if (sv_equal(name,"i64")) return cache.builtin_i64;
+    if (sv_equal(name,"u32")) return cache.builtin_u32;
+    if (sv_equal(name,"i32")) return cache.builtin_i32;
+    if (sv_equal(name,"u16")) return cache.builtin_u16;
+    if (sv_equal(name,"i16")) return cache.builtin_i16;
+    if (sv_equal(name,"u8"))  return cache.builtin_u8;
+    if (sv_equal(name,"i8"))  return cache.builtin_i8;
 
     return null;
 }

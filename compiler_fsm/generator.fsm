@@ -70,7 +70,7 @@ fn make_movx(buf: u8[32]&, reg: u8[], size, _sigend: bool) :u8[] {
     return sb.str;
 }
 
-fn output_asm(asm_file_name: u8[], opcodes: Opcode[]) {
+fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) {
     let O_WRONLY = 1;
     let O_CREAT = 64;
     let O_TRUNC = 512;
@@ -574,29 +574,25 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[]) {
         }
     }
 
-    /*
+    let enum_types_with_names: EndlosArr<Type&>;
+    EndlosArr_begin~Type&(enum_types_with_names, endlos);
 
-    Dyn_array enum_types_with_names;
-    dyn_array_init(&enum_types_with_names, sizeof(Type*), 8);
+    for (let i = 0; i < opcodes.len; i++) {
+        let op => opcodes[i];
 
-    for (let i=0; i<num_opcodes; i++) {
-        Opcode *op = &opcodes[i];
+        if (op.kind == OpKind::OP_push_string_literal) {
+            let str = op.string_value;
 
-        if (op.kind == OP_push_string_literal) {
-
-            SV str = op.string_value;
-
-            write(file, "string_literal_{}: db ", op.i64_value[0]);
+            write(file, $"string_literal_{op.i64_value[0]}: db ");
 
             while(str.len) {
-                if (*str.begin == '\\') {
-                    sv_pop(&str);
-                    uint8_t c = get_unescaped_char(*str.begin);
-                    write(file, "%d", c);
-                    sv_pop(&str);
+                if (str.begin == '\\') {
+                    str++
+                    let c = get_unescaped_char(str++);
+                    write(file, $"{c}");
+                    
                 } else {
-                    write(file, "%d", *str.begin);
-                    sv_pop(&str);
+                    write(file, $"{str++}");
                 }
 
                 write(file, ", ");
@@ -607,36 +603,35 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[]) {
 
             write(file, "\n");
         }
-         else if (op.kind == OP_get_enum_member_name)
+        else if (op.kind == OpKind::OP_get_enum_member_name)
         {
-            bool found = false;
-            for (let i = 0; !found && i < enum_types_with_names.count; i++)
-                if(op.type == ((Type**)enum_types_with_names.data)[i])
+            let found = false;
+            for (let j = 0; !found && j < enum_types_with_names.arr.len; j++)
+                if(op.type <==> enum_types_with_names.arr[j])
                     found = true;
             
-            if(!found) dyn_array_push_p(&enum_types_with_names, op.type);
+            if(!found) EndlosArr_push_ref~Type&(enum_types_with_names, op.type);
         }
-
     }
 
-    for (let i = 0; i < enum_types_with_names.count; i++) {
-        Type *t = ((Type**)enum_types_with_names.data)[i];
-        ASSERT(is_enum_kind(t) || is_enumerator_kind(t), "Tried to generate member names for something that is not an enum.\n");
+    for (let i = 0; i < enum_types_with_names.arr.len; i++) {
+        let t => enum_types_with_names.arr[i];
+        ASSERT(is_enum_kind(t) || is_enumerator_kind(t), $"{__LOCATION__}Tried to generate member names for something that is not an enum.\n");
 
-        SV name;
-        if (is_enum_kind(t)) name = t.name;
-        else if (is_enumerator_kind(t)) name = t.enumerator.target_type.name;
-        else NOT_IMPLEMENTED("Generating IL for enums");
+        let name: u8[];
+        if (is_enum_kind(t)) name = t.name
+        else if (is_enumerator_kind(t)) name = t.T_enumerator.target_type.name
+        else NOT_IMPLEMENTED(__LOCATION__, "Generating IL for enums");
         
         write(file, "align 8\n");
-        write(file, "enum_names_{}:\n", SV_prnt(name));
-        int64_t max_enum_value = get_max_enum_value(t);
-        int64_t min_enum_value = get_min_enum_value(t);
-        for (int j = min_enum_value; j <= max_enum_value; j++) {
-            SV *member_name = get_enum_member_name_by_value(t, j);
+        write(file, "enum_names_{name}:\n");
+        let max_enum_value = get_max_enum_value(t);
+        let min_enum_value = get_min_enum_value(t);
+        for (let j = min_enum_value; j <= max_enum_value; j++) {
+            let member_name => get_enum_member_name_by_value(t, j);
             if (member_name) {
-                write(file, "dq enum_names_{}_{}\n", SV_prnt(name), SV_prnt(*member_name));
-                write(file, "dq {}\n", member_name.len);
+                write(file, $"dq enum_names_{name}_{member_name}\n");
+                write(file, $"dq {member_name.len}\n");
             }
             else {
                 write(file, "dq 0\n");
@@ -645,21 +640,20 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[]) {
         }
 
         if (is_enum_kind(t)) {
-            for (let j = 0; j < t._enum.num_members; j++) {
-                write(file, "enum_names_{}_{}: db \"{}\"\n", SV_prnt(t.name),
-                        SV_prnt(t._enum.members[j].name), SV_prnt(t._enum.members[j].name));
+            for (let j = 0; j < t.T_enum.members.len; j++) {
+                write(file, $"enum_names_{t.name}_{t.T_enum.members[j].name}: db \"{t.T_enum.members[j].name}\"\n");
             }
         }
-        else if (is_enumerator_kind(t) && is_union_kind(t.enumerator.target_type)) {
-            Type *u = t.enumerator.target_type;
-            for (let j = 0; j < u._union.num_members; j++) {
-                write(file, "enum_names_{}_{}: db \"{}\"\n", SV_prnt(u.name),
-                        SV_prnt(u._union.members[j].name), SV_prnt(u._union.members[j].name));
+        else if (is_enumerator_kind(t) && is_union_kind(t.T_enumerator.target_type)) {
+            let u => t.T_enumerator.target_type;
+            for (let j = 0; j < u.T_union.members.len; j++) {
+                write(file, $"enum_names_{u.name}_{u.T_union.members[j].name}: db \"{u.T_union.members[j].name}\"\n");
             }
         }
-        else NOT_IMPLEMENTED("Generating member names is not implemented for this type.\n")
+        else NOT_IMPLEMENTED(__LOCATION__, "Generating member names for this type")
     }
-    */
+
+    EndlosArr_free~Type&(enum_types_with_names, endlos);
 
     close(file);
 }

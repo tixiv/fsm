@@ -1,4 +1,5 @@
 
+import * from "common";
 import * from "compiler_fsm/ast";
 
 struct Parser {
@@ -8,10 +9,8 @@ struct Parser {
     endlos: EndlosAllocator&;
 }
 
-fn parser_error(parser: Parser&, s: u8[]) {
-    let l = parser.CT.location;
-    write(2, $"[FSM Parser] {l.module.filename}:{l.line} Error: {s}\n");
-    exit(1);
+fn parser_error(parser: Parser&, message: u8[]) {
+    fsm_compiler_error("[FSM Parser]", parser.CT.location, message)
 }
 
 fn MOVE_NEXT(parser: Parser&) {
@@ -30,36 +29,30 @@ fn take_expected(parser: Parser&, tok: TokenKind) {
     MOVE_NEXT(parser);
 }
 
-/*
-
-fn link_arr(parser: Parser&, parent: AST_node&, child: AST_node&) {
-    switch (parent.kind) {
-        case AST_node::AST_type_array: parent._type_array.body => child; break;
-        case AST_node::AST_type_slice: parent._type_slice.body => child; break;
-        default: NOT_IMPLEMENTED("Linking to %s is not implemented yet.\n", ast_kind_name(parent.kind));
-    }
+fn link_arr(parent: AST_node&, child: AST_node&) {
+    
+         if (parent.kind == AST_node::AST_type_array) parent.AST_type_array.body => child
+    else if (parent.kind == AST_node::AST_type_slice) parent.AST_type_slice.body => child
+    else NOT_IMPLEMENTED(__LOCATION__, $"Linking to {parent.kind.name}");
 }
 
-*/
-
-fn parse_typedecl_postifx(inner: AST_node&) : AST_node& {
-    /*
+fn parse_typedecl_postifx(parser: Parser&, inner: AST_node&) : AST_node& {
     if (parser.CT.kind == TokenKind::TOK_ampersand) {
-        let ast_ref => ast_alloc(parser.allocator, AST_node::AST_node::AST_type_ref, parser.CT.location);
+        let ast_ref => ast_alloc(parser.allocator, AST_node::AST_type_ref, parser.CT.location);
         MOVE_NEXT(parser);
-        ast_ref._type_ref.body => inner;
-        return parse_typedecl_postifx(ast_ref);
+        ast_ref.AST_type_ref.body => inner;
+        return parse_typedecl_postifx(parser, ast_ref);
     } else if (parser.CT.kind == TokenKind::TOK_lbracket) {
         
-        AST_node& first => null;
-        AST_node& latest => null;
+        let first: AST_node& => null;
+        let latest: AST_node& => null;
 
         while (parser.CT.kind == TokenKind::TOK_lbracket) {
-            int location = parser.CT.location;
+            let location => parser.CT.location;
             MOVE_NEXT(parser);
             if (parser.CT.kind == TokenKind::TOK_number) {
-                let ast_array => ast_alloc(parser.allocator, AST_node::AST_node::AST_type_array, location);
-                ast_array._type_array.n_elements = strtoul(parser.CT.value.begin, 0, 0);
+                let ast_array => ast_alloc(parser.allocator, AST_node::AST_type_array, location);
+                ast_array.AST_type_array.n_elements = parse_integer(parser.CT.value);
                 MOVE_NEXT(parser);
                 take_expected(parser, TokenKind::TOK_rbracket);
 
@@ -72,7 +65,7 @@ fn parse_typedecl_postifx(inner: AST_node&) : AST_node& {
                 latest => ast_array;
             }
             else if (parser.CT.kind == TokenKind::TOK_rbracket) {
-                let ast_slice => ast_alloc(parser.allocator, AST_node::AST_node::AST_type_slice, location);
+                let ast_slice => ast_alloc(parser.allocator, AST_node::AST_type_slice, location);
                 take_expected(parser, TokenKind::TOK_rbracket);
 
                 if (!first) {
@@ -89,9 +82,8 @@ fn parse_typedecl_postifx(inner: AST_node&) : AST_node& {
         }
         
         link_arr(latest, inner);
-        return parse_typedecl_postifx(first);
+        return parse_typedecl_postifx(parser, first);
     }
-*/
     return inner;
 }
 
@@ -125,7 +117,7 @@ fn parse_typedecl(parser: Parser&) : AST_node& {
         let ast_type => ast_alloc(parser.allocator, AST_node::AST_typename, parser.CT.location);
         ast_type.AST_typename.name = parser.CT.value;
         MOVE_NEXT(parser);
-        return parse_typedecl_postifx(ast_type);
+        return parse_typedecl_postifx(parser, ast_type);
     }
     
     return null;

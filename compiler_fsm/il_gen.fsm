@@ -427,7 +427,7 @@ fn gen_builder_string_put_struct (s_sb: Symbol&, arg: AST_node&, gen: IL_gen&) {
     push_opcode(gen, OpKind::OP_call, &sb_puts_symbol.name, 0, sb_puts_symbol.type, arg.location);
 
     let t => arg.type;
-    for (let i = 0; i < t.T_struct.num_members; i++) {
+    for (let i = 0; i < t.T_struct.members.len; i++) {
         let member => t.T_struct.members[i];
         if (!sv_equal(member.name, "_")) {
             let offset = get_member_offset(t, i);

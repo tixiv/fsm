@@ -43,36 +43,50 @@ fn init_builtin_functions(res: Resolver&) {
 
     tmp_args.len = 1; tmp_args[0] => tc.builtin_i64;
     declare_builtin_fn(res, "exit", tc.builtin_void, tmp_args);
-/*
-    declare_builtin_fn(res, "__open", tc.builtin_i64, 2, (Type*[]){tc.builtin_u8_reference, tc.builtin_i64 });
-    declare_builtin_fn(res, "close", tc.builtin_i64, 1, (Type*[]){tc.builtin_i64});
-    declare_builtin_fn(res, "read", tc.builtin_i64, 2, (Type*[]){tc.builtin_i64, tc.builtin_u8_slice});
-    declare_builtin_fn(res, "write", tc.builtin_i64, 2, (Type*[]){tc.builtin_i64, tc.builtin_u8_slice});
-    declare_builtin_fn(res, "socket", tc.builtin_i64, 3, (Type*[]){tc.builtin_i64, tc.builtin_i64, tc.builtin_i64});
-    declare_builtin_fn(res, "connect", tc.builtin_i64, 2, (Type*[]){tc.builtin_i64, tc.builtin_u8_slice});
+    declare_builtin_fn(res, "close", tc.builtin_i64, tmp_args);
+
+    tmp_args.len = 2; tmp_args[0] => get_ref_type_for(tc, tc.builtin_u8); tmp_args[1] => tc.builtin_i64;
+    declare_builtin_fn(res, "__open", tc.builtin_i64, tmp_args);
+
+    tmp_args.len = 2; tmp_args[0] => tc.builtin_i64; tmp_args[1] => get_slice_type(tc, tc.builtin_u8);
+    declare_builtin_fn(res, "read", tc.builtin_i64, tmp_args);
+    declare_builtin_fn(res, "write", tc.builtin_i64, tmp_args);
+    declare_builtin_fn(res, "connect", tc.builtin_i64, tmp_args);
+
+    tmp_args.len = 3; tmp_args[0] => get_ref_type_for(tc, tc.builtin_u8); tmp_args[1] => tc.builtin_i64; tmp_args[2] => tc.builtin_i64;
+    declare_builtin_fn(res, "socket", tc.builtin_i64, tmp_args);
 
     // mmap(addr: any&, lenght: i64, prot: u64, flags: u64, fd: i64, offset: i64) : any &
-    declare_builtin_fn(res, "mmap", get_ref_type_for(tc.builtin_any, 6, (Type*[]){get_ref_type_for(tc.builtin_any), tc.builtin_i64, tc.builtin_u64, tc.builtin_u64, tc.builtin_i64, tc.builtin_i64});
+    tmp_args.len = 6; tmp_args[0] => get_ref_type_for(tc, tc.builtin_any); tmp_args[1] => tc.builtin_i64; tmp_args[2] => tc.builtin_u64;
+                      tmp_args[3] => tc.builtin_u64;                       tmp_args[4] => tc.builtin_i64; tmp_args[5] => tc.builtin_i64;
+    declare_builtin_fn(res, "mmap", get_ref_type_for(tc, tc.builtin_any), tmp_args);
 
-*/
     tmp_args.len = 1; tmp_args[0] => tc.builtin_i64;
     declare_builtin_fn(res, "print", tc.builtin_void, tmp_args);
-/*
-    declare_builtin_fn(res, "putc", tc.builtin_void, 1, (Type*[]){tc.builtin_u8});
-    declare_builtin_fn(res, "puts", tc.builtin_void, 1, (Type*[]){tc.builtin_u8_slice});
-    declare_builtin_fn(res, "fsize", tc.builtin_i64, 1, (Type*[]){tc.builtin_i64});// fsize(fd: i64) : i64
+    declare_builtin_fn(res, "fsize", tc.builtin_i64, tmp_args);// fsize(fd: i64) : i64
+
+    tmp_args.len = 1; tmp_args[0] => tc.builtin_u8;
+    declare_builtin_fn(res, "putc", tc.builtin_void, tmp_args);
+
+    tmp_args.len = 1; tmp_args[0] => get_slice_type(tc, tc.builtin_u8);
+    declare_builtin_fn(res, "puts", tc.builtin_void, tmp_args);
 
     // TODO: These should act like operators actually, and not like builtin functions, because we can then better handle different types of arguments
-    declare_builtin_fn(res, "bittest", tc.builtin_bool, 2, (Type*[]){get_ref_type_for(tc.builtin_any), tc.builtin_i64});
-    declare_builtin_fn(res, "setbit", tc.builtin_void, 3, (Type*[]){get_ref_type_for(tc.builtin_any), tc.builtin_i64, tc.builtin_bool});
-    declare_builtin_fn(res, "bitshift", tc.builtin_u64, 2, (Type*[]){get_ref_type_for(tc.builtin_any), tc.builtin_i64});
-    declare_builtin_fn(res, "bitand", tc.builtin_u64, 2, (Type*[]){tc.builtin_u64, tc.builtin_u64});
-    declare_builtin_fn(res, "bitor", tc.builtin_u64, 2, (Type*[]){tc.builtin_u64, tc.builtin_u64});
-    declare_builtin_fn(res, "bitxor", tc.builtin_u64, 2, (Type*[]){tc.builtin_u64, tc.builtin_u64});
-    declare_builtin_fn(res, "bitnot", tc.builtin_u64, 1, (Type*[]){tc.builtin_u64});
-*/
-}
+    tmp_args.len = 2; tmp_args[0] => get_ref_type_for(tc, tc.builtin_any); tmp_args[1] => tc.builtin_i64;
+    declare_builtin_fn(res, "bittest", tc.builtin_bool, tmp_args);
+    declare_builtin_fn(res, "bitshift", tc.builtin_u64, tmp_args);
 
+    tmp_args.len = 3; tmp_args[0] => get_ref_type_for(tc, tc.builtin_any); tmp_args[1] => tc.builtin_i64; tmp_args[2] => tc.builtin_bool;
+    declare_builtin_fn(res, "setbit", tc.builtin_void, tmp_args);
+
+    tmp_args.len = 2; tmp_args[0] => tc.builtin_u64; tmp_args[1] => tc.builtin_u64;
+    declare_builtin_fn(res, "bitand", tc.builtin_u64, tmp_args);
+    declare_builtin_fn(res, "bitor", tc.builtin_u64, tmp_args);
+    declare_builtin_fn(res, "bitxor", tc.builtin_u64, tmp_args);
+
+    tmp_args.len = 1; tmp_args[0] => tc.builtin_u64;
+    declare_builtin_fn(res, "bitnot", tc.builtin_u64, tmp_args);
+}
 
 fn resolver_lookup_symbol(res: Resolver&, name: u8[], n: AST_node&, do_undefined_error: bool) : Symbol& {
     // locals

@@ -1,0 +1,14 @@
+
+struct ModuleHeader {
+    filename: u8[];
+}
+
+struct Location {
+    module: ModuleHeader&;
+    line: i32; col: i32;
+}
+
+fn fsm_compiler_error(component_name: u8[], l: Location, message: u8[]) {
+    write(2, $"{component_name} {l.module.filename}:{l.line} Error: {message}\n");
+    exit(1);
+}
