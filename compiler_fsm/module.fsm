@@ -1,0 +1,12 @@
+
+import * from "std";
+import * from "common";
+import * from "type";
+import * from "ast";
+import * from "tokenizer";
+
+struct Module {
+    header: ModuleHeader;
+    tokens: Token[];
+    ast_root: AST_node&;
+}

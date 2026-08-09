@@ -66,6 +66,9 @@ static void il_gen_push_symbol_address(Symbol *s, const Location *location) {
 }
 
 static void il_gen_push_symbol(Symbol *s, const Location *location) {
+    size_t size = s->type->storage_size;
+    if (size > 16) il_gen_error(location, "Can't push something with storage size > 16. Have %lu.", size);
+
     if (s->kind == SYM_arg) {
         push_opcode(OP_push_arg, nullptr, s->offset, s->type, location);
     } else if (s->kind == SYM_local) {

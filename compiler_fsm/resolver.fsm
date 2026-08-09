@@ -147,14 +147,17 @@ fn resolver_visitor(n: AST_node&, res: Resolver&) : void {
     else NOT_IMPLEMENTED(__LOCATION__, $"Resolver for {n.kind.name}");
 }
 
-fn resolver_run(res: Resolver&, root: AST_node&) {
-    resolve_globals_visitor(root, res);
-    resolver_visitor(root, res);
-}
-
-fn resolver_init (res: Resolver&, allocator: EndlosAllocator&, symbol_cache: SymbolCache&) {
-    EndlosArr_begin~Symbol&(res.local_symbols, allocator);
-    res.locals_stack = endlos_begin~i64(allocator);
+fn resolver_run(root: AST_node&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&) {
+    let res: Resolver;
     res.type_cache => symbol_cache.type_cache;
     res.symbol_cache => symbol_cache;
+
+    EndlosArr_begin~Symbol&(res.local_symbols, endlos);
+    res.locals_stack = endlos_begin~i64(endlos);
+
+    resolve_globals_visitor(root, res);
+    resolver_visitor(root, res);
+
+    endlos_ripp_off~i64(endlos, res.locals_stack);
+    EndlosArr_free~Symbol&(res.local_symbols, endlos);
 }

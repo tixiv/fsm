@@ -139,15 +139,13 @@ struct Token {
 
 struct Tokenizer {
     code: u8[];
-    filename: u8[];
+    tokens: Token[];
     location: Location;
     inside_builder_string: bool;
-    num_tokens;
-    tokens: Token[5000];
 }
 
 fn tokenizer_error(tokenizer: Tokenizer&, message: u8[]) {
-    $"[FSM Tokenizer] {tokenizer.filename}:{tokenizer.location.line}:{tokenizer.location.col} Error: ";
+    $"[FSM Tokenizer] {tokenizer.location.module.filename}:{tokenizer.location.line}:{tokenizer.location.col} Error: ";
     puts(message);
     if (message[message.len-1] != '\n') putc('\n');
 }
@@ -180,12 +178,8 @@ fn read_number(input: u8[]&) {
     return num;
 }
 
-fn alloc_token (tokenizer: Tokenizer&) {
-    if (tokenizer.num_tokens == tokenizer.tokens.len) {
-        tokenizer_error(tokenizer, "Out of tokens!");
-        return null;
-    }
-    return &tokenizer.tokens[tokenizer.num_tokens++];
+fn alloc_token (tokenizer: Tokenizer&) : Token& {
+    return tokenizer.tokens++
 }
 
 fn push_token (tokenizer: Tokenizer&, kind: TokenKind, value: u8[]&) {
@@ -538,9 +532,9 @@ fn tokenize_fsm (tokenizer: Tokenizer&) : void {
     push_token(tokenizer, TokenKind::TOK_eof, null);
 }
 
-fn dump_tokens(tokenizer: Tokenizer&) {
-    for (let i = 0; i < tokenizer.num_tokens; i++) {
-        let t => tokenizer.tokens[i];
+fn dump_tokens(tokens: Token[]) {
+    for (let i = 0; i < tokens.len; i++) {
+        let t => tokens[i];
         if (t.value.len) {
             $"[{t.location.line}: {t.kind.name}, \"{t.value}\"]\n";
         } else {

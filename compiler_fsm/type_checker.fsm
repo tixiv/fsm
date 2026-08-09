@@ -966,18 +966,17 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
     ASSERT(n.type, $"All nodes should have a type after the type checker. Have {n.kind.name} with null type.\n");
 }
 
-fn type_checker_run(type_checker: TypeChecker&, root: AST_node&) {
+fn type_checker_run(root: AST_node&, symbol_cache: SymbolCache&, ast_allocator: AST_Node_Allocator&, endlos: EndlosAllocator&) {
+    let type_checker: TypeChecker;
+    type_checker.type_cache => symbol_cache.type_cache;
+    type_checker.symbol_cache => symbol_cache;
+    type_checker.ast_allocator => ast_allocator;
+    type_checker.endlos => endlos;
+
     annotate_used_visitor(root, type_checker);
     type_resolve_functions_visitor(root, type_checker);
 
     ast_dump_tree(root);
 
     type_propagation_visitor(root, type_checker);
-}
-
-fn type_checker_init(type_checker: TypeChecker&, symbol_cache: SymbolCache&, ast_allocator: AST_Node_Allocator&, endlos: EndlosAllocator&) {
-    type_checker.type_cache => symbol_cache.type_cache;
-    type_checker.symbol_cache => symbol_cache;
-    type_checker.ast_allocator => ast_allocator;
-    type_checker.endlos => endlos;
 }

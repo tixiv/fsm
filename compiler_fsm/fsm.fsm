@@ -2,6 +2,7 @@
 import * from "endlos";
 import * from "parser";
 import * from "symbol_cache";
+import * from "module";
 import * from "type_resolver";
 import * from "resolver";
 import * from "il_gen";
@@ -10,26 +11,58 @@ import * from "calculate_stacks";
 import * from "il_gen";
 import * from "generator";
 
+
+fn tokenize_module (module: Module&, code: u8[], endlos: EndlosAllocator&) {
+    let tokenizer: Tokenizer;
+
+    tokenizer.code = code;
+    tokenizer.location.module => module.header;
+    tokenizer.location.line = 1;
+    tokenizer.tokens = endlos_begin~Token(endlos);
+
+    tokenize_fsm(tokenizer);
+
+    module.tokens = endlos_ripp_off~Token(endlos, tokenizer.tokens);
+
+    dump_tokens(module.tokens);
+}
+
+fn compile_module (module: Module&, symbol_cache: SymbolCache&, ast_allocator: AST_Node_Allocator&, endlos: EndlosAllocator&) {
+    let verbose = true;
+    let code = read_file (module.header.filename);
+
+    if (verbose) $"Tokenizing...\n"
+    tokenize_module(module, code, endlos);
+    if (verbose) $"Tokenizing finished\n"
+
+    if (verbose) $"Parsing...\n"
+    let root => parse_program(module.tokens, ast_allocator, endlos)
+    if (verbose) $"Parsing finished\n"
+
+    if (verbose) $"Type Resolver...\n"
+    type_resolver_run(root, symbol_cache, endlos);
+    if (verbose) $"Type Resolver finished\n"
+
+    if (verbose) $"Resolver...\n"
+    resolver_run(root, symbol_cache, endlos);
+    if (verbose) $"Resolver finished\n"
+
+    ast_dump_tree(root);
+
+    if (verbose) $"Going to run type checker...\n"
+    type_checker_run(root, symbol_cache, ast_allocator, endlos);
+    if (verbose) $"Finished type checking.\n"
+
+    ast_dump_tree(root);
+
+    calculate_stacks(root, endlos);
+
+    module.ast_root => root;
+}
+
 fn main (argv: u8&[]) {
     let endlos: EndlosAllocator;
     endlos_init(endlos);
-
-    let tokenizer: Tokenizer;
-
-    let module: ModuleHeader;
-    module.filename = "foo.fsm";
-
-    if (argv.len > 1) module.filename = sv_of_c_string(argv[1])
-
-    tokenizer.code = read_file (module.filename);
-    tokenizer.location.module => module;
-    tokenizer.location.line = 1;
-
-    tokenize_fsm(tokenizer);
-    // dump_tokens(tokenizer);
-
-    let tokens: Token[] = tokenizer.tokens;
-    tokens.len = tokenizer.num_tokens;
 
     let type_cache: TypeCache;
     TypeCache_init(type_cache, endlos)
@@ -40,45 +73,18 @@ fn main (argv: u8&[]) {
     let ast_allocator: AST_Node_Allocator;
     AST_Node_Allocator_init(ast_allocator);
 
-    $"Parsing...\n"
-    let root => parse_program(tokens, ast_allocator, endlos)
-    $"Parsing finished\n"
+    let module: Module;
+    module.header.filename = "foo.fsm";
 
-    $"Type Resolver...\n"
-    type_resolver_run(root, symbol_cache, endlos);
-    $"Type Resolver finished\n"
+    if (argv.len > 1) module.header.filename = sv_of_c_string(argv[1])
 
-    let resolver: Resolver;
-    resolver_init(resolver, endlos, symbol_cache);
-
-    $"Resolver...\n"
-    resolver_run(resolver, root);
-    $"Resolver finished\n"
-
-    ast_dump_tree(root);
-
-    let type_checker: TypeChecker;
-    type_checker_init(type_checker, symbol_cache, ast_allocator, endlos);
-
-    $"Going to run type checker...\n"
-    type_checker_run(type_checker, root);
-    $"Finished type checking.\n"
-
-    ast_dump_tree(root);
-
-    calculate_stacks(root, endlos);
-
-    let il_gen: IL_gen;
-    il_gen_init(il_gen, endlos, symbol_cache);
+    compile_module(module, symbol_cache, ast_allocator, endlos);
 
     $"Going to run il gen...\n"
-    il_gen_run(il_gen, root);
+    let opcodes = il_gen_run(module.ast_root, symbol_cache, endlos);
     $"il gen finished\n"
-
-    let opcodes = EndlosArr_finalize~Opcode(il_gen.opcodes, endlos);
 
     dump_opcodes(opcodes);
 
     output_asm("out1.asm", opcodes, endlos);
-
 }

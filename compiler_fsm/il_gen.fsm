@@ -21,12 +21,6 @@ struct IL_gen {
     num_strings;
 }
 
-fn il_gen_init(gen: IL_gen&, endlos: EndlosAllocator&, symbol_cache: SymbolCache&) {
-    EndlosArr_begin~Opcode(gen.opcodes, endlos);
-    gen.type_cache => symbol_cache.type_cache;
-    gen.symbol_cache => symbol_cache;
-}
-
 fn push_opcode_2(gen: IL_gen&, kind: OpKind, value: u8[]&, i64_value_0, i64_value_1, type: Type&, location: Location&) : Opcode& {
     let op => EndlosArr_push~Opcode(gen.opcodes);
 
@@ -766,6 +760,14 @@ fn il_gen_visitor(n: AST_node&, gen: IL_gen&) : void {
     }
 }
 
-fn il_gen_run (gen: IL_gen&, root: AST_node&) : void {
+fn il_gen_run (root: AST_node&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&) : Opcode [] {
+    let gen: IL_gen;
+    gen.type_cache => symbol_cache.type_cache;
+    gen.symbol_cache => symbol_cache;
+
+    EndlosArr_begin~Opcode(gen.opcodes, endlos);
+    
     il_gen_visitor(root, gen);
+
+    return EndlosArr_finalize~Opcode(gen.opcodes, endlos);
 }
