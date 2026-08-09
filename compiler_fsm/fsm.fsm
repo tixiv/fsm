@@ -100,6 +100,7 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : void {
         let import_filename = endlos_ripp_off~u8(mw.endlos, sb.buffer);
         
         if (res) {
+            import_filename.len--; // make the terminating 0 for C invisible to FSM
             compile_module(mw, import_filename);
         }
         else {
@@ -130,7 +131,7 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : void {
 }
 
 fn compile_program(initial_filename: u8[]) {
-    let verbose = false;
+    let verbose = true;
 
     let endlos: EndlosAllocator;
     endlos_init(endlos);
@@ -156,7 +157,17 @@ fn compile_program(initial_filename: u8[]) {
     let compiled_modules = EndlosArr_finalize~Module(mw.modules, endlos);
 
     if (verbose) $"Going to run il gen...\n"
-    let opcodes = il_gen_run(compiled_modules[0].ast_root, symbol_cache, endlos);
+
+    let gen: IL_gen;
+    gen.type_cache => type_cache;
+    gen.symbol_cache => symbol_cache;
+    EndlosArr_begin~Opcode(gen.opcodes, endlos);
+
+    for (let i = 0; i < compiled_modules.len; i++) {
+        il_gen_run(gen, compiled_modules[i].ast_root);
+    }
+    let opcodes = EndlosArr_finalize~Opcode(gen.opcodes, endlos);
+
     if (verbose) $"il gen finished\n"
 
     // dump_opcodes(opcodes);

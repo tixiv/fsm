@@ -48,7 +48,7 @@ fn init_builtin_functions(sc: SymbolCache&) {
     declare_builtin_fn(sc, "write", tc.builtin_i64, tmp_args);
     declare_builtin_fn(sc, "connect", tc.builtin_i64, tmp_args);
 
-    tmp_args.len = 3; tmp_args[0] => get_ref_type_for(tc, tc.builtin_u8); tmp_args[1] => tc.builtin_i64; tmp_args[2] => tc.builtin_i64;
+    tmp_args.len = 3; tmp_args[0] => tc.builtin_i64; tmp_args[1] => tc.builtin_i64; tmp_args[2] => tc.builtin_i64;
     declare_builtin_fn(sc, "socket", tc.builtin_i64, tmp_args);
 
     // mmap(addr: any&, lenght: i64, prot: u64, flags: u64, fd: i64, offset: i64) : any &

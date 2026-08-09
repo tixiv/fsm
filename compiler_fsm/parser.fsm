@@ -13,6 +13,14 @@ fn parser_error(parser: Parser&, message: u8[]) {
     fsm_compiler_error("[FSM Parser]", parser.CT.location, message)
 }
 
+fn make_location_string(parser: Parser&) : u8[] {
+    let l = parser.CT.location;
+    let sb: StringBuilder;
+    sb_init(sb, endlos_begin~u8(parser.endlos));
+    sb_puts(sb, $"{l.module.filename}:{l.line}")
+    return endlos_ripp_off~u8(parser.endlos, sb.buffer);
+}
+
 fn MOVE_NEXT(parser: Parser&) {
     parser.tokens++;
     parser.CT => parser.tokens.begin;
@@ -204,36 +212,34 @@ fn parse_for(parser: Parser&) :AST_node& {
     return n;
 }
 
-/*
-fn AST_node& parse_builder_string(parser: Parser&) {
+fn parse_builder_string(parser: Parser&) : AST_node& {
     let builder => ast_alloc(parser.allocator, AST_node::AST_builder_string, parser.CT.location);
 
-    builder.builder_string.var_decl_sb => ast_alloc(parser.allocator, AST_node::AST_var_decl, parser.CT.location);
-    builder.builder_string.var_decl_sb.var_decl._typedecl => ast_alloc(parser.allocator, AST_node::AST_typename, parser.CT.location);
-    builder.builder_string.var_decl_sb.var_decl._typedecl._typename.name = mkSV("StringBuilder");
+    builder.AST_builder_string.var_decl_sb => ast_alloc(parser.allocator, AST_node::AST_var_decl, parser.CT.location);
+    builder.AST_builder_string.var_decl_sb.AST_var_decl._typedecl => ast_alloc(parser.allocator, AST_node::AST_typename, parser.CT.location);
+    builder.AST_builder_string.var_decl_sb.AST_var_decl._typedecl.AST_typename.name = "StringBuilder";
 
-    builder.builder_string.var_decl_arr => ast_alloc(parser.allocator, AST_node::AST_var_decl, parser.CT.location);
-    builder.builder_string.var_decl_arr.var_decl._typedecl => ast_alloc(parser.allocator, AST_node::AST_type_array, parser.CT.location);
-    builder.builder_string.var_decl_arr.var_decl._typedecl._type_array.n_elements = 1024;
-    builder.builder_string.var_decl_arr.var_decl._typedecl._type_array.body => ast_alloc(parser.allocator, AST_node::AST_typename, parser.CT.location);
-    builder.builder_string.var_decl_arr.var_decl._typedecl._type_array.body._typename.name = mkSV("u8");
+    builder.AST_builder_string.var_decl_arr => ast_alloc(parser.allocator, AST_node::AST_var_decl, parser.CT.location);
+    builder.AST_builder_string.var_decl_arr.AST_var_decl._typedecl => ast_alloc(parser.allocator, AST_node::AST_type_array, parser.CT.location);
+    builder.AST_builder_string.var_decl_arr.AST_var_decl._typedecl.AST_type_array.n_elements = 1024;
+    builder.AST_builder_string.var_decl_arr.AST_var_decl._typedecl.AST_type_array.body => ast_alloc(parser.allocator, AST_node::AST_typename, parser.CT.location);
+    builder.AST_builder_string.var_decl_arr.AST_var_decl._typedecl.AST_type_array.body.AST_typename.name = "u8";
 
     MOVE_NEXT(parser);
 
     while (parser.CT.kind != TokenKind::TOK_builder_string_end) {
         if (parser.CT.kind == TokenKind::TOK_string) {
             let ast_str => ast_alloc(parser.allocator, AST_node::AST_string, parser.CT.location);
-            ast_str.str.value = parser.CT.value;
-            ast_link_to_chain(&builder.builder_string.body, ast_str);
+            ast_str.AST_string.value = parser.CT.value;
+            ast_link_to_chain(&builder.AST_builder_string.body, ast_str);
             MOVE_NEXT(parser);
         } else {
-            ast_link_to_chain(&builder.builder_string.body, parse_expression(parser));
+            ast_link_to_chain(&builder.AST_builder_string.body, parse_expression(parser));
         }
     }
     MOVE_NEXT(parser);
     return builder;
 }
-*/
 
 fn parse_call_arguments(parser: Parser&) : AST_node& {
     MOVE_NEXT(parser);
@@ -303,20 +309,28 @@ fn parse_primary(parser: Parser&) : AST_node&
         n.AST_string.value = parser.CT.value;
         MOVE_NEXT(parser);
     }
+    else if (parser.CT.kind == TokenKind::TOK_magic_location) {
+        n => ast_alloc(parser.allocator, AST_node::AST_string, parser.CT.location);
+        n.AST_string.value = make_location_string(parser);
+        MOVE_NEXT(parser);
+    }
     else if (parser.CT.kind == TokenKind::TOK_char_constant) {
         n => ast_alloc(parser.allocator, AST_node::AST_char_constant, parser.CT.location);
         n.AST_char_constant.value = parser.CT.value;
         MOVE_NEXT(parser);
     }
-    /*
     else if (parser.CT.kind == TokenKind::TOK_builder_string_begin) {
-        n => parse_builder_string();
+        n => parse_builder_string(parser);
     }
-    */
     else if (parser.CT.kind == TokenKind::TOK_ampersand) {
         n => ast_alloc(parser.allocator, AST_node::AST_reference, parser.CT.location);
         MOVE_NEXT(parser);
         n.AST_reference.body => parse_primary(parser);
+    }
+    else if (parser.CT.kind == TokenKind::TOK_asterisk) {
+        n => ast_alloc(parser.allocator, AST_node::AST_dereference, parser.CT.location);
+        MOVE_NEXT(parser);
+        n.AST_dereference.body => parse_primary(parser);
     }
     else if (parser.CT.kind == TokenKind::TOK_exclam || parser.CT.kind == TokenKind::TOK_minus) {
         n => ast_alloc(parser.allocator, AST_node::AST_unary, parser.CT.location);
@@ -333,6 +347,13 @@ fn parse_primary(parser: Parser&) : AST_node&
         n => ast_alloc(parser.allocator, AST_node::AST_minus_minus, parser.CT.location);
         MOVE_NEXT(parser);
         n.AST_minus_minus.body => parse_primary(parser);
+    }
+    else if (parser.CT.kind == TokenKind::TOK_lower) {
+        n => ast_alloc(parser.allocator, AST_node::AST_user_cast, parser.CT.location);
+        MOVE_NEXT(parser);
+        n.AST_user_cast.typedecl => parse_typedecl(parser);
+        take_expected(parser, TokenKind::TOK_greater);
+        n.AST_user_cast.body => parse_primary(parser);
     }
     else if (parser.CT.kind == TokenKind::TOK_identifier) {
         n => ast_alloc(parser.allocator, AST_node::AST_symbol, parser.CT.location);
@@ -377,6 +398,13 @@ fn parse_primary(parser: Parser&) : AST_node&
                 ast_namespace_access.AST_namespace_access.name = parser.CT.value;
                 MOVE_NEXT(parser);
                 n => ast_namespace_access;
+            }
+            if (parser.CT.kind == TokenKind::TOK_tilde) {
+                let ast_generic_speciation => ast_alloc(parser.allocator, AST_node::AST_generic_speciation, parser.CT.location);
+                MOVE_NEXT(parser);
+                ast_generic_speciation.AST_generic_speciation.typedecl => parse_typedecl(parser);
+                ast_generic_speciation.AST_generic_speciation.body => n;
+                n => ast_generic_speciation;
             }
         }
     }
@@ -833,6 +861,29 @@ fn parse_enum(parser: Parser&) : AST_node& {
     return ast_enum;
 }
 
+fn parse_generic(parser: Parser&) : AST_node& {
+    expect_token(parser, TokenKind::TOK_keyword_generic);
+    let ast_generic => ast_alloc(parser.allocator, AST_node::AST_generic, parser.CT.location);
+    MOVE_NEXT(parser);
+
+    expect_token(parser, TokenKind::TOK_identifier);
+    ast_generic.AST_generic.parameter_name = parser.CT.value;
+    MOVE_NEXT(parser);
+
+    if (parser.CT.kind == TokenKind::TOK_keyword_fn) {
+        ast_generic.AST_generic.body => parse_function(parser);
+    }
+    else if (parser.CT.kind == TokenKind::TOK_keyword_struct |== TokenKind::TOK_keyword_record) {
+        ast_generic.AST_generic.body => parse_struct(parser);
+    }
+    else if (parser.CT.kind == TokenKind::TOK_keyword_union) {
+        ast_generic.AST_generic.body => parse_union(parser);
+    }
+    else parser_error(parser, "Generic definition expects either 'fn', 'struct', 'record' or 'union'.");
+
+    return ast_generic;
+}
+
 fn parse_program(tokens: Token[], allocator: AST_Node_Allocator&, endlos: EndlosAllocator&) : AST_node& {
     let parser: Parser;
     parser.tokens = tokens;
@@ -867,6 +918,9 @@ fn parse_program(tokens: Token[], allocator: AST_Node_Allocator&, endlos: Endlos
         }
         else if (parser.CT.kind == TokenKind::TOK_keyword_enum) {
             ast_link_to_chain(&root.AST_program.body, parse_enum(parser));
+        }
+        else if (parser.CT.kind == TokenKind::TOK_keyword_generic) {
+            ast_link_to_chain(&root.AST_program.body, parse_generic(parser));
         }
         else {
             parser_error(parser, $"Expected top level definition or EOF but got {parser.CT.kind.name}");

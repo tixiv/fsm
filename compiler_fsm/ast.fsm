@@ -403,6 +403,10 @@ fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
     else if (n.kind == AST_node::AST_cast) {
         visit_non_null(n.AST_cast.body, visit, arg);
     }
+    else if (n.kind == AST_node::AST_user_cast) {
+        visit_non_null(n.AST_user_cast.typedecl, visit, arg);
+        visit_non_null(n.AST_user_cast.body, visit, arg);
+    }
     else if (n.kind == AST_node::AST_array_to_slice) {
         visit_non_null(n.AST_array_to_slice.body, visit, arg);
     }
@@ -467,6 +471,9 @@ fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
         ast_visit_chain(n.AST_function_type.function_args, visit, arg);
         visit_non_null(n.AST_function_type.function_ret, visit, arg);
     }
+    else if (n.kind == AST_node::AST_generic) {
+        visit_non_null(n.AST_generic.body, visit, arg);
+    }
     else if (n.kind  == AST_node::AST_enum_member
                     |== AST_node::AST_symbol
                     |== AST_node::AST_number
@@ -523,47 +530,47 @@ fn ast_dump_visitor (n: AST_node&, spaces: i64&) : void {
                    |== AST_node::AST_function_type
                    |== AST_node::AST_null)
     {
-        $"{spc}{n.kind.name} ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_struct) {
-        $"{spc}{n.kind.name} '{n.AST_struct.name}' ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} '{n.AST_struct.name}' ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_member_def) {
-        $"{spc}{n.kind.name} '{n.AST_member_def.name}' ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} '{n.AST_member_def.name}' ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_member_access) {
-        $"{spc}{n.kind.name} '{n.AST_member_access.name}' ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} '{n.AST_member_access.name}' ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_enum) {
-        $"{spc}{n.kind.name} '{n.AST_enum.name}' ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} '{n.AST_enum.name}' ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_enum_member) {
-        $"{spc}{n.kind.name} '{n.AST_enum_member.name}' {n.AST_enum_member.value} ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} '{n.AST_enum_member.name}' {n.AST_enum_member.value} ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_union) {
-        $"{spc}{n.kind.name} '{n.AST_union.name}' ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} '{n.AST_union.name}' ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_union_member_def) {
-        $"{spc}{n.kind.name} '{n.AST_union_member_def.name}' ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} '{n.AST_union_member_def.name}' ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_namespace_access) {
-        $"{spc}{n.kind.name} '{n.AST_namespace_access.name}' ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} '{n.AST_namespace_access.name}' ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_typename) {
-        $"{spc}{n.kind.name} '{n.AST_typename.name}' ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} '{n.AST_typename.name}' ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_function) {
-        $"{spc}{n.kind.name} '{n.AST_function.name}', ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} '{n.AST_function.name}', ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_var_decl) {
@@ -579,19 +586,19 @@ fn ast_dump_visitor (n: AST_node&, spaces: i64&) : void {
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_number) {
-        $"{spc}{n.kind.name} '{n.AST_number.value}' ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} '{n.AST_number.value}' ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
     }
     else if (n.kind == AST_node::AST_bool) {
-        $"{spc}{n.kind.name} '{n.AST_bool.value}' ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} '{n.AST_bool.value}' ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
     }
     else if (n.kind == AST_node::AST_string) {
-        $"{spc}{n.kind.name} \"{n.AST_string.value}\" ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} \"{n.AST_string.value}\" ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
     }
     else if (n.kind == AST_node::AST_char_constant) {
-        $"{spc}{n.kind.name} \"{n.AST_char_constant.value}\" ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} \"{n.AST_char_constant.value}\" ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
     }
     else if (n.kind == AST_node::AST_if) {
-        $"{spc}{n.kind.name} ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         if (n.AST_if.condition) {
             $"{spc}  Condition:\n";
             ast_dump_visitor(n.AST_if.condition, child_spaces);
@@ -606,30 +613,42 @@ fn ast_dump_visitor (n: AST_node&, spaces: i64&) : void {
         }
     }
     else if (n.kind == AST_node::AST_binary) {
-        $"{spc}{n.kind.name} {n.AST_binary.token_kind.name} ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} {n.AST_binary.token_kind.name} ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_unary) {
-        $"{spc}{n.kind.name} {n.AST_unary.token_kind.name} ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} {n.AST_unary.token_kind.name} ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_variadic_operator) {
-        $"{spc}{n.kind.name} {n.AST_variadic_operator.members[0].token_kind.name} ({get_type_name_r(buf, n.type)})\n";
+        $"{spc}{n.kind.name} {n.AST_variadic_operator.members[0].token_kind.name} ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_symbol) {
         $"{spc}{n.kind.name} '{n.AST_symbol.name}' ";
         print_symbol(n.AST_symbol.symbol);
-        $" ({get_type_name_r(buf, n.type)})\n";
+        $" ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_call) {
         $"{spc}{n.kind.name} ";
-        $"({get_type_name_r(buf, n.type)})\n";
+        $"({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else if (n.kind == AST_node::AST_cast) {
-        $"{spc}{n.kind.name} '{get_type_name_r(buf, n.type)}' <- '{get_type_name_r(buf, n.AST_cast.right_type)}'\n";
+        $"{spc}{n.kind.name} '{get_type_name_r(buf, n.type)}' <- '{get_type_name_r(buf, n.AST_cast.right_type)}' ru:{n.result_used}\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_user_cast) {
+        $"{spc}{n.kind.name} '{get_type_name_r(buf, n.type)}' <- '{get_type_name_r(buf, n.AST_user_cast.body.type)}' ru:{n.result_used}\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_generic) {
+        $"{spc}{n.kind.name} {n.AST_generic.parameter_name} ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
+        ast_visit_children(n, ast_dump_visitor, child_spaces);
+    }
+    else if (n.kind == AST_node::AST_import) {
+        $"{spc}{n.kind.name} {n.AST_import.name} ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
     }
     else {

@@ -148,6 +148,7 @@ fn tokenizer_error(tokenizer: Tokenizer&, message: u8[]) {
     $"[FSM Tokenizer] {tokenizer.location.module.filename}:{tokenizer.location.line}:{tokenizer.location.col} Error: ";
     puts(message);
     if (message[message.len-1] != '\n') putc('\n');
+    exit(1);
 }
 
 fn read_word(input: u8[]&) {
@@ -218,6 +219,9 @@ fn handle_word(tokenizer: Tokenizer&, word: u8[]) {
     else if (sv_equal(word, "struct")) {
         push_token(tokenizer, TokenKind::TOK_keyword_struct, null);
     }
+    else if (sv_equal(word, "record")) {
+        push_token(tokenizer, TokenKind::TOK_keyword_record, null);
+    }
     else if (sv_equal(word, "enum")) {
         push_token(tokenizer, TokenKind::TOK_keyword_enum, null);
     }
@@ -241,6 +245,9 @@ fn handle_word(tokenizer: Tokenizer&, word: u8[]) {
     }
     else if (sv_equal(word, "fsm_debug")) {
         push_token(tokenizer, TokenKind::TOK_keyword_fsm_debug, null);
+    }
+    else if (sv_equal(word, "__LOCATION__")) {
+        push_token(tokenizer, TokenKind::TOK_magic_location, null);
     }
     else {
         push_token(tokenizer, TokenKind::TOK_identifier, word);
@@ -526,8 +533,9 @@ fn tokenize_fsm (tokenizer: Tokenizer&) : void {
             handle_word(tokenizer, read_word(code)); 
         }
         else {
-            tokenizer_error(tokenizer,  "encountered unhandled character '{c}' = 0x%02X. Quitting.\n");
-            // exit(EXIT_FAILURE);
+            let a = code;
+            a.len = 1;
+            tokenizer_error(tokenizer,  $"encountered unhandled character {c} = '{a}'. Quitting.\n");
         }
     }
     push_token(tokenizer, TokenKind::TOK_eof, null);

@@ -751,7 +751,8 @@ fn il_gen_visitor(n: AST_node&, gen: IL_gen&) : void {
                     |== AST_node::AST_union
                     |== AST_node::AST_union_member_def
                     |== AST_node::AST_generic_implementation
-                    |== AST_node::AST_type_generic_speciation)
+                    |== AST_node::AST_type_generic_speciation
+                    |== AST_node::AST_import)
     {
         ast_visit_children(n, il_gen_visitor, gen);
     }
@@ -760,14 +761,6 @@ fn il_gen_visitor(n: AST_node&, gen: IL_gen&) : void {
     }
 }
 
-fn il_gen_run (root: AST_node&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&) : Opcode [] {
-    let gen: IL_gen;
-    gen.type_cache => symbol_cache.type_cache;
-    gen.symbol_cache => symbol_cache;
-
-    EndlosArr_begin~Opcode(gen.opcodes, endlos);
-    
+fn il_gen_run (gen: IL_gen&, root: AST_node&) : void {
     il_gen_visitor(root, gen);
-
-    return EndlosArr_finalize~Opcode(gen.opcodes, endlos);
 }

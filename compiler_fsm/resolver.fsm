@@ -15,6 +15,9 @@ struct Resolver {
     current_function: Symbol&;
     locals_stack: i64[];
     locals_stack_pointer : i64;
+    current_generic: AST_node&;
+    generic_symbol: Symbol&;
+    current_generic_type: Type&;
 }
 
 fn push_symbol(res: Resolver&, arr: EndlosArr<Symbol&>&, s: Symbol&, n: AST_node&) {
@@ -37,6 +40,10 @@ fn resolver_lookup_symbol(res: Resolver&, name: u8[], n: AST_node&, do_undefined
     // globals
     s => get_global_symbol_by_name(res.symbol_cache, name);
     if (s) return s;
+
+    if (res.generic_symbol && sv_equal(res.generic_symbol.name, name)) {
+        return res.generic_symbol;
+    }
 
     if(do_undefined_error)
         resolver_error(n, $"Undefined symbol {name}");
@@ -70,6 +77,11 @@ fn resolve_globals_visitor (n: AST_node&, res: Resolver&) : void {
         let s_fun => alloc_symbol(res.symbol_cache, SymbolKind::SYM_function, n.AST_function.name, n.location);
         push_global_symbol(res.symbol_cache, s_fun)
         n.AST_function.symbol => s_fun;
+    }
+    else if (n.kind == AST_node::AST_generic) {
+        res.current_generic => n;
+        ast_visit_children(n, resolve_globals_visitor, res);
+        res.current_generic => null;
     }
     else
         ast_visit_children(n, resolve_globals_visitor, res);
@@ -107,6 +119,17 @@ fn resolver_visitor(n: AST_node&, res: Resolver&) : void {
         resolver_enter_scope(res, n);
         ast_visit_children(n, resolver_visitor, res);
         resolver_leave_scope(res);
+    }
+    else if (n.kind == AST_node::AST_generic) {
+        res.current_generic => n;
+        res.generic_symbol => alloc_symbol(res.symbol_cache, SymbolKind::SYM_type, n.AST_generic.parameter_name, n.location);
+        if (res.current_generic_type)
+            res.generic_symbol.type => res.current_generic_type
+        else
+            res.generic_symbol.type => res.type_cache.builtin_generic;
+        ast_visit_children(n, resolver_visitor, res);
+        res.generic_symbol => null;
+        res.current_generic => null;
     }
     else if (n.kind == AST_node::AST_arg_list
                     |== AST_node::AST_program

@@ -40,8 +40,9 @@ fn annotate_used_visitor(n: AST_node&, type_checker: TypeChecker&) {
         ast_visit_children(n, annotate_used_visitor, type_checker);
     }
     else if (n.kind == AST_node::AST_var_decl
-                    |== AST_node::AST_call
-    ) {
+                    |== AST_node::AST_call)
+    {
+        type_checker.used = true;
         ast_visit_children(n, annotate_used_visitor, type_checker);
     }
     else if (n.kind == AST_node::AST_return) {
@@ -952,13 +953,14 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
     }
     else if (n.kind == AST_node::AST_arg_list
                     |== AST_node::AST_program
-                    |== AST_node::AST_scope)
+                    |== AST_node::AST_scope
+                    |== AST_node::AST_import)
     {
         // these have void type
         n.type => type_checker.type_cache.builtin_void;
     }
     else {
-        NOT_IMPLEMENTED(__LOCATION__, "Type checking {n.kind}");
+        NOT_IMPLEMENTED(__LOCATION__, $"Type checking {n.kind.name}");
     }
 
     ASSERT(n.type, $"All nodes should have a type after the type checker. Have {n.kind.name} with null type.\n");
@@ -973,6 +975,5 @@ fn type_checker_run(root: AST_node&, symbol_cache: SymbolCache&, ast_allocator: 
 
     annotate_used_visitor(root, type_checker);
     type_resolve_functions_visitor(root, type_checker);
-
     type_propagation_visitor(root, type_checker);
 }
