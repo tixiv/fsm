@@ -24,27 +24,6 @@ static void type_resolver_error(const Location *location, const char * fmt, ...)
     va_end(args);
 }
 
-typedef struct {
-    Type *type;
-    const Location *location;
-} NamedType;
-
-Dyn_array named_types; // <NamedType>
-
-NamedType *get_named_type(size_t index) {
-    ASSERT(index < named_types.count, "Named type index out of bounds.\n");
-    return &((NamedType*)named_types.data)[index];
-}
-
-NamedType *get_named_type_by_name(const SV *name) {
-    for (size_t i = 0; i < named_types.count; i++) {
-        NamedType *nt = get_named_type(i);
-        if (sv_equal(&nt->type->name, name))
-            return nt;
-    }
-    return nullptr;
-}
-
 Type *get_builtin_type_by_name(const SV *name) {
     if (sv_compare_cstr(name,"void")) return &builtin_void;
     if (sv_compare_cstr(name,"any")) return &builtin_any;
@@ -61,12 +40,18 @@ Type *get_builtin_type_by_name(const SV *name) {
     return nullptr;
 }
 
-Type *get_type_by_name(const SV *name) {
+Type *get_type_by_name(SV *name, const Location *location) {
     Type *t = get_builtin_type_by_name(name);
     if (t) return t;
 
-    NamedType *nt = get_named_type_by_name(name);
-    if (nt) return nt->type;
+    Symbol *sym = get_symbol_by_name(&global_symbols, name);
+
+    if (sym) {
+        if (sym->kind != SYM_type) {
+            type_resolver_error(location, "'%.*s' is not a type symbol.");
+        }
+        return sym->type;
+    }
 
     return nullptr;
 }
@@ -82,9 +67,12 @@ static void type_resolver_push_symbol(Symbol *s, const Location *location) {
 }
 
 void push_named_type(SV name, Type * t, const Location *location) {
-    NamedType *nt = get_named_type_by_name(&name);
-    if (nt) {
-        type_resolver_error(location, "Tried to redefine type '%.*s' which was previously defined in %s:%d\n", SV_prnt(name), nt->location->filename, nt->location->line);
+    // NamedType *nt = get_named_type_by_name(&name);
+
+    Symbol *sym = get_symbol_by_name(&global_symbols, &name);
+
+    if (sym) {
+        type_resolver_error(location, "Tried to redefine type '%.*s' which was previously defined in %s:%d\n", SV_prnt(name), sym->location->filename, sym->location->line);
     }
 
     if (get_builtin_type_by_name(&name)) {
@@ -92,9 +80,6 @@ void push_named_type(SV name, Type * t, const Location *location) {
     }
 
     t->name = name;
-    nt = dyn_array_push(&named_types);
-    nt->location = location;
-    nt->type = t;
 
     Symbol *s = alloc_symbol(SYM_type, name, location);
     s->name = name;
@@ -185,7 +170,7 @@ void type_resolve_struct(AST_node *n, TypeResolverState *trs, bool global) {
     srs.trs = trs;
     dyn_array_init(&srs.struct_members, sizeof(StructMember), 8);
     if (global) {
-        n->type = get_type_by_name(&n->_struct.name);
+        n->type = get_type_by_name(&n->_struct.name, n->location);
         ASSERT(n->type, "The type name '%.*s' should exist because it should have been found in the lookup pass.\n", SV_prnt(n->_struct.name));
     }
     else {
@@ -277,7 +262,7 @@ void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
         case AST_enum: {
             EnumResolverState ers;
             dyn_array_init(&ers.enum_members, sizeof(EnumMember), 8);
-            n->type = get_type_by_name(&n->_enum.name);
+            n->type = get_type_by_name(&n->_enum.name, n->location);
             ASSERT(n->type, "The type name should exist because it should have been found in the lookup pass.\n");
             ers.current_enum = n->type;
             ast_visit_children(n, (AstVisitor)type_resolver_enum_visitor, &ers);
@@ -289,7 +274,7 @@ void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
             UnionResolverState urs;
             urs.trs = trs;
             dyn_array_init(&urs.union_members, sizeof(UnionMember), 8);
-            n->type = get_type_by_name(&n->_union.name);
+            n->type = get_type_by_name(&n->_union.name, n->location);
             n->type->_union.enumarator_name = n->_union.enumerator_name;
             ASSERT(n->type, "The type name should exist because it should have been found in the lookup pass.\n");
             urs.current_union = n->type;
@@ -307,7 +292,7 @@ void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
                     n->type = &builtin_generic;
             }
             else
-                n->type = get_type_by_name(&n->_typename.name);
+                n->type = get_type_by_name(&n->_typename.name, n->location);
             if (!n->type) type_resolver_error(n->location, "The typename '%.*s' could not be resolved.\n", SV_prnt(n->_typename.name));
             break;
         }
@@ -374,8 +359,4 @@ void run_type_resolver(AST_node *root) {
     trs.generic_parameter_name = (SV) {nullptr, 0};
     type_lookup_visitor(root, nullptr);
     type_resolver_visitor(root, &trs);
-}
-
-void type_resolver_init() {
-    dyn_array_init(&named_types, sizeof(NamedType), 32);
 }

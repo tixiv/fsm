@@ -25,7 +25,7 @@ Symbol *get_symbol(Dyn_array *arr, size_t index) {
 }
 
 Symbol *make_type_symbol(SV *name, const Location *location) {
-    Type *t = get_type_by_name(name);
+    Type *t = get_type_by_name(name, location);
     if (!t) return nullptr;
 
     Symbol *s = alloc_symbol(SYM_type, *name, location);
