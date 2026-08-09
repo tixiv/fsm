@@ -177,7 +177,7 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
     if (is_slice_kind(target_type) && is_array_kind(n->type)) {
         if (get_slice_element_type(target_type) == n->type->_array.element_type) {
             AST_node *conv = ast_alloc(AST_array_to_slice, n->location);
-            conv->type = get_sclice_type(n->type->_array.element_type);
+            conv->type = get_slice_type(n->type->_array.element_type);
             ast_insert_node(n, conv);
             return;
         }

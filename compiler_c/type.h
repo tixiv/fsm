@@ -159,7 +159,7 @@ Type *get_ref_type_for(Type *t);
 Type *get_enumerator_type_for(Type *t);
 
 Type *get_array_type(Type *element_type, size_t n_elements);
-Type *get_sclice_type(Type *element_type);
+Type *get_slice_type(Type *element_type);
 Type *get_function_type(Type *ret_type, Type *arg_types[], size_t num_args);
 
 Type *get_speciated_type(Type *base, Type *speciation);

@@ -15,16 +15,16 @@ fn il_gen_warning(l: Location, s: u8[]) {
 struct IL_gen {
     opcodes: EndlosArr<Opcode>;
     type_cache: TypeCache&;
-    global_symbols: SymbolRefArr&;
+    symbol_cache: SymbolCache&;
     num_ifs;
     num_whiles;
     num_strings;
 }
 
-fn il_gen_init(gen: IL_gen&, endlos: EndlosAllocator&, type_cache: TypeCache&, global_symbols: SymbolRefArr&) {
+fn il_gen_init(gen: IL_gen&, endlos: EndlosAllocator&, symbol_cache: SymbolCache&) {
     EndlosArr_begin~Opcode(gen.opcodes, endlos);
-    gen.type_cache => type_cache;
-    gen.global_symbols => global_symbols;
+    gen.type_cache => symbol_cache.type_cache;
+    gen.symbol_cache => symbol_cache;
 }
 
 fn push_opcode_2(gen: IL_gen&, kind: OpKind, value: u8[]&, i64_value_0, i64_value_1, type: Type&, location: Location&) : Opcode& {
@@ -411,8 +411,8 @@ fn gen_address_visitor(n: AST_node&, gen: IL_gen&) : void {
 fn gen_builder_string_put_struct (s_sb: Symbol&, arg: AST_node&, gen: IL_gen&) {
     let buf: u8[1024];
 
-    let sb_puts_symbol => get_symbol_by_name(gen.global_symbols, "sb_puts");
-    let sb_puti_symbol => get_symbol_by_name(gen.global_symbols, "sb_puti");
+    let sb_puts_symbol => get_global_symbol_by_name(gen.symbol_cache, "sb_puts");
+    let sb_puti_symbol => get_global_symbol_by_name(gen.symbol_cache, "sb_puti");
     ASSERT(sb_puts_symbol, "sb_puts not found.\n");
     ASSERT(sb_puti_symbol, "sb_puti not found.\n");
 
@@ -478,9 +478,9 @@ fn gen_builder_string (n: AST_node&, gen: IL_gen&) {
     let buf: u8[1024];
     let s_sb => n.AST_builder_string.var_decl_sb.AST_symbol.symbol;
     let s_arr => n.AST_builder_string.var_decl_arr.AST_symbol.symbol;
-    let sb_init_symbol => get_symbol_by_name(gen.global_symbols, "sb_init");
-    let sb_puts_symbol => get_symbol_by_name(gen.global_symbols, "sb_puts");
-    let sb_puti_symbol => get_symbol_by_name(gen.global_symbols, "sb_puti");
+    let sb_init_symbol => get_global_symbol_by_name(gen.symbol_cache, "sb_init");
+    let sb_puts_symbol => get_global_symbol_by_name(gen.symbol_cache, "sb_puts");
+    let sb_puti_symbol => get_global_symbol_by_name(gen.symbol_cache, "sb_puti");
     ASSERT(sb_puts_symbol, "sb_puts not found.\n");
     ASSERT(sb_puti_symbol, "sb_puti not found.\n");
 

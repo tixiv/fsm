@@ -18,9 +18,9 @@ fn type_checker_warning(n: AST_node&, s: u8[]) {
 
 struct TypeChecker {
     type_cache: TypeCache&;
+    symbol_cache: SymbolCache&;
     ast_allocator: AST_Node_Allocator&;
     endlos: EndlosAllocator&;
-    global_symbols: SymbolRefArr&;
     used: bool;
     current_function_symbol: Symbol&;
     current_function_ret_type_decl: Type&;
@@ -92,7 +92,7 @@ fn annotate_used_visitor(n: AST_node&, type_checker: TypeChecker&) {
             let ast_call => ast_alloc(type_checker.ast_allocator, AST_node::AST_call, n.location);
             let ast_symbol => ast_alloc(type_checker.ast_allocator, AST_node::AST_symbol, n.location);
             ast_symbol.AST_symbol.name = "puts";
-            ast_symbol.AST_symbol.symbol => get_symbol_by_name(type_checker.global_symbols, "puts");
+            ast_symbol.AST_symbol.symbol => get_global_symbol_by_name(type_checker.symbol_cache, "puts");
             ast_call.AST_call.target => ast_symbol;
             ast_insert_node(type_checker.ast_allocator, n, ast_call);
             type_checker.used = true;
@@ -121,13 +121,10 @@ fn auto_dereference(type_checker: TypeChecker&, n: AST_node&) {
 }
 
 fn insert_take_reference(type_checker: TypeChecker&, n: AST_node&) {
-    NOT_IMPLEMENTED(__LOCATION__, "insert_take_reference");
-    /*
     let ref => ast_alloc(type_checker.ast_allocator, AST_node::AST_reference, n.location);
-    ref.type => get_ref_type_for(n.type);
+    ref.type => get_ref_type_for(type_checker.type_cache, n.type);
     ref.addressable = false;
     ast_insert_node(type_checker.ast_allocator, n, ref);
-    */
 }
 
 fn check_function_argument_compatible(type_checker: TypeChecker&, arg_1: Type&, arg_2: Type&) : bool {
@@ -978,9 +975,9 @@ fn type_checker_run(type_checker: TypeChecker&, root: AST_node&) {
     type_propagation_visitor(root, type_checker);
 }
 
-fn type_checker_init(type_checker: TypeChecker&, type_cache: TypeCache&, ast_allocator: AST_Node_Allocator&, endlos: EndlosAllocator&, global_symbols: SymbolRefArr&) {
-    type_checker.type_cache => type_cache;
+fn type_checker_init(type_checker: TypeChecker&, symbol_cache: SymbolCache&, ast_allocator: AST_Node_Allocator&, endlos: EndlosAllocator&) {
+    type_checker.type_cache => symbol_cache.type_cache;
+    type_checker.symbol_cache => symbol_cache;
     type_checker.ast_allocator => ast_allocator;
     type_checker.endlos => endlos;
-    type_checker.global_symbols => global_symbols;
 }

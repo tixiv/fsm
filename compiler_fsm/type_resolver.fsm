@@ -1,0 +1,262 @@
+
+import * from "std";
+import * from "endlos";
+import * from "symbol";
+import * from "tokenizer";
+import * from "type";
+import * from "ast";
+
+fn type_resolver_error(location: Location&, message: u8[]) {
+    fsm_compiler_error("[FSM Type Resolver]", location, message);
+}
+
+struct TypeResolverState {
+    symbol_cache: SymbolCache&;
+    endlos: EndlosAllocator&;
+    generic_parameter_name: u8[];
+    generic_parameter_type: Type&;
+}
+
+struct EnumResolverState {
+    trs: TypeResolverState&;
+    current_enum: Type&;
+    enum_members: EndlosArr<EnumMember>;
+}
+
+struct StructResolverState {
+    trs: TypeResolverState&;
+    current_struct: Type&;
+    struct_members: EndlosArr<StructMember>;
+}
+
+struct UnionResolverState {
+    trs: TypeResolverState&;
+    current_union: Type&;
+    union_members: EndlosArr<UnionMember>;
+}
+
+fn get_type_by_name(symbol_cache: SymbolCache&, name: u8[], location: Location&) : Type& {
+    let sym => get_global_symbol_by_name(symbol_cache, name);
+
+    if (sym) {
+        if (sym.kind != SymbolKind::SYM_type) {
+            if (sym.location)
+                type_resolver_error(location, $"'{name}' is not a type symbol. The definition of {name} is here: {sym.location.module.filename}:{sym.location.line}")
+            else
+                type_resolver_error(location, $"Builtin '{name}' is not a type symbol");
+        }
+        return sym.type;
+    }
+
+    return null;
+}
+
+fn push_named_type(symbol_cache: SymbolCache&, name: u8[], type: Type&, location: Location&) : void {
+    type.name = name;
+
+    let sym => alloc_symbol(symbol_cache, SymbolKind::SYM_type, name, location);
+    sym.type => type;
+
+    push_global_symbol(symbol_cache, sym);
+}
+
+fn type_lookup_visitor(n: AST_node&, trs: TypeResolverState&) : void {
+    if (n.kind == AST_node::AST_struct) {
+        let t => type_alloc(trs.symbol_cache.type_cache, Type::T_struct);
+        t.T_struct.kind = StructlikeKind::SL_struct;
+        if (n.AST_struct.is_record)
+            t.T_struct.kind = StructlikeKind::SL_record;
+        push_named_type(trs.symbol_cache, n.AST_struct.name, t, n.location);
+    }
+    else if (n.kind == AST_node::AST_enum) {
+        let t => type_alloc(trs.symbol_cache.type_cache, Type::T_enum);
+        t.storage_size = 8;
+        push_named_type(trs.symbol_cache, n.AST_enum.name, t, n.location);
+    }
+    else if (n.kind == AST_node::AST_union) {
+        push_named_type(trs.symbol_cache, n.AST_union.name, type_alloc(trs.symbol_cache.type_cache, Type::T_union), n.location);
+    }
+    else {
+        ast_visit_children(n, type_lookup_visitor, trs);
+    }
+}
+
+fn type_resolve_struct(n: AST_node&, trs: TypeResolverState&, global: bool) {
+    let srs: StructResolverState;
+    srs.trs => trs;
+    EndlosArr_begin~StructMember(srs.struct_members, trs.endlos);
+    if (global) {
+        n.type => get_type_by_name(trs.symbol_cache, n.AST_struct.name, n.location);
+        ASSERT(n.type, $"{__LOCATION__} The type name '{n.AST_struct.name}' should exist because it should have been found in the lookup pass.\n");
+    }
+    else {
+        n.type => type_alloc(trs.symbol_cache.type_cache, Type::T_struct);
+        n.type.T_struct.kind = if (n.AST_struct.is_record) StructlikeKind::SL_record else StructlikeKind::SL_struct;
+    }
+    srs.current_struct => n.type;
+
+    ast_visit_children(n, type_resolver_struct_visitor, srs);
+
+    srs.current_struct.T_struct.members = EndlosArr_finalize~StructMember(srs.struct_members, srs.trs.endlos);
+    calculate_storage_size(srs.current_struct);
+}
+
+fn type_resolver_enum_visitor(n: AST_node&, ers: EnumResolverState&) {
+    if (n.kind == AST_node::AST_enum_member) {
+        ASSERT(ers.current_enum, $"{__LOCATION__} Encountered {n.kind.name} outside of enum.\n");
+        let member => EndlosArr_push~EnumMember(&ers.enum_members);
+        member.name = n.AST_enum_member.name;
+        ast_visit_children(n, type_resolver_visitor, ers.trs);
+        member.value = n.AST_enum_member.value;
+        n.type => ers.trs.symbol_cache.type_cache.builtin_i64;
+    }
+    else {
+        NOT_IMPLEMENTED(__LOCATION__, $"type_resolver_enum_visitor() for {n.kind.name}");
+    }
+}
+
+fn type_resolver_struct_visitor(n: AST_node&, srs: StructResolverState&) : void {
+    if (n.kind == AST_node::AST_member_def) {
+        ASSERT(srs.current_struct, $"{__LOCATION__} Encountered {n.kind.name} outside of struct.\n");
+        let member => EndlosArr_push~StructMember(srs.struct_members);
+        member.name = n.AST_member_def.name;
+        ast_visit_children(n, type_resolver_visitor, srs.trs);
+        if (n.AST_member_def._typedef) {
+            if (!n.AST_member_def._typedef.type) type_resolver_error(n.location, $"The type for struct member '{member.name}' could not be resolved.");
+            n.type => n.AST_member_def._typedef.type;
+        }
+        else {
+            n.type => srs.trs.symbol_cache.type_cache.builtin_i64;
+        }
+        member.type => n.type;
+    }
+    else {
+        NOT_IMPLEMENTED(__LOCATION__, $"type_resolver_struct_visitor() is not implemented for {n.kind.name}.\n");
+    }
+}
+
+fn type_resolver_union_visitor(n: AST_node&, urs: UnionResolverState&) : void {
+    if (n.kind == AST_node::AST_union_member_def) {
+        let member => EndlosArr_push~UnionMember(urs.union_members);
+        member.name = n.AST_union_member_def.name;
+        ast_visit_children(n, type_resolver_union_visitor, urs);
+        if (n.AST_union_member_def._typedef) {
+            if (!n.AST_union_member_def._typedef.type) type_resolver_error(n.location, $"The type for union member '{member.name}' could not be resolved.");
+            n.type => n.AST_union_member_def._typedef.type;
+        }
+        else {
+            n.type => urs.trs.symbol_cache.type_cache.builtin_i64;
+        }
+        member.type => n.type;
+        member.value = n.AST_union_member_def.enum_value;
+    }
+    else if (n.kind == AST_node::AST_struct) {
+        type_resolve_struct(n, urs.trs, false);
+    }
+    else {
+        NOT_IMPLEMENTED(__LOCATION__, $"type_resolver_union_visitor() for {n.kind.name}");
+    }
+}
+
+fn type_resolver_visitor(n: AST_node&, trs: TypeResolverState&) : void {
+    let tc => trs.symbol_cache.type_cache;
+    if (n.kind == AST_node::AST_struct) {
+        type_resolve_struct(n, trs, true);
+    }
+    else if (n.kind == AST_node::AST_enum) {
+        let ers: EnumResolverState;
+
+        EndlosArr_begin~EnumMember(ers.enum_members, trs.endlos);
+
+        n.type => get_type_by_name(trs.symbol_cache, n.AST_enum.name, n.location);
+        ASSERT(n.type, "The type name should exist because it should have been found in the lookup pass.\n");
+        
+        ers.current_enum => n.type;
+        
+        ast_visit_children(n, type_resolver_enum_visitor, &ers);
+        
+        ers.current_enum.T_enum.members = EndlosArr_finalize~EnumMember(ers.enum_members, trs.endlos);
+        }
+    else if (n.kind == AST_node::AST_union) {
+        let urs: UnionResolverState;
+        urs.trs => trs;
+        EndlosArr_begin~UnionMember(urs.union_members, trs.endlos);
+
+        n.type => get_type_by_name(trs.symbol_cache, n.AST_union.name, n.location);
+        ASSERT(n.type, "The type name should exist because it should have been found in the lookup pass.\n");
+
+        n.type.T_union.enumarator_name = n.AST_union.enumerator_name;
+        urs.current_union => n.type;
+
+        ast_visit_children(n, type_resolver_union_visitor, &urs);
+
+        urs.current_union.T_union.members = EndlosArr_finalize~UnionMember(urs.union_members, trs.endlos);
+        calculate_storage_size(urs.current_union);
+    }
+    else if (n.kind == AST_node::AST_typename) {
+        ast_visit_children(n, type_resolver_visitor, trs);
+        if (trs.generic_parameter_name.begin && sv_equal(&trs.generic_parameter_name, &n.AST_typename.name)) {
+            if (trs.generic_parameter_type)
+                n.type => trs.generic_parameter_type
+            else
+                n.type => trs.symbol_cache.type_cache.builtin_generic
+        }
+        else
+            n.type => get_type_by_name(trs.symbol_cache, n.AST_typename.name, n.location);
+        if (!n.type) type_resolver_error(n.location, $"The typename '{n.AST_typename.name}' could not be resolved.");
+    }
+    else if (n.kind == AST_node::AST_function_type) {
+        ast_visit_children(n, type_resolver_visitor, trs);
+        
+        let args = endlos_begin~Type&(trs.endlos);
+        for (let arg => n.AST_function_type.function_args; arg; arg => arg.next) {
+            *args++ => arg.type;
+        } 
+        args = endlos_ripp_off~Type&(trs.endlos, args);
+        
+        n.type => get_ref_type_for(tc, get_function_type(tc, n.AST_function_type.function_ret.type, args));
+    }
+    else if (n.kind == AST_node::AST_type_ref) {
+        ast_visit_children(n, type_resolver_visitor, trs);
+        n.type => get_ref_type_for(tc, n.AST_type_ref.body.type);
+    }
+    else if (n.kind == AST_node::AST_type_array) {
+        ast_visit_children(n, type_resolver_visitor, trs);
+        n.type => get_array_type(tc, n.AST_type_array.body.type, n.AST_type_array.n_elements);
+    }
+    else if (n.kind == AST_node::AST_type_slice) {
+        ast_visit_children(n, type_resolver_visitor, trs);
+        n.type => get_slice_type(tc, n.AST_type_slice.body.type);
+    }
+    else if (n.kind == AST_node::AST_type_generic_speciation) {
+        ast_visit_children(n, type_resolver_visitor, trs);
+        NOT_IMPLEMENTED(__LOCATION__, "generic speciation");
+        // n.type => get_speciated_type(n.type_generic_speciation.body.type, n.type_generic_speciation.typedecl.type);
+    }
+    else if (n.kind == AST_node::AST_generic) {
+        trs.generic_parameter_name = n.AST_generic.parameter_name;
+        ast_visit_children(n, type_resolver_visitor, trs);
+        trs.generic_parameter_name.begin => null;
+        trs.generic_parameter_name.len = 0;
+    }
+    else {
+        ast_visit_children(n, type_resolver_visitor, trs);
+    }
+}
+
+fn type_resolver_speciate_generic(root: AST_node&, t: Type&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&) {
+    let trs: TypeResolverState;
+    trs.symbol_cache => symbol_cache;
+    trs.endlos => endlos;
+    trs.generic_parameter_type => t;
+    type_resolver_visitor(root, trs);
+}
+
+
+fn type_resolver_run(root: AST_node&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&) {
+    let trs: TypeResolverState;
+    trs.symbol_cache => symbol_cache;
+    trs.endlos => endlos;
+    type_lookup_visitor(root, trs);
+    type_resolver_visitor(root, trs);
+}

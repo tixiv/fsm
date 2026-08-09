@@ -73,6 +73,14 @@ generic T fn EndlosArr_begin(arr: EndlosArr<T>&, allocator: EndlosAllocator&) : 
     arr.arr.len = 0;
 }
 
+generic T fn EndlosArr_reset (arr: EndlosArr<T>&, len) : void {
+    let old_len = arr.arr.len;
+    ASSERT(len <= old_len, __LOCATION__);
+    arr.alloc.begin => &arr.arr[len];
+    arr.alloc.len = arr.alloc.len + old_len - len;
+    arr.arr.len = len;
+}
+
 generic T fn EndlosArr_finalize(arr: EndlosArr<T>&, allocator: EndlosAllocator&) : T[] {
     return endlos_ripp_off~T(allocator, arr.alloc);
 }

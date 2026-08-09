@@ -1,6 +1,8 @@
 
 import * from "endlos";
 import * from "parser";
+import * from "symbol_cache";
+import * from "type_resolver";
 import * from "resolver";
 import * from "il_gen";
 import * from "type_checker";
@@ -32,13 +34,18 @@ fn main (argv: u8&[]) {
     let type_cache: TypeCache;
     TypeCache_init(type_cache, endlos)
 
+    let symbol_cache: SymbolCache;
+    SymbolCache_init(symbol_cache, type_cache, endlos);
+
     let ast_allocator: AST_Node_Allocator;
     AST_Node_Allocator_init(ast_allocator);
 
     let root => parse_program(tokens, ast_allocator, endlos)
 
+    type_resolver_run(root, symbol_cache, endlos);
+
     let resolver: Resolver;
-    resolver_init(resolver, endlos, type_cache);
+    resolver_init(resolver, endlos, symbol_cache);
 
     resolver_run(resolver, root);
 
@@ -46,7 +53,7 @@ fn main (argv: u8&[]) {
 
 
     let type_checker: TypeChecker;
-    type_checker_init(type_checker, type_cache, ast_allocator, endlos, resolver.global_symbols);
+    type_checker_init(type_checker, symbol_cache, ast_allocator, endlos);
 
     $"Going to run type checker...\n"
     type_checker_run(type_checker, root);
@@ -57,7 +64,7 @@ fn main (argv: u8&[]) {
     calculate_stacks(root, endlos);
 
     let il_gen: IL_gen;
-    il_gen_init(il_gen, endlos, type_cache, resolver.global_symbols);
+    il_gen_init(il_gen, endlos, symbol_cache);
 
     $"Going to run il gen...\n"
     il_gen_run(il_gen, root);

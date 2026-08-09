@@ -155,7 +155,7 @@ bool resolve_import (SV name) {
 }
 
 void compile_program(const char *filename) {
-    dyn_array_init(&modules, sizeof(Module), 16);
+    dyn_array_init(&modules, sizeof(Module), 64);
     init_resolver();
     compile_module(filename);
 }

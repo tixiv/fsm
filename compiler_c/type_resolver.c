@@ -48,7 +48,7 @@ Type *get_type_by_name(SV *name, const Location *location) {
 
     if (sym) {
         if (sym->kind != SYM_type) {
-            type_resolver_error(location, "'%.*s' is not a type symbol.");
+            type_resolver_error(location, "'%.*s' is not a type symbol.", SV_prnt(*name));
         }
         return sym->type;
     }
@@ -67,8 +67,6 @@ static void type_resolver_push_symbol(Symbol *s, const Location *location) {
 }
 
 void push_named_type(SV name, Type * t, const Location *location) {
-    // NamedType *nt = get_named_type_by_name(&name);
-
     Symbol *sym = get_symbol_by_name(&global_symbols, &name);
 
     if (sym) {
@@ -324,7 +322,7 @@ void type_resolver_visitor(AST_node *n, TypeResolverState *trs) {
 
         case AST_type_slice:
             ast_visit_children(n, (AstVisitor)type_resolver_visitor, trs);
-            n->type = get_sclice_type(n->_type_slice.body->type);
+            n->type = get_slice_type(n->_type_slice.body->type);
             break;
 
         case AST_type_generic_speciation:

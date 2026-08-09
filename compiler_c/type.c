@@ -502,7 +502,7 @@ static Type *make_slice_type(Type *element_type) {
 
 Dyn_array slice_types;
 
-Type *get_sclice_type(Type *element_type) {
+Type *get_slice_type(Type *element_type) {
     if (element_type == &builtin_u8) return &builtin_u8_slice;
     
     if (slice_types.capacity == 0)
@@ -551,7 +551,7 @@ static Type *speciate_tree(Type *t, Type *speciation) {
 
         case T_struct: {
             if (is_slice_kind(t)) {
-                return get_sclice_type(
+                return get_slice_type(
                     dereferenced_type(
                         speciate_tree(t->_struct.members[0].type, speciation)));
             }

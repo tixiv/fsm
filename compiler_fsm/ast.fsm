@@ -142,6 +142,7 @@ union AST_node enum kind {
     struct AST_struct {
         body: AST_node&;
         name: u8[];
+        is_record: bool;
     }
 
     struct AST_member_def {
@@ -397,6 +398,9 @@ fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
     }
     else if (n.kind == AST_node::AST_cast) {
         visit_non_null(n.AST_cast.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_array_to_slice) {
+        visit_non_null(n.AST_array_to_slice.body, visit, arg);
     }
     else if (n.kind == AST_node::AST_array_access) {
         visit_non_null(n.AST_array_access.array, visit, arg);
