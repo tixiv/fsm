@@ -56,7 +56,7 @@ fn mmap_anonymous(reserve_size) : any & {
 
 fn is_whitespace(c: i32) { return c == ' ' ||  c == '\t' || c == '\r' }
 fn is_numeric(c: i32) { return '0' <= c <= '9' }
-fn is_hex_digit(c: i32) { return is_numeric(c) || 'a' < c < 'f' || 'A' < c < 'F' }
+fn is_hex_digit(c: i32) { return is_numeric(c) || 'a' <= c <= 'f' || 'A' <= c <= 'F' }
 fn is_alpha(c: i32) { return 'A' <= c <= 'Z' || 'a' <= c <= 'z' }
 fn is_allowed_at_start_of_identifier(c: i32) { return is_alpha(c) || c == '_' }
 fn is_allowed_in_identifier(c: i32) { return is_alpha(c) || is_numeric(c) || c == '_' }
@@ -178,6 +178,12 @@ struct StringBuilder {
 fn sb_init(sb: StringBuilder&, buffer: u8[]) {
     sb.buffer = buffer
     sb.str.begin => buffer.begin
+    sb.str.len = 0
+}
+
+fn sb_reset(sb: StringBuilder&) {
+    sb.buffer.begin => sb.str.begin;
+    sb.buffer.len = sb.buffer.len + sb.str.len;
     sb.str.len = 0
 }
 

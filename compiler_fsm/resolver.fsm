@@ -140,7 +140,9 @@ fn resolver_visitor(n: AST_node&, res: Resolver&) : void {
                     |== AST_node::AST_builder_string
                     |== AST_node::AST_user_cast
                     |== AST_node::AST_call
-                    |== AST_node::AST_return)
+                    |== AST_node::AST_return
+                    |== AST_node::AST_import
+            )
     {
         ast_visit_children(n, resolver_visitor, res);
     }

@@ -843,16 +843,20 @@ fn parse_program(tokens: Token[], allocator: AST_Node_Allocator&, endlos: Endlos
     let root => ast_alloc(parser.allocator, AST_node::AST_program, parser.CT.location);
 
     while (parser.CT.kind != TokenKind::TOK_eof) {
-        /* if (parser.CT.kind == TokenKind::TOK_keyword_import) {
+        if (parser.CT.kind == TokenKind::TOK_keyword_import) {
             MOVE_NEXT(parser);
             take_expected(parser, TokenKind::TOK_asterisk);
             take_expected(parser, TokenKind::TOK_identifier); // from
             expect_token(parser, TokenKind::TOK_string);
-            if (!resolve_import(parser.CT.value)) parser_error(parser, "Couldn't resolve import '%.*s'.\n", SV_prnt(parser.CT.value));
+
+            let ast_import => ast_alloc(parser.allocator, AST_node::AST_import, parser.CT.location);
+            ast_import.AST_import.name = parser.CT.value;
+            ast_link_to_chain(&root.AST_program.body, ast_import);
+
             MOVE_NEXT(parser);
             take_expected(parser, TokenKind::TOK_semicolon);
         }
-        else */ if (parser.CT.kind == TokenKind::TOK_keyword_fn) {
+        else if (parser.CT.kind == TokenKind::TOK_keyword_fn) {
             ast_link_to_chain(&root.AST_program.body, parse_function(parser));
         }
         else if (parser.CT.kind == TokenKind::TOK_keyword_struct || parser.CT.kind == TokenKind::TOK_keyword_record) {

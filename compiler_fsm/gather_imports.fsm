@@ -1,0 +1,31 @@
+import * from "std";
+import * from "endlos";
+import * from "ast";
+
+
+struct Import {
+    name: u8[];
+    location: Location&;
+}
+
+struct ImportsVisitor {
+    imports: Import[];
+}
+
+fn gather_imports_visitor (n: AST_node&, v: ImportsVisitor&) : void {
+    if (n.kind == AST_node::AST_import) {
+        let imp => v.imports++;
+        imp.name = n.AST_import.name;
+        imp.location => n.location;
+    }
+    ast_visit_children(n, gather_imports_visitor, v);
+}
+
+fn gather_imports (root: AST_node&, endlos: EndlosAllocator&) {
+    let v: ImportsVisitor;
+    v.imports = endlos_begin~Import(endlos);
+
+    gather_imports_visitor(root, v)
+
+    return endlos_ripp_off~Import(endlos, v.imports);
+}

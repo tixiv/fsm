@@ -166,12 +166,13 @@ fn read_number(input: u8[]&) {
     num.begin => input.begin;
     num.len = 0;
     let hex = false;
-    if (sv_starts_with(num, "0x")) {
+
+    if (sv_starts_with(input, "0x")) {
         input++ input++
         num.len = 2
         hex = true
     }
-    while(if (input.len && hex) is_hex_digit(input.begin) else is_numeric(input.begin)) {
+    while(input.len && if (hex) is_hex_digit(input.begin) else is_numeric(input.begin)) {
         input++
         num.len++;
     }

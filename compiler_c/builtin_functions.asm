@@ -82,6 +82,7 @@ SYS_OPEN    = 2
 SYS_CLOSE   = 3
 SYS_FSTAT   = 5
 SYS_MMAP    = 9
+SYS_ACCESS  = 21
 SYS_SOCKET  = 41
 SYS_CONNECT = 42
 SYS_EXIT    = 60
@@ -142,8 +143,12 @@ fn_connect: ; connect (fd: i64, addr: u8[]) : i64
     syscall
     ret
 
-          ;mmap(lenght: i64, fd: i64) : u8 &
-   
+fn_access: ; access (filename: u8&, mode: i64) : i64
+    mov eax, SYS_ACCESS
+    mov rsi, [rsp+8]       ; const char *filename
+    mov rdi, [rsp+16]      ; int mode
+    syscall
+    ret
 
 fn_mmap: ; mmap(addr: any&, lenght: i64, prot: u64, flags: u64, fd: i64, offset: i64) : any &
    mov     rax, SYS_MMAP

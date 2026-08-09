@@ -233,6 +233,10 @@ union AST_node enum kind {
     struct AST_generic_implementation {
         body: AST_node&;
     }
+
+    struct AST_import {
+        name: u8[];
+    }
 }
 
 struct AST_Node_Allocator {
@@ -472,6 +476,7 @@ fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
                     |== AST_node::AST_char_constant
                     |== AST_node::AST_array_len
                     |== AST_node::AST_typename
+                    |== AST_node::AST_import
     ) {
         // no child nodes to visit
     }
