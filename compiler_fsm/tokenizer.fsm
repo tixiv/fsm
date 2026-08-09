@@ -226,6 +226,12 @@ fn handle_word(tokenizer: Tokenizer&, word: u8[]) {
     else if (sv_equal(word, "enum")) {
         push_token(tokenizer, TokenKind::TOK_keyword_enum, null);
     }
+    else if (sv_equal(word, "union")) {
+        push_token(tokenizer, TokenKind::TOK_keyword_union, null);
+    }
+    else if (sv_equal(word, "generic")) {
+        push_token(tokenizer, TokenKind::TOK_keyword_generic, null);
+    }
     else if (sv_equal(word, "import")) {
         push_token(tokenizer, TokenKind::TOK_keyword_import, null);
     }

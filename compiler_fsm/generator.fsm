@@ -624,7 +624,7 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) 
         else NOT_IMPLEMENTED(__LOCATION__, "Generating IL for enums");
         
         write(file, "align 8\n");
-        write(file, "enum_names_{name}:\n");
+        write(file, $"enum_names_{name}:\n");
         let max_enum_value = get_max_enum_value(t);
         let min_enum_value = get_min_enum_value(t);
         for (let j = min_enum_value; j <= max_enum_value; j++) {

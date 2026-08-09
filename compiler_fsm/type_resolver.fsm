@@ -159,13 +159,14 @@ fn type_resolver_union_visitor(n: AST_node&, urs: UnionResolverState&) : void {
 }
 
 fn type_resolver_visitor(n: AST_node&, trs: TypeResolverState&) : void {
+    $"type_resolver_visitor {n.kind.name}\n"
     let tc => trs.symbol_cache.type_cache;
     if (n.kind == AST_node::AST_struct) {
         type_resolve_struct(n, trs, true);
     }
     else if (n.kind == AST_node::AST_enum) {
         let ers: EnumResolverState;
-
+        ers.trs => trs;
         EndlosArr_begin~EnumMember(ers.enum_members, trs.endlos);
 
         n.type => get_type_by_name(trs.symbol_cache, n.AST_enum.name, n.location);

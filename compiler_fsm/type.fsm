@@ -539,7 +539,7 @@ fn check_enumerator_type_matches(enumerator: Type&, target_type: Type&, _: any&)
 }
 
 fn get_enumerator_type_for(cache: TypeCache&, t: Type&) : Type& {
-    let enumerator => find_type_in_array(cache.ref_types, check_ref_type_matches, t, null)
+    let enumerator => find_type_in_array(cache.enumerator_types, check_enumerator_type_matches, t, null)
     if (enumerator) return enumerator;
 
     enumerator => make_enumerator_type_for(cache, t);

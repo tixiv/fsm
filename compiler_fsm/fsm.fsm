@@ -40,17 +40,22 @@ fn main (argv: u8&[]) {
     let ast_allocator: AST_Node_Allocator;
     AST_Node_Allocator_init(ast_allocator);
 
+    $"Parsing...\n"
     let root => parse_program(tokens, ast_allocator, endlos)
+    $"Parsing finished\n"
 
+    $"Type Resolver...\n"
     type_resolver_run(root, symbol_cache, endlos);
+    $"Type Resolver finished\n"
 
     let resolver: Resolver;
     resolver_init(resolver, endlos, symbol_cache);
 
+    $"Resolver...\n"
     resolver_run(resolver, root);
+    $"Resolver finished\n"
 
     ast_dump_tree(root);
-
 
     let type_checker: TypeChecker;
     type_checker_init(type_checker, symbol_cache, ast_allocator, endlos);

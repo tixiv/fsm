@@ -1,6 +1,4 @@
 
-import * from "std";
-
 enum OperatorKind {
     Add,
 }
@@ -39,7 +37,9 @@ fn visit_children (n: TreeNode&, visit: fn (TreeNode&, any&) : void, arg: any&) 
     else if (n.kind == TreeNode::Number)
     {
     }
-    else $"Visiting {n.kind.name} is not implemented yet.\n"
+    else {
+        puts("Visiting ") puts(n.kind.name) puts("is not implemented yet.\n")
+    }
 }
 
 fn tree_visitor(n: TreeNode&, foo: i64&) : void {
@@ -51,7 +51,7 @@ fn tree_visitor(n: TreeNode&, foo: i64&) : void {
         let a = n.BinaryOperator.left.value
         let b = n.BinaryOperator.right.value
         n.value = a + b
-        $"+\n={n.value}\n"
+        puts ("+\n=") print(n.value)
     } else {
         // $"Number\n"
         n.value = n.Number.num_value;
