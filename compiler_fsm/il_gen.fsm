@@ -659,7 +659,7 @@ fn gen_value_visitor(n: AST_node&, gen: IL_gen&) : void {
 
 fn il_gen_visitor(n: AST_node&, gen: IL_gen&) : void {
     if (!n) return;
-    $"il_gen_visitor {n.kind.name}\n"
+    // $"il_gen_visitor {n.kind.name}\n"
 
     if (n.kind == AST_node::AST_function) {
         let s_fun => n.AST_function.symbol;

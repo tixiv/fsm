@@ -24,11 +24,13 @@ fn tokenize_module (module: Module&, code: u8[], endlos: EndlosAllocator&) {
 
     module.tokens = endlos_ripp_off~Token(endlos, tokenizer.tokens);
 
-    dump_tokens(module.tokens);
+    // dump_tokens(module.tokens);
 }
 
+
+
 fn compile_module (module: Module&, symbol_cache: SymbolCache&, ast_allocator: AST_Node_Allocator&, endlos: EndlosAllocator&) {
-    let verbose = true;
+    let verbose = false;
     let code = read_file (module.header.filename);
 
     if (verbose) $"Tokenizing...\n"
@@ -47,13 +49,13 @@ fn compile_module (module: Module&, symbol_cache: SymbolCache&, ast_allocator: A
     resolver_run(root, symbol_cache, endlos);
     if (verbose) $"Resolver finished\n"
 
-    ast_dump_tree(root);
+    // ast_dump_tree(root);
 
     if (verbose) $"Going to run type checker...\n"
     type_checker_run(root, symbol_cache, ast_allocator, endlos);
     if (verbose) $"Finished type checking.\n"
 
-    ast_dump_tree(root);
+    // ast_dump_tree(root);
 
     calculate_stacks(root, endlos);
 
@@ -61,6 +63,8 @@ fn compile_module (module: Module&, symbol_cache: SymbolCache&, ast_allocator: A
 }
 
 fn main (argv: u8&[]) {
+    let verbose = false;
+    
     let endlos: EndlosAllocator;
     endlos_init(endlos);
 
@@ -80,11 +84,11 @@ fn main (argv: u8&[]) {
 
     compile_module(module, symbol_cache, ast_allocator, endlos);
 
-    $"Going to run il gen...\n"
+    if (verbose) $"Going to run il gen...\n"
     let opcodes = il_gen_run(module.ast_root, symbol_cache, endlos);
-    $"il gen finished\n"
+    if (verbose) $"il gen finished\n"
 
-    dump_opcodes(opcodes);
+    // dump_opcodes(opcodes);
 
     output_asm("out1.asm", opcodes, endlos);
 }

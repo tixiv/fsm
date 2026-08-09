@@ -166,7 +166,7 @@ fn make_cast(type_checker: TypeChecker&, to: Type&, from: Type&) : AST_node& {
 fn try_convert_to_type_if_necessary(type_checker: TypeChecker&, n: AST_node&, target_type: Type&, desc: u8[]) {
     let buf_1: u8[1024]; let buf_2: u8[1024];
     let original_type => n.type;
-    $"try_convert_to_type_if_necessary begin {get_type_name_r(buf_1, original_type)} {get_type_name_r(buf_2, target_type)}\n"
+    // $"try_convert_to_type_if_necessary begin {get_type_name_r(buf_1, original_type)} {get_type_name_r(buf_2, target_type)}\n"
 
 
     if (target_type <==> original_type) return;
@@ -464,9 +464,6 @@ fn type_resolve_functions_visitor(n: AST_node&, type_checker: TypeChecker&) : vo
 
         type_checker.current_function_symbol.type =>
             get_function_type(type_checker.type_cache, type_checker.current_function_ret_type, arg_types);
-        
-        $"Get_function_type {type_checker.arg_symbols.arr.len} {arg_types.len} \n"
-
     }
     else if (n.kind == AST_node::AST_arg_decl) {
         let t => if (n.AST_arg_decl._typedecl)
@@ -559,7 +556,8 @@ fn type_check_symbol(n: AST_node&, type_checker: TypeChecker&)
 fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
     let buf_1: u8[1024]; let buf_2: u8[1024];
 
-    $"Type propagation visitor {n.kind.name}\n"
+    // $"Type propagation visitor {n.kind.name}\n"
+
     // actions while traversing the tree down
     if (n.kind == AST_node::AST_function) {
         type_checker.current_function_symbol => n.AST_function.symbol;
@@ -975,8 +973,6 @@ fn type_checker_run(root: AST_node&, symbol_cache: SymbolCache&, ast_allocator: 
 
     annotate_used_visitor(root, type_checker);
     type_resolve_functions_visitor(root, type_checker);
-
-    ast_dump_tree(root);
 
     type_propagation_visitor(root, type_checker);
 }
