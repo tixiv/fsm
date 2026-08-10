@@ -481,19 +481,18 @@ fn type_resolve_functions_visitor(n: AST_node&, type_checker: TypeChecker&) : vo
     }
 }
 
-
 fn get_speciated_function_symbol(n: AST_node&, g: Symbol&, type_checker: TypeChecker&) : Symbol& {
     NOT_IMPLEMENTED(__LOCATION__, "get_speciated_function_symbol");
     /*
     if (!g.source) {
-        type_checker_error(n, "Cannot speciate non generic function '%.*s'.\n", SV_prnt(g.name));
+        type_checker_error(n, $"Cannot speciate non generic function '{g.name}'.\n");
     }
-    ASSERT(g.source.kind == AST_generic, "Speciate called on wrong kind of node.\n");
-    ASSERT(g.source.AST_generic.body.kind == AST_function, "Speciate called on wrong kind of node.\n");
+    ASSERT(g.source.kind == AST_generic, $"{__LOCATION__} Speciate called on wrong kind of node.\n");
+    ASSERT(g.source.AST_generic.body.kind == AST_function, $"{__LOCATION__} Speciate called on wrong kind of node.\n");
 
-    SV encoded_name = encode_function_name(g.source.AST_generic.body.fun.name, type_checker.generic_type);
+    let encoded_name = encode_function_name(g.source.AST_generic.body.fun.name, type_checker.generic_type);
 
-    let  existing = get_symbol_by_name(&global_symbols, &encoded_name);
+    let existing = get_global_symbol_by_name(type_checker.symbol_cache, encoded_name);
 
     if (existing) return existing;
     

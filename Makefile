@@ -45,7 +45,7 @@ test: $(FSM)
 	@for t in $(TESTS); do \
 		echo "Testing $$t"; \
 		./$(FSM) $$t && \
-		fasm out1.asm out > /dev/null && \
+		fasm out.asm out > /dev/null && \
 		./out > $$t.out && \
 		diff -u $$t.expected $$t.out || exit 1; \
 	done

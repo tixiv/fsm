@@ -232,8 +232,7 @@ fn type_resolver_visitor(n: AST_node&, trs: TypeResolverState&) : void {
     }
     else if (n.kind == AST_node::AST_type_generic_speciation) {
         ast_visit_children(n, type_resolver_visitor, trs);
-        NOT_IMPLEMENTED(__LOCATION__, "generic speciation");
-        // n.type => get_speciated_type(n.type_generic_speciation.body.type, n.type_generic_speciation.typedecl.type);
+        n.type => get_speciated_type(trs.symbol_cache.type_cache, n.AST_type_generic_speciation.body.type, n.AST_type_generic_speciation.typedecl.type);
     }
     else if (n.kind == AST_node::AST_generic) {
         trs.generic_parameter_name = n.AST_generic.parameter_name;

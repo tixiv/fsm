@@ -165,6 +165,8 @@ fn resolver_visitor(n: AST_node&, res: Resolver&) : void {
                     |== AST_node::AST_call
                     |== AST_node::AST_return
                     |== AST_node::AST_import
+                    |== AST_node::AST_generic_speciation
+                    |== AST_node::AST_type_generic_speciation
             )
     {
         ast_visit_children(n, resolver_visitor, res);

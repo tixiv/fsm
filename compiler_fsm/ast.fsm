@@ -474,6 +474,14 @@ fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
     else if (n.kind == AST_node::AST_generic) {
         visit_non_null(n.AST_generic.body, visit, arg);
     }
+    else if (n.kind == AST_node::AST_generic_speciation) {
+        visit_non_null(n.AST_generic_speciation.typedecl, visit, arg);
+        visit_non_null(n.AST_generic_speciation.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_type_generic_speciation) {
+        visit_non_null(n.AST_type_generic_speciation.typedecl, visit, arg);
+        visit_non_null(n.AST_type_generic_speciation.body, visit, arg);
+    }
     else if (n.kind  == AST_node::AST_enum_member
                     |== AST_node::AST_symbol
                     |== AST_node::AST_number

@@ -440,6 +440,10 @@ fn tokenize_fsm (tokenizer: Tokenizer&) : void {
             code++
             push_token(tokenizer, TokenKind::TOK_up_arrow, null);
         }
+        else if ('~' == c) {
+            code++
+            push_token(tokenizer, TokenKind::TOK_tilde, null);
+        }
         else if (sv_starts_with(code, "//")) {
             while(code.len && code.begin != '\n')
                 code++

@@ -66,6 +66,12 @@ union Type enum kind {
     }
 }
 
+struct SpeciatedType {
+    base_type: Type&;
+    speciation: Type&;
+    speciated: Type&;
+}
+
 struct TypeRefArr {
     alloc: Type&[];
     arr: Type&[];
@@ -100,6 +106,7 @@ struct TypeCache {
     enumerator_types :TypeRefArr;
     array_types      :TypeRefArr;
     slice_types      :TypeRefArr;
+    speciated_types  :EndlosArr<SpeciatedType>;
 
     builtin_void: Type;
     builtin_null: Type;
@@ -126,6 +133,7 @@ fn TypeCache_init(cache: TypeCache&, endlos: EndlosAllocator&) {
     TypeRefArr_init(cache.enumerator_types, endlos);
     TypeRefArr_init(cache.array_types,      endlos);
     TypeRefArr_init(cache.slice_types,      endlos);
+    EndlosArr_begin~SpeciatedType(cache.speciated_types, endlos);
 
     let t: Type&;
     t => cache.builtin_void;         t.kind = Type::T_void;
@@ -637,6 +645,83 @@ fn get_function_type(cache: TypeCache&, ret_type: Type&, arg_types: Type&[]) : T
 
     TypeRefArr_push(cache.function_types, new_fun);
     return new_fun;
+}
+
+fn speciate_tree(tc: TypeCache&, t: Type&, speciation: Type&) : Type& {
+    let buf: u8[1024];
+
+    if (t.kind == Type::T_generic) {
+        return speciation;
+    }
+    else if (t.kind == Type::T_struct) {
+        if (is_slice_kind(t)) {
+            return get_slice_type(tc, 
+                dereferenced_type(
+                    speciate_tree(tc, t.T_struct.members[0].type, speciation)));
+        }
+        else {
+            let need_to_copy = false;
+            let alloc = endlos_begin~StructMember(tc.endlos);
+            let members = alloc;
+            for (let i = 0; i < t.T_struct.members.len; i++) {
+                members[i].type => speciate_tree(tc, t.T_struct.members[i].type, speciation);
+                if (members[i].type <!=> t.T_struct.members[i].type) need_to_copy = true;
+                members[i].name = t.T_struct.members[i].name;
+            }
+
+            if (!need_to_copy) {
+                endlos_ripp_off~StructMember(tc.endlos, alloc);
+                return t;
+            }
+            members = endlos_ripp_off~StructMember(tc.endlos, members);
+
+            let new_struct => type_alloc(tc, Type::T_struct);
+            objcopy~Type(new_struct, t);
+            new_struct.T_struct.members = members;
+
+            calculate_storage_size(new_struct);
+            return new_struct;
+        }
+    }
+    else if (t.kind == Type::T_reference) {
+        return get_ref_type_for(tc, speciate_tree(tc, t.T_reference.target_type, speciation))
+    }
+    else if (t.kind == Type::T_array) {
+        return get_array_type(tc, speciate_tree(tc, t.T_array.element_type, speciation), t.T_array.n_elements)
+    }
+    else if (t.kind == Type::T_integer
+                   |== Type::T_boolean
+                   |== Type::T_enum
+                   |== Type::T_enumerator) {
+        return t;
+    }
+    else NOT_IMPLEMENTED(__LOCATION__, $"Speciating {get_type_name_r(buf, t)}");
+    return t;
+}
+
+fn make_speciated_type(tc: TypeCache&, base: Type&, speciation: Type&) : Type& {
+    let t => speciate_tree(tc, base, speciation);
+
+    if (t <!=> base) {
+        t.speciation => speciation;
+    }
+    return t;
+}
+
+fn get_speciated_type(tc: TypeCache&, base: Type&, speciation: Type&) {
+
+    for (let i = 0; i < tc.speciated_types.arr.len; i++) {
+        let spec => tc.speciated_types.arr[i];
+        if (spec.base_type <==> base
+            && spec.speciation <==> speciation) return spec.speciated;
+    }
+
+    let spec => EndlosArr_push~SpeciatedType(tc.speciated_types);
+    spec.base_type => base;
+    spec.speciation => speciation;
+    spec.speciated => make_speciated_type(tc, base, speciation);
+
+    return spec.speciated;
 }
 
 fn get_stack_offset_for(t: Type&) {
