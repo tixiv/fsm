@@ -17,6 +17,7 @@ struct Symbol {
     size; // stack frame size for functions
     offset; // stack offset for args and local vars
     location: Location&;
+    source: any&; // AST_node&
 }
 
 fn get_symbol_by_name(arr: EndlosArr<Symbol&>&, name: u8[]) : Symbol& {

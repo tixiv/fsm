@@ -18,6 +18,7 @@ struct Resolver {
     current_generic: AST_node&;
     generic_symbol: Symbol&;
     current_generic_type: Type&;
+    out_latest_function: Symbol&;
 }
 
 fn push_symbol(res: Resolver&, arr: EndlosArr<Symbol&>&, s: Symbol&, n: AST_node&) {
@@ -75,6 +76,7 @@ fn resolver_leave_scope(res: Resolver&) {
 fn resolve_globals_visitor (n: AST_node&, res: Resolver&) : void {
     if (n.kind == AST_node::AST_function) {
         let s_fun => alloc_symbol(res.symbol_cache, SymbolKind::SYM_function, n.AST_function.name, n.location);
+        s_fun.source => res.current_generic;
         push_global_symbol(res.symbol_cache, s_fun)
         n.AST_function.symbol => s_fun;
     }
@@ -173,6 +175,25 @@ fn resolver_visitor(n: AST_node&, res: Resolver&) : void {
     }
     else NOT_IMPLEMENTED(__LOCATION__, $"Resolver for {n.kind.name}");
 }
+
+fn resolver_speciate_generic(root: AST_node&, type: Type&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&) : Symbol& {
+    let res: Resolver;
+    res.type_cache => symbol_cache.type_cache;
+    res.symbol_cache => symbol_cache;
+    res.current_generic_type => type;
+
+    EndlosArr_begin~Symbol&(res.local_symbols, endlos);
+    res.locals_stack = endlos_begin~i64(endlos);
+
+    resolve_globals_visitor(root, &res);
+    resolver_visitor(root, &res);
+
+    endlos_ripp_off~i64(endlos, res.locals_stack);
+    EndlosArr_free~Symbol&(res.local_symbols, endlos);
+
+    return res.out_latest_function;
+}
+
 
 fn resolver_run(root: AST_node&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&) {
     let res: Resolver;

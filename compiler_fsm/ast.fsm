@@ -316,9 +316,9 @@ fn ast_insert_node(allocator: AST_Node_Allocator&, at: AST_node&, new_node: AST_
 fn ast_remove_node(n: AST_node&) : void {
     AST_node *child = nullptr;
     switch (n.kind) {        
-        case AST_dereference:
+        else if (n.kind == AST_node::AST_dereference:
             child = n.deref.body;
-            break;
+        }
         default:
             NOT_IMPLEMENTED(__LOCATION__, "Removing AST node of kind %s");
     }
@@ -498,6 +498,160 @@ fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
     else {
         NOT_IMPLEMENTED(__LOCATION__, $"Visiting {n.kind.name}");
     }
+}
+
+fn ast_copy_chain(alloc: AST_Node_Allocator&, n: AST_node&) : AST_node& {
+    let base: AST_node& = null;
+    while(n) {
+        ast_link_to_chain(&base, ast_copy_tree(alloc, n));
+        n => n.next;
+    }
+    
+    return base;
+}
+
+fn ast_copy_tree(alloc: AST_Node_Allocator&, n: AST_node&) : AST_node& {
+    if (!n) return null;
+    let nn => ast_alloc(alloc, n.kind, n.location);
+    objcopy~AST_node(nn, n);
+    nn.next => null;
+
+    if (n.kind == AST_node::AST_generic) {
+        nn.AST_generic.body => ast_copy_tree(alloc, n.AST_generic.body);
+    }
+    else if (n.kind == AST_node::AST_arg_list) {
+        nn.AST_arg_list.body => ast_copy_chain(alloc, n.AST_arg_list.body);
+    }
+    else if (n.kind == AST_node::AST_scope) {
+        nn.AST_scope.body => ast_copy_chain(alloc, n.AST_scope.body);
+    }
+    else if (n.kind == AST_node::AST_function) {
+        nn.AST_function.args => ast_copy_tree(alloc, n.AST_function.args);
+        nn.AST_function.ret_typedecl => ast_copy_tree(alloc, n.AST_function.ret_typedecl);
+        nn.AST_function.body => ast_copy_chain(alloc, n.AST_function.body);
+    }
+    else if (n.kind == AST_node::AST_return) {
+        nn.AST_return.body => ast_copy_tree(alloc, n.AST_return.body);
+    }
+    else if (n.kind == AST_node::AST_var_decl) {
+        nn.AST_var_decl._typedecl => ast_copy_tree(alloc, n.AST_var_decl._typedecl);
+        nn.AST_var_decl.initializer => ast_copy_tree(alloc, n.AST_var_decl.initializer);
+    }
+    else if (n.kind == AST_node::AST_arg_decl) {
+        nn.AST_arg_decl._typedecl => ast_copy_tree(alloc, n.AST_arg_decl._typedecl);
+    }
+    else if (n.kind == AST_node::AST_if) {
+        nn.AST_if.condition => ast_copy_tree(alloc, n.AST_if.condition);
+        nn.AST_if.if_clause => ast_copy_tree(alloc, n.AST_if.if_clause);
+        nn.AST_if.else_clause => ast_copy_tree(alloc, n.AST_if.else_clause);
+    }
+    else if (n.kind == AST_node::AST_while) {
+        nn.AST_while.condition => ast_copy_tree(alloc, n.AST_while.condition);
+        nn.AST_while.body => ast_copy_tree(alloc, n.AST_while.body);
+    }
+    else if (n.kind == AST_node::AST_for) {
+        nn.AST_for.initializer => ast_copy_tree(alloc, n.AST_for.initializer);
+        nn.AST_for.condition => ast_copy_tree(alloc, n.AST_for.condition);
+        nn.AST_for.post_action => ast_copy_tree(alloc, n.AST_for.post_action);
+        nn.AST_for.body => ast_copy_tree(alloc, n.AST_for.body);
+        nn.AST_for.result => ast_copy_tree(alloc, n.AST_for.result);
+    }
+    else if (n.kind == AST_node::AST_binary) {
+        nn.AST_binary.left => ast_copy_tree(alloc, n.AST_binary.left);
+        nn.AST_binary.right => ast_copy_tree(alloc, n.AST_binary.right);
+    }
+    else if (n.kind == AST_node::AST_unary) {
+        nn.AST_unary.body => ast_copy_tree(alloc, n.AST_unary.body);
+    }
+    else if (n.kind == AST_node::AST_call) {
+        nn.AST_call.target => ast_copy_tree(alloc, n.AST_call.target);
+        nn.AST_call.args => ast_copy_chain(alloc, n.AST_call.args);
+    }
+    else if (n.kind == AST_node::AST_cast) {
+        nn.AST_cast.body => ast_copy_tree(alloc, n.AST_cast.body);
+    }
+    else if (n.kind == AST_node::AST_array_to_slice) {
+        nn.AST_array_to_slice.body => ast_copy_tree(alloc, n.AST_array_to_slice.body);
+    }
+    else if (n.kind == AST_node::AST_array_access) {
+        nn.AST_array_access.array => ast_copy_tree(alloc, n.AST_array_access.array);
+        nn.AST_array_access.index => ast_copy_tree(alloc, n.AST_array_access.index);
+    }
+    else if (n.kind == AST_node::AST_dereference) {
+        nn.AST_dereference.body => ast_copy_tree(alloc, n.AST_dereference.body);
+    }
+    else if (n.kind == AST_node::AST_reference) {
+        nn.AST_reference.body => ast_copy_tree(alloc, n.AST_reference.body);
+    }
+    else if (n.kind == AST_node::AST_plus_plus) {
+        nn.AST_plus_plus.body => ast_copy_tree(alloc, n.AST_plus_plus.body);
+    }
+    else if (n.kind == AST_node::AST_minus_minus) {
+        nn.AST_minus_minus.body => ast_copy_tree(alloc, n.AST_minus_minus.body);
+    }
+    else if (n.kind == AST_node::AST_member_access) {
+        nn.AST_member_access.body => ast_copy_tree(alloc, n.AST_member_access.body);
+    }
+    else if (n.kind == AST_node::AST_namespace_access) {
+        nn.AST_namespace_access.body => ast_copy_tree(alloc, n.AST_namespace_access.body);
+    }
+    else if (n.kind == AST_node::AST_typename) {
+    }
+    else if (n.kind == AST_node::AST_type_ref) {
+        nn.AST_type_ref.body => ast_copy_tree(alloc, n.AST_type_ref.body);
+    }
+    else if (n.kind == AST_node::AST_type_array) {
+        nn.AST_type_array.body => ast_copy_tree(alloc, n.AST_type_array.body);
+    }
+    else if (n.kind == AST_node::AST_type_slice) {
+        nn.AST_type_slice.body => ast_copy_tree(alloc, n.AST_type_slice.body);
+    }
+    /*
+    else if (n.kind == AST_node::AST_variadic_operator) {
+        nn.AST_variadic_operator.left => ast_copy_tree(alloc, n.AST_variadic_operator.left);
+        nn.AST_variadic_operator.members = malloc(sizeof(VariadicOperatorMember) * n.AST_variadic_operator.num_members);
+        for (size_t i = 0; i < n.AST_variadic_operator.num_members; i++) {
+            memcpy(&nn.AST_variadic_operator.members[i], &n.AST_variadic_operator.members[i], sizeof(VariadicOperatorMember));
+            nn.AST_variadic_operator.members[i].right => ast_copy_tree(alloc, n.AST_variadic_operator.members[i].right);
+        }
+    } */
+
+    else if (n.kind == AST_node::AST_builder_string) {
+        nn.AST_builder_string.var_decl_sb => ast_copy_tree(alloc, n.AST_builder_string.var_decl_sb);
+        nn.AST_builder_string.var_decl_arr => ast_copy_tree(alloc, n.AST_builder_string.var_decl_arr);
+        nn.AST_builder_string.body => ast_copy_chain(alloc, n.AST_builder_string.body);
+    }
+    else if (n.kind == AST_node::AST_function_type) {
+        nn.AST_function_type.function_args => ast_copy_chain(alloc, n.AST_function_type.function_args);
+        nn.AST_function_type.function_ret => ast_copy_tree(alloc, n.AST_function_type.function_ret);
+    }
+    else if (n.kind == AST_node::AST_user_cast) {
+        nn.AST_user_cast.typedecl => ast_copy_tree(alloc, n.AST_user_cast.typedecl);
+        nn.AST_user_cast.body => ast_copy_tree(alloc, n.AST_user_cast.body);
+    }
+    else if (n.kind == AST_node::AST_generic_speciation) {
+        nn.AST_generic_speciation.typedecl => ast_copy_tree(alloc, n.AST_generic_speciation.typedecl);
+        nn.AST_generic_speciation.body => ast_copy_tree(alloc, n.AST_generic_speciation.body);
+    }
+    else if (n.kind == AST_node::AST_type_generic_speciation) {
+        nn.AST_type_generic_speciation.typedecl => ast_copy_tree(alloc, n.AST_type_generic_speciation.typedecl);
+        nn.AST_type_generic_speciation.body => ast_copy_tree(alloc, n.AST_type_generic_speciation.body);
+    }
+    else if (n.kind == AST_node::AST_enum_member
+                    |== AST_node::AST_symbol
+                    |== AST_node::AST_number
+                    |== AST_node::AST_bool
+                    |== AST_node::AST_null
+                    |== AST_node::AST_string
+                    |== AST_node::AST_char_constant
+                    |== AST_node::AST_array_len
+    ) {
+    }
+    else {
+        NOT_IMPLEMENTED(__LOCATION__, "Copying {n.kind}");
+    }
+
+    return nn;
 }
 
 fn print_symbol(s: Symbol&) : void {
