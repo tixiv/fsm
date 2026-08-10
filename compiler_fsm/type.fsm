@@ -209,7 +209,7 @@ fn get_type_name_r_impl(print_buf: u8[1024]&, type: Type&, encoded: bool) : u8[]
         sb_puts(sb, $") :{get_type_name_r(child_print_buf, type.T_function.return_type)}");
     }
     else if (type.kind == Type::T_reference) {
-        sb_puts(sb, $"{get_type_name_r(child_print_buf, type.T_reference.target_type)} &");
+        sb_puts(sb, $"{get_type_name_r(child_print_buf, type.T_reference.target_type)}{if(encoded) "ref" else " &"}");
     }
     else if (type.kind == Type::T_enumerator) {
         sb_puts(sb, $"{get_type_name_r(child_print_buf, type.T_enumerator.target_type)}::enumerator");
@@ -263,6 +263,10 @@ fn get_type_name_r_impl(print_buf: u8[1024]&, type: Type&, encoded: bool) : u8[]
 
 fn get_type_name_r(print_buf: u8[1024]&, type: Type&) : u8[] {
     return get_type_name_r_impl(print_buf, type, false);
+}
+
+fn get_type_name_encoded_r(print_buf: u8[1024]&, type: Type&) : u8[] {
+    return get_type_name_r_impl(print_buf, type, true);
 }
 
 fn is_void_kind(t: Type&) : bool {
@@ -664,9 +668,10 @@ fn speciate_tree(tc: TypeCache&, t: Type&, speciation: Type&) : Type& {
             let alloc = endlos_begin~StructMember(tc.endlos);
             let members = alloc;
             for (let i = 0; i < t.T_struct.members.len; i++) {
-                members[i].type => speciate_tree(tc, t.T_struct.members[i].type, speciation);
-                if (members[i].type <!=> t.T_struct.members[i].type) need_to_copy = true;
-                members[i].name = t.T_struct.members[i].name;
+                members.begin.type => speciate_tree(tc, t.T_struct.members[i].type, speciation);
+                if (members.begin.type <!=> t.T_struct.members[i].type) need_to_copy = true;
+                members.begin.name = t.T_struct.members[i].name;
+                members++;
             }
 
             if (!need_to_copy) {

@@ -482,6 +482,9 @@ fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
         visit_non_null(n.AST_type_generic_speciation.typedecl, visit, arg);
         visit_non_null(n.AST_type_generic_speciation.body, visit, arg);
     }
+    else if (n.kind == AST_node::AST_generic_implementation) {
+        visit_non_null(n.AST_generic_implementation.body, visit, arg);
+    }
     else if (n.kind  == AST_node::AST_enum_member
                     |== AST_node::AST_symbol
                     |== AST_node::AST_number
@@ -673,7 +676,8 @@ fn ast_dump_visitor (n: AST_node&, spaces: i64&) : void {
               |== AST_node::AST_arg_list
               |== AST_node::AST_return
               |== AST_node::AST_while
-              |== AST_node::AST_for)
+              |== AST_node::AST_for
+              |== AST_node::AST_generic_implementation)
     {
         $"{spc}{n.kind.name} \n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);
@@ -690,7 +694,9 @@ fn ast_dump_visitor (n: AST_node&, spaces: i64&) : void {
                    |== AST_node::AST_array_len
                    |== AST_node::AST_array_to_slice
                    |== AST_node::AST_function_type
-                   |== AST_node::AST_null)
+                   |== AST_node::AST_null
+                   |== AST_node::AST_type_generic_speciation
+                   |== AST_node::AST_generic_speciation)
     {
         $"{spc}{n.kind.name} ({get_type_name_r(buf, n.type)}) ru:{n.result_used}\n";
         ast_visit_children(n, ast_dump_visitor, child_spaces);

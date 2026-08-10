@@ -95,6 +95,7 @@ fn resolver_visitor(n: AST_node&, res: Resolver&) : void {
         resolver_enter_function(res,  n.AST_function.symbol);
         ast_visit_children(n, resolver_visitor, res);
         resolver_leave_function(res);
+        res.out_latest_function => n.AST_function.symbol;
     }
     else if (n.kind == AST_node::AST_arg_decl) {
         ASSERT(res.current_function, $"{__LOCATION__}: Found function argument declaration for '{n.AST_arg_decl.name}' outside of function\n");

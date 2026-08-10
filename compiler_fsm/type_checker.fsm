@@ -481,8 +481,15 @@ fn type_resolve_functions_visitor(n: AST_node&, type_checker: TypeChecker&) : vo
     }
 }
 
-fn encode_function_name (name: u8[], type: Type&) :u8[] {
-    return name;
+fn encode_function_name (name: u8[], type: Type&, endlos: EndlosAllocator&) :u8[] {
+    let sb: StringBuilder;
+    sb_init(sb, endlos_begin~u8(endlos));
+    
+    let buf: u8[1024];
+    sb_puts(sb, name);
+    sb_puts(sb, get_type_name_encoded_r(buf, type));
+
+    return endlos_ripp_off~u8(endlos, sb.buffer);
 }
 
 fn get_speciated_function_symbol(n: AST_node&, g: Symbol&, type_checker: TypeChecker&) : Symbol& {
@@ -494,7 +501,7 @@ fn get_speciated_function_symbol(n: AST_node&, g: Symbol&, type_checker: TypeChe
     ASSERT(source.kind == AST_node::AST_generic, $"{__LOCATION__} Speciate called on wrong kind of node.\n");
     ASSERT(source.AST_generic.body.kind == AST_node::AST_function, $"{__LOCATION__} Speciate called on wrong kind of node.\n");
 
-    let encoded_name = encode_function_name(source.AST_generic.body.AST_function.name, type_checker.generic_type);
+    let encoded_name = encode_function_name(source.AST_generic.body.AST_function.name, type_checker.generic_type, type_checker.endlos);
 
     let existing => get_global_symbol_by_name(type_checker.symbol_cache, encoded_name);
 
@@ -523,6 +530,7 @@ fn get_speciated_function_symbol(n: AST_node&, g: Symbol&, type_checker: TypeChe
     ast_implementation.AST_generic_implementation.body => ast_generic.AST_generic.body;
 
     ast_link_to_chain(&type_checker.program.AST_program.body, ast_implementation);
+
     return s;
 }
 
@@ -553,6 +561,7 @@ fn type_check_symbol(n: AST_node&, type_checker: TypeChecker&)
             type_checker_error(n, $"Generic speciation not allowed for {n.AST_symbol.symbol.kind.name}\n");
         }
     }
+
     n.type => n.AST_symbol.symbol.type;
     n.addressable = n.AST_symbol.symbol.kind != SymbolKind::SYM_type;
 }
@@ -978,5 +987,6 @@ fn type_checker_run(root: AST_node&, symbol_cache: SymbolCache&, ast_allocator: 
 
     annotate_used_visitor(root, type_checker);
     type_resolve_functions_visitor(root, type_checker);
+
     type_propagation_visitor(root, type_checker);
 }
