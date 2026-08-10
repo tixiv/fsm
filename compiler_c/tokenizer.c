@@ -69,7 +69,7 @@ void read_string(SV *str, SV *input, Location *location) {
     str->begin = input->begin;
     str->len = 0;
     while(input->len && '"' != *input->begin) {
-        if (sv_starts_with(input, "\\\"")) {
+        if (sv_starts_with(input, "\\")) {
             str->len += 2; sv_pop(input); sv_pop(input);
         }
         else {

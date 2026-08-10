@@ -20,6 +20,14 @@ fn endlos_init(allocator: EndlosAllocator&) {
     }
 }
 
+fn endlos_rolls_in_use (allocator: EndlosAllocator&) {
+    let count = 0;
+    for (let i = 0; i < 256; i++)
+        if (allocator.rolls[i].latest.begin)
+            count++;
+    return count;
+}
+
 generic T fn endlos_begin (allocator: EndlosAllocator&) : T[] {
     let align = T.sizeof;
     if (align > 8) align = 8;

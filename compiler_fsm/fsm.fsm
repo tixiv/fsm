@@ -89,13 +89,13 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : void {
     if (verbose) $"Reading '{filename}'\n"
     let code = read_file (filename);
 
-    if (verbose) $"Tokenizing...\n"
+    if (verbose) $"Tokenizing {endlos_rolls_in_use(mw.endlos)}...\n"
     tokenize_module(module, code, mw.endlos);
-    if (verbose) $"Tokenizing finished\n"
+    if (verbose) $"Tokenizing finished {endlos_rolls_in_use(mw.endlos)}\n"
 
-    if (verbose) $"Parsing...\n"
+    if (verbose) $"Parsing {endlos_rolls_in_use(mw.endlos)} ...\n"
     let root => parse_program(module.tokens, mw.ast_allocator, mw.endlos)
-    if (verbose) $"Parsing finished\n"
+    if (verbose) $"Parsing finished {endlos_rolls_in_use(mw.endlos)} \n"
 
     let imports = gather_imports(root, mw.endlos);
 
@@ -118,19 +118,19 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : void {
         }
     }
 
-    if (verbose) $"Type Resolver...\n"
+    if (verbose) $"Type Resolver {endlos_rolls_in_use(mw.endlos)} ...\n"
     type_resolver_run(root, mw.symbol_cache, mw.endlos);
-    if (verbose) $"Type Resolver finished\n"
+    if (verbose) $"Type Resolver finished  {endlos_rolls_in_use(mw.endlos)} \n"
 
-    if (verbose) $"Resolver...\n"
+    if (verbose) $"Resolver  {endlos_rolls_in_use(mw.endlos)} ...\n"
     resolver_run(root, mw.symbol_cache, mw.endlos);
-    if (verbose) $"Resolver finished\n"
+    if (verbose) $"Resolver finished {endlos_rolls_in_use(mw.endlos)} \n"
 
     // ast_dump_tree(root);
 
-    if (verbose) $"Going to run type checker...\n"
+    if (verbose) $"Going to run type checker {endlos_rolls_in_use(mw.endlos)} ...\n"
     type_checker_run(root, mw.symbol_cache, mw.ast_allocator, mw.endlos);
-    if (verbose) $"Finished type checking.\n"
+    if (verbose) $"Finished type checking. {endlos_rolls_in_use(mw.endlos)}\n"
 
     // ast_dump_tree(root);
 

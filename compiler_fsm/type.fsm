@@ -165,13 +165,13 @@ fn type_alloc(cache: TypeCache&, kind) : Type& {
     return t;
 }
 
-fn print_array_type(sb: StringBuilder&, arr_t: Type&) : void {
+fn print_array_type(sb: StringBuilder&, arr_t: Type&, encoded: bool) : void {
     let child_print_buf: u8[1024];
 
     let t => arr_t;
     while (is_array_kind(t)) t => t.T_array.element_type;
 
-    sb_puts(sb, get_type_name_r(child_print_buf, t));
+    sb_puts(sb, get_type_name_r_impl(child_print_buf, t, encoded));
 
     t => arr_t;
     while (is_array_kind(t)) {
@@ -203,19 +203,19 @@ fn get_type_name_r_impl(print_buf: u8[1024]&, type: Type&, encoded: bool) : u8[]
         sb_puts(sb, "fn (");
         let args = type.T_function.argument_types;
         for (let i = 0; i < args.len; i++) {
-            sb_puts(sb, get_type_name_r(child_print_buf, args[i]));
+            sb_puts(sb, get_type_name_r_impl(child_print_buf, args[i], encoded));
             if (i < args.len - 1) sb_puts(sb, ", ");
         }
-        sb_puts(sb, $") :{get_type_name_r(child_print_buf, type.T_function.return_type)}");
+        sb_puts(sb, $") :{get_type_name_r_impl(child_print_buf, type.T_function.return_type, encoded)}");
     }
     else if (type.kind == Type::T_reference) {
-        sb_puts(sb, $"{get_type_name_r(child_print_buf, type.T_reference.target_type)}{if(encoded) "ref" else " &"}");
+        sb_puts(sb, $"{get_type_name_r_impl(child_print_buf, type.T_reference.target_type, encoded)}{if(encoded) "_ref" else " &"}");
     }
     else if (type.kind == Type::T_enumerator) {
-        sb_puts(sb, $"{get_type_name_r(child_print_buf, type.T_enumerator.target_type)}::enumerator");
+        sb_puts(sb, $"{get_type_name_r_impl(child_print_buf, type.T_enumerator.target_type, encoded)}::enumerator");
     }
     else if (type.kind == Type::T_array) {
-        print_array_type(sb, type);
+        print_array_type(sb, type, encoded);
     }
     else if (type.kind == Type::T_struct) {
         if (is_slice_kind(type)) {
@@ -227,7 +227,7 @@ fn get_type_name_r_impl(print_buf: u8[1024]&, type: Type&, encoded: bool) : u8[]
             if (type.T_struct.kind == StructlikeKind::SL_struct) kind_name = "struct ";
             if (type.T_struct.kind == StructlikeKind::SL_record) kind_name = "record ";
             if (type.name.begin) {
-                sb_puts(sb, if(encoded) "" else kind_name); sb_puts(sb, type.name);
+                sb_puts(sb, if(encoded) "_" else kind_name); sb_puts(sb, type.name);
             }
             else {
                 sb_puts(sb, "anonymous "); sb_puts(sb, kind_name);
@@ -236,7 +236,7 @@ fn get_type_name_r_impl(print_buf: u8[1024]&, type: Type&, encoded: bool) : u8[]
     }
     else if (type.kind == Type::T_union) {
         if (type.name.begin) {
-            sb_puts(sb, $"union {type.name}");
+            sb_puts(sb, $"{if (encoded) "_" else "union "}{type.name}");
         }
         else {
             sb_puts(sb, "anonymous union");
@@ -275,6 +275,10 @@ fn is_void_kind(t: Type&) : bool {
 
 fn is_boolean_kind(t: Type&) : bool {
     return t && t.kind == Type::T_boolean;
+}
+
+fn is_null_kind(t: Type&) : bool {
+    return t && t.kind == Type::T_null;
 }
 
 fn is_integer_kind(t: Type&) : bool {

@@ -4,6 +4,10 @@ FSM can stand for either the "Flying Sphaghetticode Monster", or for "Finite Sta
 
 This is a language that I am making up right now as a hobby project because I never wrote a real compiler in my life before, and I thought I'd better do it late than never.
 
+# Self hostingnes has been achieved!
+
+As of now, the FSM written compiler can compile itself! The resulting binary is identical to the one from the C version.
+
 # Hello, World
 ```fsm
 fn main () {
@@ -137,19 +141,20 @@ fn main () {
 - [X] Implement function refs
 - [X] Implement null type for refs
 - [X] Implement nested structs and unions
+- [X] Memory management
 - [ ] Improve the module system (make it do more than essentially #include)
-- [ ] Memory management
 - [ ] Implement initializers for arrays and structs
 - [ ] Write more documentation
 - [ ] Runtime bounds checks
-- [ ] Make the compiler self hosting
+- [X] Make the compiler self hosting
   - [X] Port the tokenizer to FSM
   - [X] Port the AST tree and visitor to FSM
-  - [ ] Port the parser to FSM
-  - [ ] Port the resolver to FSM
-  - [ ] Port the type checker to FSM
-  - [ ] Write new IL gen in FSM that uses TOC instead of being stack based
-  - [ ] Write new machine code generation backend
+  - [X] Port the parser to FSM
+  - [X] Port the resolver to FSM
+  - [X] Port the type checker to FSM
+  - [X] Port the assembl gen to FSM
+- [ ] Write new IL gen in FSM that uses TOC instead of being stack based
+- [ ] Write new machine code generation backend
 - [ ] Implement a language server for FSM
 - [ ] Global variables (maybe the language shouldn't even have them? I'll see how far I get without)
 

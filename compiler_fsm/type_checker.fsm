@@ -128,6 +128,12 @@ fn insert_take_reference(type_checker: TypeChecker&, n: AST_node&) {
     ast_insert_node(type_checker.ast_allocator, n, ref);
 }
 
+fn auto_take_reference(type_checker: TypeChecker&, n: AST_node&) {
+    if (is_reference_kind(n.type)) return;
+    if (is_null_kind(n.type)) return;
+    insert_take_reference(type_checker, n);
+}
+
 fn check_function_argument_compatible(type_checker: TypeChecker&, arg_1: Type&, arg_2: Type&) : bool {
     return arg_1 <==> arg_2
         || (is_reference_kind(arg_1) && is_reference_kind(arg_2)
@@ -323,7 +329,20 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
             try_convert_to_type_if_necessary(type_checker, n.AST_binary.right, n.AST_binary.left.type, "Argument of operator '='");
             n.type => n.AST_binary.right.type;
         }
-
+        else if (tk == TokenKind::TOK_reference_target_equal
+                   |== TokenKind::TOK_reference_target_unequal)
+        {
+            auto_take_reference(type_checker, n.AST_binary.left);
+            auto_take_reference(type_checker, n.AST_binary.right);
+            let okay = (n.AST_binary.left.type <==> n.AST_binary.right.type)
+                        || (is_null_kind(n.AST_binary.left.type) && is_reference_kind(n.AST_binary.right.type))
+                        || (is_reference_kind(n.AST_binary.left.type) && is_null_kind(n.AST_binary.right.type));
+            if (!okay) {
+                type_checker_error(n, $"Operator {token_kind_printable(tk)} can't accept arguments with different types. Have '{get_type_name_r(buf_1, n.AST_binary.left.type)}' and '{get_type_name_r(buf_2, n.AST_binary.right.type)}'")
+            }
+            n.type => type_checker.type_cache.builtin_bool;
+            n.addressable = false;
+        }
         else {
             NOT_IMPLEMENTED(__LOCATION__, $"Type checking binary operator {token_kind_printable(n.AST_binary.token_kind)}\n");
         }
@@ -454,7 +473,6 @@ fn type_resolve_functions_visitor(n: AST_node&, type_checker: TypeChecker&) : vo
         // visiting the children of the arg list will fill up 'arg_symbols'
         ast_visit_children(n, type_resolve_functions_visitor, type_checker);
 
-
         let arg_types = endlos_begin~Type&(type_checker.endlos);
 
         for (let i = 0; i < type_checker.arg_symbols.arr.len; i++) {
@@ -462,6 +480,7 @@ fn type_resolve_functions_visitor(n: AST_node&, type_checker: TypeChecker&) : vo
         }
 
         arg_types = endlos_ripp_off~Type&(type_checker.endlos, arg_types);
+        EndlosArr_free~Symbol&(type_checker.arg_symbols, type_checker.endlos);
 
         type_checker.current_function_symbol.type =>
             get_function_type(type_checker.type_cache, type_checker.current_function_ret_type, arg_types);

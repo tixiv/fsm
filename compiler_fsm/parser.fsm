@@ -451,6 +451,7 @@ fn is_in_prio(op: TokenKind, prio) : bool {
       else if (prio == 2) op == TokenKind::TOK_boolean_and
       else if (prio == 3) op == TokenKind::TOK_greater |== TokenKind::TOK_lower |== TokenKind::TOK_greater_equal |== TokenKind::TOK_lower_equal
       else if (prio == 4) op == TokenKind::TOK_equal |== TokenKind::TOK_unequal |== TokenKind::TOK_or_equal_to |== TokenKind::TOK_and_not_equal_to
+                            |== TokenKind::TOK_reference_target_equal |== TokenKind::TOK_reference_target_unequal
       else if (prio == 5) op == TokenKind::TOK_plus |== TokenKind::TOK_minus
       else if (prio == 6) op == TokenKind::TOK_asterisk |== TokenKind::TOK_slash |== TokenKind::TOK_percent
       else if (prio == 7) op == TokenKind::TOK_up_arrow
