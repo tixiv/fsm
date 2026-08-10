@@ -503,7 +503,12 @@ fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
     }
 }
 
-fn ast_copy_chain(alloc: AST_Node_Allocator&, n: AST_node&) : AST_node& {
+struct AllocatorsForTreeCopy {
+    ast_alloc: AST_Node_Allocator&;
+    endlos: EndlosAllocator&;
+}
+
+fn ast_copy_chain(alloc: AllocatorsForTreeCopy&, n: AST_node&) : AST_node& {
     let base: AST_node& = null;
     while(n) {
         ast_link_to_chain(&base, ast_copy_tree(alloc, n));
@@ -513,9 +518,9 @@ fn ast_copy_chain(alloc: AST_Node_Allocator&, n: AST_node&) : AST_node& {
     return base;
 }
 
-fn ast_copy_tree(alloc: AST_Node_Allocator&, n: AST_node&) : AST_node& {
+fn ast_copy_tree(alloc: AllocatorsForTreeCopy&, n: AST_node&) : AST_node& {
     if (!n) return null;
-    let nn => ast_alloc(alloc, n.kind, n.location);
+    let nn => ast_alloc(alloc.ast_alloc, n.kind, n.location);
     objcopy~AST_node(nn, n);
     nn.next => null;
 
@@ -609,15 +614,17 @@ fn ast_copy_tree(alloc: AST_Node_Allocator&, n: AST_node&) : AST_node& {
     else if (n.kind == AST_node::AST_type_slice) {
         nn.AST_type_slice.body => ast_copy_tree(alloc, n.AST_type_slice.body);
     }
-    /*
     else if (n.kind == AST_node::AST_variadic_operator) {
         nn.AST_variadic_operator.left => ast_copy_tree(alloc, n.AST_variadic_operator.left);
-        nn.AST_variadic_operator.members = malloc(sizeof(VariadicOperatorMember) * n.AST_variadic_operator.num_members);
-        for (size_t i = 0; i < n.AST_variadic_operator.num_members; i++) {
-            memcpy(&nn.AST_variadic_operator.members[i], &n.AST_variadic_operator.members[i], sizeof(VariadicOperatorMember));
-            nn.AST_variadic_operator.members[i].right => ast_copy_tree(alloc, n.AST_variadic_operator.members[i].right);
+      
+        let members = endlos_begin~VariadicOperatorMember(alloc.endlos);
+        for (let i = 0; i < n.AST_variadic_operator.members.len; i++) {
+            let m => members++;
+            objcopy~VariadicOperatorMember(m, n.AST_variadic_operator.members[i]);
+            m.right => ast_copy_tree(alloc, n.AST_variadic_operator.members[i].right);
         }
-    } */
+        nn.AST_variadic_operator.members = endlos_ripp_off~VariadicOperatorMember(alloc.endlos, members);
+    } 
 
     else if (n.kind == AST_node::AST_builder_string) {
         nn.AST_builder_string.var_decl_sb => ast_copy_tree(alloc, n.AST_builder_string.var_decl_sb);
@@ -651,7 +658,7 @@ fn ast_copy_tree(alloc: AST_Node_Allocator&, n: AST_node&) : AST_node& {
     ) {
     }
     else {
-        NOT_IMPLEMENTED(__LOCATION__, "Copying {n.kind}");
+        NOT_IMPLEMENTED(__LOCATION__, $"Copying {n.kind.name}");
     }
 
     return nn;

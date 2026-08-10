@@ -506,8 +506,12 @@ fn get_speciated_function_symbol(n: AST_node&, g: Symbol&, type_checker: TypeChe
     let existing => get_global_symbol_by_name(type_checker.symbol_cache, encoded_name);
 
     if (existing) return existing;
+
+    let alloc: AllocatorsForTreeCopy;
+    alloc.ast_alloc => type_checker.ast_allocator;
+    alloc.endlos => type_checker.endlos;
     
-    let ast_generic => ast_copy_tree(type_checker.ast_allocator, source);
+    let ast_generic => ast_copy_tree(alloc, source);
     let ast_fn => ast_generic.AST_generic.body;
 
     ast_fn.AST_function.name = encoded_name;

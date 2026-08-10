@@ -71,6 +71,14 @@ struct ModuleWalker {
     symbol_cache: SymbolCache&;
 }
 
+fn already_compiled(mw: ModuleWalker&, import_filename : u8[]) {
+    for (let i = 0; i < mw.modules.arr.len; i++) {
+        if (sv_equal(import_filename, mw.modules.arr[i].header.filename))
+            return true;
+    }
+    return false;
+}
+
 fn compile_module (mw: ModuleWalker&, filename: u8[]) : void {
     let verbose = false;
 
@@ -101,7 +109,8 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : void {
         
         if (res) {
             import_filename.len--; // make the terminating 0 for C invisible to FSM
-            compile_module(mw, import_filename);
+            if (!already_compiled(mw, import_filename))
+                compile_module(mw, import_filename);
         }
         else {
             write(2, $"[FSM Modulizer] {filename}:{imp.location.line} Error: couldn't find import '{imp.name}'.\n")
