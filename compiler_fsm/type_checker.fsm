@@ -545,7 +545,7 @@ fn get_speciated_function_symbol(n: AST_node&, g: Symbol&, type_checker: TypeChe
     tc_child.type_cache    => type_checker.type_cache;
     tc_child.program       => type_checker.program;
     tc_child.current_function_symbol => s;
-    EndlosArr_begin~Symbol&(tc_child.arg_symbols, type_checker.endlos);
+
     type_resolve_functions_visitor(ast_generic.AST_generic.body, &tc_child);
     type_propagation_visitor(ast_generic.AST_generic.body, &tc_child);
 
