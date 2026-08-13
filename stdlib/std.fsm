@@ -2,6 +2,7 @@
 fn strerror (error_code) {
     if (error_code == -1) return "Operation not permitted";
     if (error_code == -2) return "No such file or directory";
+    if (error_code == -13) return "Permission denied";
 
     print(error_code)
     return "unknown error"
