@@ -144,12 +144,11 @@ struct Tokenizer {
     tokens: Token[];
     location: Location;
     inside_builder_string: bool;
+    error_handler: fn (u8[], Location, u8[]) : void;
 }
 
 fn tokenizer_error(tokenizer: Tokenizer&, message: u8[]) {
-    $"[FSM Tokenizer] {tokenizer.location.module.filename}:{tokenizer.location.line}:{tokenizer.location.col} Error: ";
-    puts(message);
-    if (message[message.len-1] != '\n') putc('\n');
+    tokenizer.error_handler("[FSM Tokenizer]", tokenizer.location, message);
     exit(1);
 }
 

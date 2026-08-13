@@ -13,6 +13,13 @@ import * from "il_gen";
 import * from "generator";
 
 
+fn error_handler(facility: u8[], location: Location, message: u8[]) {
+    $"{facility} {location.module.filename}:{location.line}:{location.col} Error: ";
+    puts(message);
+    putc('\n');
+    exit(1);
+}
+
 fn tokenize_module (module: Module&, code: u8[], endlos: EndlosAllocator&) {
     let tokenizer: Tokenizer;
 
@@ -20,6 +27,7 @@ fn tokenize_module (module: Module&, code: u8[], endlos: EndlosAllocator&) {
     tokenizer.location.module => module.header;
     tokenizer.location.line = 1;
     tokenizer.tokens = endlos_begin~Token(endlos);
+    tokenizer.error_handler => error_handler;
 
     tokenize_fsm(tokenizer);
 
@@ -27,7 +35,6 @@ fn tokenize_module (module: Module&, code: u8[], endlos: EndlosAllocator&) {
 
     // dump_tokens(module.tokens);
 }
-
 
 fn get_path(filename: u8[]) : u8[] {
     let path = filename;
