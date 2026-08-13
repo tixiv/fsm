@@ -8,7 +8,7 @@ struct Location {
     line: i32; col: i32;
 }
 
-struct ErrorHandler {
-    handler: fn (u8[], any&, u8[], any&) : void;
+generic T struct ErrorHandler {
+    handler: fn (u8[], T, u8[], any&) : void;
     arg: any&;
 }

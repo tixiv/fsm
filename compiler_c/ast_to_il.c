@@ -60,6 +60,9 @@ static void il_gen_push_symbol_address(Symbol *s, const Location *location) {
     else if (s->kind == SYM_function) {
         push_opcode(OP_push_global_address, &s->name, 0, nullptr, location);
     }
+    else if (s->kind == SYM_type) {
+        il_gen_error(location, "Pushing type symbol '%.*s' is not supported.", SV_prnt(s->name));
+    }
     else {
         NOT_IMPLEMENTED("Pushing address for symbol kind %s is not implemented yet.\n", symbol_kind_name(s->kind));
     }

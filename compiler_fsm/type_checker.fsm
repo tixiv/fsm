@@ -267,8 +267,13 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
             }
 
             let any_ref => get_ref_type_for(type_checker.type_cache, type_checker.type_cache.builtin_any);
-
-            if (n.AST_binary.left.type <!=> n.AST_binary.right.type && n.AST_binary.left.type <!=> any_ref && n.AST_binary.right.type <!=> any_ref) {
+            
+            
+            if (!check_function_refs_compatible(type_checker, n.AST_binary.left.type, n.AST_binary.right.type)
+                  && n.AST_binary.left.type <!=> n.AST_binary.right.type
+                  && n.AST_binary.left.type <!=> any_ref
+                  && n.AST_binary.right.type <!=> any_ref)
+            {
                 type_checker_error(type_checker, n, $"Operator {token_kind_printable(tk)} requires the type on the right side to be referenceable by the left type. Have '{get_type_name_r(buf_1, n.AST_binary.left.type)}' and '{get_type_name_r(buf_2, n.AST_binary.right.type)}'.\n");
             }
         }
@@ -1001,7 +1006,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
     ASSERT(n.type, $"All nodes should have a type after the type checker. Have {n.kind.name} with null type.\n");
 }
 
-fn type_checker_run(root: AST_node&, symbol_cache: SymbolCache&, ast_allocator: AST_Node_Allocator&, endlos: EndlosAllocator&, error_handler: fn (u8[], AST_node&, u8[]):void ) {
+fn type_checker_run(root: AST_node&, symbol_cache: SymbolCache&, ast_allocator: AST_Node_Allocator&, endlos: EndlosAllocator&, error_handler: ErrorHandler<AST_node&>& ) {
     let type_checker: TypeChecker;
     type_checker.type_cache => symbol_cache.type_cache;
     type_checker.symbol_cache => symbol_cache;

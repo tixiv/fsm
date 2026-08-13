@@ -10,11 +10,12 @@ struct IL_gen {
     num_ifs;
     num_whiles;
     num_strings;
+    error_handler: ErrorHandler<AST_node&>&;
 }
 
-fn il_gen_error(l: Location, s: u8[]) {
-    write(2, $"[FSM IL Gen] {l.module.filename}:{l.line} Error: {s}\n");
-    exit(1);
+fn il_gen_error(il_gen: IL_gen&, n: AST_node&, message: u8[]) {
+    let eh => il_gen.error_handler;
+    eh.handler("[FSM IL Gen]", n, message, eh.arg)
 }
 
 fn il_gen_warning(l: Location, s: u8[]) {
@@ -38,15 +39,18 @@ fn push_opcode(gen: IL_gen&, kind: OpKind, value: u8[]&, i64_value, type: Type&,
     return push_opcode_2(gen, kind, value, i64_value, 0, type, location);
 }
 
-fn il_gen_push_symbol_address(gen: IL_gen&, s: Symbol&, location: Location&) {
+fn il_gen_push_symbol_address(gen: IL_gen&, s: Symbol&, n: AST_node&) {
     if (s.kind == SymbolKind::SYM_local) {
-        push_opcode(gen, OpKind::OP_push_local_var_address, null, s.offset, null, location);
+        push_opcode(gen, OpKind::OP_push_local_var_address, null, s.offset, null, n.location);
     }
     else if (s.kind == SymbolKind::SYM_arg) {
-        push_opcode(gen, OpKind::OP_push_arg_address, null, s.offset, null, location);
+        push_opcode(gen, OpKind::OP_push_arg_address, null, s.offset, null, n.location);
     }
     else if (s.kind == SymbolKind::SYM_function) {
-        push_opcode(gen, OpKind::OP_push_global_address, &s.name, 0, null, location);
+        push_opcode(gen, OpKind::OP_push_global_address, &s.name, 0, null, n.location);
+    }
+    else if (s.kind == SymbolKind::SYM_type) {
+        il_gen_error(gen, n, $"Pushing type symbol '{s.name}' is not supported.");
     }
     else {
         NOT_IMPLEMENTED(__LOCATION__, $"Pushing address for symbol kind {s.kind.name}");
@@ -100,7 +104,7 @@ fn gen_binary_operators(n: AST_node&, gen: IL_gen&, result_used: bool) {
     }
     else if (TokenKind::TOK_equal_assign == n.AST_binary.token_kind || TokenKind::TOK_bind_ref == n.AST_binary.token_kind) {
         if (!n.AST_binary.left.addressable) {
-            il_gen_error(n.location, $"Trying to assign to something that is not addressable. Have {n.AST_binary.left.kind.name}.\n");
+            il_gen_error(gen, n, $"Trying to assign to something that is not addressable. Have {n.AST_binary.left.kind.name}.\n");
         }
         gen_address_visitor(n.AST_binary.left, gen);
         gen_value_visitor(n.AST_binary.right, gen);
@@ -227,7 +231,7 @@ fn gen_cast(n: AST_node&, gen: IL_gen&, result_used: bool) {
     }
     
     if (!result_used) {
-        il_gen_error(n.location, "Cast with unused result is not supported.\n");
+        il_gen_error(gen, n, "Cast with unused result is not supported.\n");
     }
 
     if (is_boolean_kind(to) && is_integer_kind(from)) {
@@ -392,7 +396,7 @@ fn gen_address_visitor(n: AST_node&, gen: IL_gen&) : void {
         let s => n.AST_symbol.symbol;
         ASSERT(s, $"Symbol for variable assignment to '{n.AST_symbol.name}' is not resolved\n");
 
-        il_gen_push_symbol_address(gen, s, n.location);
+        il_gen_push_symbol_address(gen, s, n);
     }
     else if (n.kind == AST_node::AST_dereference) {
         ast_visit_children(n, gen_value_visitor, gen);
@@ -401,7 +405,7 @@ fn gen_address_visitor(n: AST_node&, gen: IL_gen&) : void {
         gen_address_visitor(n.AST_generic_speciation.body, gen);
     }
     else {
-        il_gen_error(n.location, $"Trying to take the address of something for which it is not possible. Have {n.kind.name}.\n");
+        il_gen_error(gen, n, $"Trying to take the address of something for which it is not possible. Have {n.kind.name}.\n");
     }
 }
 
@@ -581,7 +585,7 @@ fn gen_value_visitor(n: AST_node&, gen: IL_gen&) : void {
 
     else if (n.kind == AST_node::AST_dereference) {
         let size = get_storage_size(n.type);
-        if (size > 16) il_gen_error(n.location, $"Can't dereference something with storage size > 16. Have {size}.");
+        if (size > 16) il_gen_error(gen, n, $"Can't dereference something with storage size > 16. Have {size}.");
         ast_visit_children(n, gen_value_visitor, gen);
         push_opcode(gen, OpKind::OP_load, null, 0, n.type, n.location);
     }
@@ -700,7 +704,7 @@ fn il_gen_visitor(n: AST_node&, gen: IL_gen&) : void {
 
     else if (n.kind == AST_node::AST_var_decl) {
         if (n.AST_var_decl.initializer) {
-            il_gen_push_symbol_address(gen, n.AST_var_decl.symbol, n.location);                
+            il_gen_push_symbol_address(gen, n.AST_var_decl.symbol, n);                
             gen_value_visitor(n.AST_var_decl.initializer, gen);
             push_opcode(gen, OpKind::OP_store, null, 0, n.AST_var_decl.symbol.type, n.location);
         }

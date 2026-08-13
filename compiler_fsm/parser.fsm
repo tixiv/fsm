@@ -897,7 +897,7 @@ fn parse_generic(parser: Parser&) : AST_node& {
     return ast_generic;
 }
 
-fn parse_program(tokens: Token[], allocator: AST_Node_Allocator&, endlos: EndlosAllocator&, error_handler: fn (u8[],Location&,u8[]) : void ) : AST_node& {
+fn parse_program(tokens: Token[], allocator: AST_Node_Allocator&, endlos: EndlosAllocator&, error_handler: ErrorHandler<Location&>& ) : AST_node& {
     let parser: Parser;
     parser.tokens = tokens;
     parser.CT => tokens.begin;

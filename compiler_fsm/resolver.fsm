@@ -25,7 +25,7 @@ fn push_symbol(res: Resolver&, arr: EndlosArr<Symbol&>&, s: Symbol&, n: AST_node
     if (s.name.len) {
         let conflicting => resolver_lookup_symbol(res,  s.name, n, false);
         if (conflicting) {
-            resolver_error(res, n, $"Symbol '{s.name}' redefined\n");
+            resolver_error(res, n, $"Symbol '{s.name}' redefined which was previously defined in {conflicting.location.module.filename}:{conflicting.location.line}");
             return;
         }
     }
@@ -77,7 +77,7 @@ fn resolve_globals_visitor (n: AST_node&, res: Resolver&) : void {
     if (n.kind == AST_node::AST_function) {
         let s_fun => alloc_symbol(res.symbol_cache, SymbolKind::SYM_function, n.AST_function.name, n.location);
         s_fun.source => res.current_generic;
-        push_global_symbol(res.symbol_cache, s_fun)
+        push_global_symbol(res.symbol_cache, s_fun, n, res.error_handler)
         n.AST_function.symbol => s_fun;
     }
     else if (n.kind == AST_node::AST_generic) {
@@ -178,7 +178,7 @@ fn resolver_visitor(n: AST_node&, res: Resolver&) : void {
     else NOT_IMPLEMENTED(__LOCATION__, $"Resolver for {n.kind.name}");
 }
 
-fn resolver_speciate_generic(root: AST_node&, type: Type&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&, error_handler: fn (u8[], AST_node&, u8[]) : void ) : Symbol& {
+fn resolver_speciate_generic(root: AST_node&, type: Type&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&, error_handler:ErrorHandler<AST_node&>& ) : Symbol& {
     let res: Resolver;
     res.type_cache => symbol_cache.type_cache;
     res.symbol_cache => symbol_cache;
@@ -198,7 +198,7 @@ fn resolver_speciate_generic(root: AST_node&, type: Type&, symbol_cache: SymbolC
 }
 
 
-fn resolver_run(root: AST_node&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&, error_handler: fn (u8[], AST_node&, u8[]) : void ) {
+fn resolver_run(root: AST_node&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&, error_handler: ErrorHandler<AST_node&>& ) {
     let res: Resolver;
     res.type_cache => symbol_cache.type_cache;
     res.symbol_cache => symbol_cache;

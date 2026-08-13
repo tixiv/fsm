@@ -53,13 +53,13 @@ fn get_type_by_name(symbol_cache: SymbolCache&, name: u8[], trs: TypeResolverSta
     return null;
 }
 
-fn push_named_type(symbol_cache: SymbolCache&, name: u8[], type: Type&, location: Location&) : void {
+fn push_named_type(trs: TypeResolverState&, name: u8[], type: Type&, n: AST_node&) : void {
     type.name = name;
 
-    let sym => alloc_symbol(symbol_cache, SymbolKind::SYM_type, name, location);
+    let sym => alloc_symbol(trs.symbol_cache, SymbolKind::SYM_type, name, n.location);
     sym.type => type;
 
-    push_global_symbol(symbol_cache, sym);
+    push_global_symbol(trs.symbol_cache, sym, n, trs.error_handler);
 }
 
 fn type_lookup_visitor(n: AST_node&, trs: TypeResolverState&) : void {
@@ -68,15 +68,15 @@ fn type_lookup_visitor(n: AST_node&, trs: TypeResolverState&) : void {
         t.T_struct.kind = StructlikeKind::SL_struct;
         if (n.AST_struct.is_record)
             t.T_struct.kind = StructlikeKind::SL_record;
-        push_named_type(trs.symbol_cache, n.AST_struct.name, t, n.location);
+        push_named_type(trs, n.AST_struct.name, t, n);
     }
     else if (n.kind == AST_node::AST_enum) {
         let t => type_alloc(trs.symbol_cache.type_cache, Type::T_enum);
         t.storage_size = 8;
-        push_named_type(trs.symbol_cache, n.AST_enum.name, t, n.location);
+        push_named_type(trs, n.AST_enum.name, t, n);
     }
     else if (n.kind == AST_node::AST_union) {
-        push_named_type(trs.symbol_cache, n.AST_union.name, type_alloc(trs.symbol_cache.type_cache, Type::T_union), n.location);
+        push_named_type(trs, n.AST_union.name, type_alloc(trs.symbol_cache.type_cache, Type::T_union), n);
     }
     else {
         ast_visit_children(n, type_lookup_visitor, trs);
@@ -247,7 +247,7 @@ fn type_resolver_visitor(n: AST_node&, trs: TypeResolverState&) : void {
     }
 }
 
-fn type_resolver_speciate_generic(root: AST_node&, t: Type&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&, error_handler: fn (u8[],AST_node&,u8[]):void ) {
+fn type_resolver_speciate_generic(root: AST_node&, t: Type&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&, error_handler: ErrorHandler<AST_node&>& ) {
     let trs: TypeResolverState;
     trs.symbol_cache => symbol_cache;
     trs.endlos => endlos;
@@ -257,7 +257,7 @@ fn type_resolver_speciate_generic(root: AST_node&, t: Type&, symbol_cache: Symbo
 }
 
 
-fn type_resolver_run(root: AST_node&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&, error_handler: fn (u8[],AST_node&,u8[]):void ) {
+fn type_resolver_run(root: AST_node&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&, error_handler: ErrorHandler<AST_node&>& ) {
     let trs: TypeResolverState;
     trs.symbol_cache => symbol_cache;
     trs.endlos => endlos;

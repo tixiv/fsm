@@ -13,36 +13,18 @@ import * from "il_gen";
 import * from "generator";
 
 
-fn error_handler_location(facility: u8[], location: Location&, message: u8[]) {
+fn error_handler_location(facility: u8[], location: Location&, message: u8[], _: any&) {
     $"{facility} {location.module.filename}:{location.line}:{location.col} Error: ";
     puts(message);
     putc('\n');
-    puts("I'm da new error handler for locations!\n");
     exit(1);
 }
 
-fn error_handler_ast_node(facility: u8[], n: AST_node&, message: u8[]) {
+fn error_handler_ast_node(facility: u8[], n: AST_node&, message: u8[], _: any&) {
     $"{facility} {n.location.module.filename}:{n.location.line}:{n.location.col} Error: ";
     puts(message);
     putc('\n');
-    puts("I'm da new error handler for AST nodes!\n");
     exit(1);
-}
-
-fn tokenize_module (module: Module&, code: u8[], endlos: EndlosAllocator&) {
-    let tokenizer: Tokenizer;
-
-    tokenizer.code = code;
-    tokenizer.location.module => module.header;
-    tokenizer.location.line = 1;
-    tokenizer.tokens = endlos_begin~Token(endlos);
-    tokenizer.error_handler => error_handler_location;
-
-    tokenize_fsm(tokenizer);
-
-    module.tokens = endlos_ripp_off~Token(endlos, tokenizer.tokens);
-
-    // dump_tokens(module.tokens);
 }
 
 fn get_path(filename: u8[]) : u8[] {
@@ -85,6 +67,24 @@ struct ModuleWalker {
     ast_allocator: AST_Node_Allocator&;
     endlos: EndlosAllocator&;
     symbol_cache: SymbolCache&;
+    error_handler_location: ErrorHandler<Location&>;
+    error_handler_ast_node: ErrorHandler<AST_node&>;
+}
+
+fn tokenize_module (mw: ModuleWalker&, module: Module&, code: u8[], endlos: EndlosAllocator&) {
+    let tokenizer: Tokenizer;
+
+    tokenizer.code = code;
+    tokenizer.location.module => module.header;
+    tokenizer.location.line = 1;
+    tokenizer.tokens = endlos_begin~Token(endlos);
+    tokenizer.error_handler => mw.error_handler_location;
+
+    tokenize_fsm(tokenizer);
+
+    module.tokens = endlos_ripp_off~Token(endlos, tokenizer.tokens);
+
+    // dump_tokens(module.tokens);
 }
 
 fn already_compiled(mw: ModuleWalker&, import_filename : u8[]) {
@@ -106,11 +106,11 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : void {
     let code = read_file (filename);
 
     if (verbose) $"Tokenizing {endlos_rolls_in_use(mw.endlos)}...\n"
-    tokenize_module(module, code, mw.endlos);
+    tokenize_module(mw, module, code, mw.endlos);
     if (verbose) $"Tokenizing finished {endlos_rolls_in_use(mw.endlos)}\n"
 
     if (verbose) $"Parsing {endlos_rolls_in_use(mw.endlos)} ...\n"
-    let root => parse_program(module.tokens, mw.ast_allocator, mw.endlos, error_handler_location)
+    let root => parse_program(module.tokens, mw.ast_allocator, mw.endlos, mw.error_handler_location)
     if (verbose) $"Parsing finished {endlos_rolls_in_use(mw.endlos)} \n"
 
     let imports = gather_imports(root, mw.endlos);
@@ -135,17 +135,17 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : void {
     }
 
     if (verbose) $"Type Resolver {endlos_rolls_in_use(mw.endlos)} ...\n"
-    type_resolver_run(root, mw.symbol_cache, mw.endlos, error_handler_ast_node);
+    type_resolver_run(root, mw.symbol_cache, mw.endlos, mw.error_handler_ast_node);
     if (verbose) $"Type Resolver finished  {endlos_rolls_in_use(mw.endlos)} \n"
 
     if (verbose) $"Resolver  {endlos_rolls_in_use(mw.endlos)} ...\n"
-    resolver_run(root, mw.symbol_cache, mw.endlos, error_handler_ast_node);
+    resolver_run(root, mw.symbol_cache, mw.endlos, mw.error_handler_ast_node);
     if (verbose) $"Resolver finished {endlos_rolls_in_use(mw.endlos)} \n"
 
     // ast_dump_tree(root);
 
     if (verbose) $"Going to run type checker {endlos_rolls_in_use(mw.endlos)} ...\n"
-    type_checker_run(root, mw.symbol_cache, mw.ast_allocator, mw.endlos, error_handler_ast_node);
+    type_checker_run(root, mw.symbol_cache, mw.ast_allocator, mw.endlos, mw.error_handler_ast_node);
     if (verbose) $"Finished type checking. {endlos_rolls_in_use(mw.endlos)}\n"
 
     // ast_dump_tree(root);
@@ -170,11 +170,12 @@ fn compile_program(initial_filename: u8[]) {
     let ast_allocator: AST_Node_Allocator;
     AST_Node_Allocator_init(ast_allocator);
 
-
     let mw: ModuleWalker;
     mw.ast_allocator => ast_allocator;
     mw.endlos => endlos;
     mw.symbol_cache => symbol_cache;
+    mw.error_handler_location.handler => error_handler_location;
+    mw.error_handler_ast_node.handler => error_handler_ast_node;
     EndlosArr_begin~Module(mw.modules, endlos);
 
     compile_module(mw, initial_filename);
@@ -186,6 +187,7 @@ fn compile_program(initial_filename: u8[]) {
     let gen: IL_gen;
     gen.type_cache => type_cache;
     gen.symbol_cache => symbol_cache;
+    gen.error_handler => mw.error_handler_ast_node;
     EndlosArr_begin~Opcode(gen.opcodes, endlos);
 
     for (let i = 0; i < compiled_modules.len; i++) {
