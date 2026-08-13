@@ -13,10 +13,19 @@ import * from "il_gen";
 import * from "generator";
 
 
-fn error_handler(facility: u8[], location: Location, message: u8[]) {
+fn error_handler_location(facility: u8[], location: Location&, message: u8[]) {
     $"{facility} {location.module.filename}:{location.line}:{location.col} Error: ";
     puts(message);
     putc('\n');
+    puts("I'm da new error handler for locations!\n");
+    exit(1);
+}
+
+fn error_handler_ast_node(facility: u8[], n: AST_node&, message: u8[]) {
+    $"{facility} {n.location.module.filename}:{n.location.line}:{n.location.col} Error: ";
+    puts(message);
+    putc('\n');
+    puts("I'm da new error handler for AST nodes!\n");
     exit(1);
 }
 
@@ -27,7 +36,7 @@ fn tokenize_module (module: Module&, code: u8[], endlos: EndlosAllocator&) {
     tokenizer.location.module => module.header;
     tokenizer.location.line = 1;
     tokenizer.tokens = endlos_begin~Token(endlos);
-    tokenizer.error_handler => error_handler;
+    tokenizer.error_handler => error_handler_location;
 
     tokenize_fsm(tokenizer);
 
@@ -101,7 +110,7 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : void {
     if (verbose) $"Tokenizing finished {endlos_rolls_in_use(mw.endlos)}\n"
 
     if (verbose) $"Parsing {endlos_rolls_in_use(mw.endlos)} ...\n"
-    let root => parse_program(module.tokens, mw.ast_allocator, mw.endlos)
+    let root => parse_program(module.tokens, mw.ast_allocator, mw.endlos, error_handler_location)
     if (verbose) $"Parsing finished {endlos_rolls_in_use(mw.endlos)} \n"
 
     let imports = gather_imports(root, mw.endlos);
@@ -126,17 +135,17 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : void {
     }
 
     if (verbose) $"Type Resolver {endlos_rolls_in_use(mw.endlos)} ...\n"
-    type_resolver_run(root, mw.symbol_cache, mw.endlos);
+    type_resolver_run(root, mw.symbol_cache, mw.endlos, error_handler_ast_node);
     if (verbose) $"Type Resolver finished  {endlos_rolls_in_use(mw.endlos)} \n"
 
     if (verbose) $"Resolver  {endlos_rolls_in_use(mw.endlos)} ...\n"
-    resolver_run(root, mw.symbol_cache, mw.endlos);
+    resolver_run(root, mw.symbol_cache, mw.endlos, error_handler_ast_node);
     if (verbose) $"Resolver finished {endlos_rolls_in_use(mw.endlos)} \n"
 
     // ast_dump_tree(root);
 
     if (verbose) $"Going to run type checker {endlos_rolls_in_use(mw.endlos)} ...\n"
-    type_checker_run(root, mw.symbol_cache, mw.ast_allocator, mw.endlos);
+    type_checker_run(root, mw.symbol_cache, mw.ast_allocator, mw.endlos, error_handler_ast_node);
     if (verbose) $"Finished type checking. {endlos_rolls_in_use(mw.endlos)}\n"
 
     // ast_dump_tree(root);

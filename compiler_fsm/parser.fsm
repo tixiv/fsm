@@ -7,10 +7,12 @@ struct Parser {
     CT: Token&;
     allocator: AST_Node_Allocator&;
     endlos: EndlosAllocator&;
+    error_handler: ErrorHandler<Location&>&;
 }
 
 fn parser_error(parser: Parser&, message: u8[]) {
-    fsm_compiler_error("[FSM Parser]", parser.CT.location, message)
+    let eh =>  parser.error_handler;
+    eh.handler("[FSM Parser]", parser.CT.location, message, eh.arg)
 }
 
 fn make_location_string(parser: Parser&) : u8[] {
@@ -895,12 +897,13 @@ fn parse_generic(parser: Parser&) : AST_node& {
     return ast_generic;
 }
 
-fn parse_program(tokens: Token[], allocator: AST_Node_Allocator&, endlos: EndlosAllocator&) : AST_node& {
+fn parse_program(tokens: Token[], allocator: AST_Node_Allocator&, endlos: EndlosAllocator&, error_handler: fn (u8[],Location&,u8[]) : void ) : AST_node& {
     let parser: Parser;
     parser.tokens = tokens;
     parser.CT => tokens.begin;
     parser.allocator => allocator;
     parser.endlos => endlos;
+    parser.error_handler => error_handler;
 
     let root => ast_alloc(parser.allocator, AST_node::AST_program, parser.CT.location);
 

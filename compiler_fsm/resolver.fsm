@@ -2,12 +2,6 @@
 import * from "ast";
 import * from "symbol";
 
-fn resolver_error(n: AST_node&, s: u8[]) {
-    let l = n.location;
-    write(2, $"[FSM Resolver] {l.module.filename}:{l.line} Error: {s}\n");
-    exit(1);
-}
-
 struct Resolver {
     symbol_cache: SymbolCache&;
     type_cache: TypeCache&;
@@ -19,13 +13,19 @@ struct Resolver {
     generic_symbol: Symbol&;
     current_generic_type: Type&;
     out_latest_function: Symbol&;
+    error_handler: ErrorHandler<AST_node&>&;
+}
+
+fn resolver_error(res: Resolver&, n: AST_node&, message: u8[]) {
+    let eh => res.error_handler;
+    eh.handler("[FSM Resolver]", n, message, eh.arg);
 }
 
 fn push_symbol(res: Resolver&, arr: EndlosArr<Symbol&>&, s: Symbol&, n: AST_node&) {
     if (s.name.len) {
         let conflicting => resolver_lookup_symbol(res,  s.name, n, false);
         if (conflicting) {
-            resolver_error(n, $"Symbol '{s.name}' redefined\n");
+            resolver_error(res, n, $"Symbol '{s.name}' redefined\n");
             return;
         }
     }
@@ -47,7 +47,7 @@ fn resolver_lookup_symbol(res: Resolver&, name: u8[], n: AST_node&, do_undefined
     }
 
     if(do_undefined_error)
-        resolver_error(n, $"Undefined symbol {name}");
+        resolver_error(res, n, $"Undefined symbol {name}");
     
     return null;
 }
@@ -64,7 +64,7 @@ fn resolver_leave_function(res: Resolver&) {
 }
 
 fn resolver_enter_scope(res: Resolver&, n: AST_node&) {
-    if (res.locals_stack_pointer >= 99) resolver_error(n, "Scope stack overflow. More than 100 levels nested. What are you doing?.\n");
+    if (res.locals_stack_pointer >= 99) resolver_error(res, n, "Scope stack overflow. More than 100 levels nested. What are you doing?.\n");
     res.locals_stack[res.locals_stack_pointer++] = res.local_symbols.arr.len;
 }
 
@@ -178,11 +178,12 @@ fn resolver_visitor(n: AST_node&, res: Resolver&) : void {
     else NOT_IMPLEMENTED(__LOCATION__, $"Resolver for {n.kind.name}");
 }
 
-fn resolver_speciate_generic(root: AST_node&, type: Type&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&) : Symbol& {
+fn resolver_speciate_generic(root: AST_node&, type: Type&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&, error_handler: fn (u8[], AST_node&, u8[]) : void ) : Symbol& {
     let res: Resolver;
     res.type_cache => symbol_cache.type_cache;
     res.symbol_cache => symbol_cache;
     res.current_generic_type => type;
+    res.error_handler => error_handler;    
 
     EndlosArr_begin~Symbol&(res.local_symbols, endlos);
     res.locals_stack = endlos_begin~i64(endlos);
@@ -197,10 +198,11 @@ fn resolver_speciate_generic(root: AST_node&, type: Type&, symbol_cache: SymbolC
 }
 
 
-fn resolver_run(root: AST_node&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&) {
+fn resolver_run(root: AST_node&, symbol_cache: SymbolCache&, endlos: EndlosAllocator&, error_handler: fn (u8[], AST_node&, u8[]) : void ) {
     let res: Resolver;
     res.type_cache => symbol_cache.type_cache;
     res.symbol_cache => symbol_cache;
+    res.error_handler => error_handler;
 
     EndlosArr_begin~Symbol&(res.local_symbols, endlos);
     res.locals_stack = endlos_begin~i64(endlos);

@@ -1,5 +1,6 @@
 
 import * from "std";
+import * from "common";
 
 enum TokenKind {
     TOK_null,
@@ -144,12 +145,12 @@ struct Tokenizer {
     tokens: Token[];
     location: Location;
     inside_builder_string: bool;
-    error_handler: fn (u8[], Location, u8[]) : void;
+    error_handler: ErrorHandler<Location&>&;
 }
 
 fn tokenizer_error(tokenizer: Tokenizer&, message: u8[]) {
-    tokenizer.error_handler("[FSM Tokenizer]", tokenizer.location, message);
-    exit(1);
+    let eh =>  parser.error_handler;
+    eh.handler("[FSM Tokenizer]", tokenizer.location, message, eh.arg);
 }
 
 fn read_word(input: u8[]&) {

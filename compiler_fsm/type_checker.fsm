@@ -4,18 +4,6 @@ import * from "endlos";
 import * from "type";
 import * from "ast";
 
-
-fn type_checker_error(n: AST_node&, s: u8[]) {
-    let l = n.location;
-    write(2, $"[FSM Type Checker] {l.module.filename}:{l.line} Error: {s}\n");
-    exit(1);
-}
-
-fn type_checker_warning(n: AST_node&, s: u8[]) {
-    let l = n.location;
-    write(2, $"[FSM Type Checker] {l.module.filename}:{l.line} Warning: {s}\n");
-}
-
 struct TypeChecker {
     type_cache: TypeCache&;
     symbol_cache: SymbolCache&;
@@ -28,6 +16,17 @@ struct TypeChecker {
     arg_symbols: EndlosArr<Symbol&>;
     generic_type: Type&;
     program: AST_node&;
+    error_handler: ErrorHandler<AST_node&>&;
+}
+
+fn type_checker_error(type_checker: TypeChecker&, n: AST_node&, message: u8[]) {
+    let eh => type_checker.error_handler;
+    eh.handler("[FSM Type Checker]", n, message, eh.arg)
+}
+
+fn type_checker_warning(n: AST_node&, s: u8[]) {
+    let l = n.location;
+    write(2, $"[FSM Type Checker] {l.module.filename}:{l.line} Warning: {s}\n");
 }
 
 fn annotate_used_visitor(n: AST_node&, type_checker: TypeChecker&) {
@@ -35,7 +34,7 @@ fn annotate_used_visitor(n: AST_node&, type_checker: TypeChecker&) {
     n.result_used = type_checker.used;
 
     if (n.kind == AST_node::AST_scope) {
-        if (type_checker.used) type_checker_error(n, "Using the result of a scope is not implemented yet.\n");
+        if (type_checker.used) type_checker_error(type_checker, n, "Using the result of a scope is not implemented yet.\n");
         type_checker.used = false;
         ast_visit_children(n, annotate_used_visitor, type_checker);
     }
@@ -46,7 +45,7 @@ fn annotate_used_visitor(n: AST_node&, type_checker: TypeChecker&) {
         ast_visit_children(n, annotate_used_visitor, type_checker);
     }
     else if (n.kind == AST_node::AST_return) {
-        if (type_checker.used) type_checker_error(n, "The 'return' statement has no value and therefore can't be used in an expression.\n");
+        if (type_checker.used) type_checker_error(type_checker, n, "The 'return' statement has no value and therefore can't be used in an expression.\n");
         ast_visit_children(n, annotate_used_visitor, type_checker);
     }
     else if (n.kind == AST_node::AST_if) {
@@ -57,7 +56,7 @@ fn annotate_used_visitor(n: AST_node&, type_checker: TypeChecker&) {
         annotate_used_visitor(n.AST_if.else_clause, type_checker);
     }
     else if (n.kind == AST_node::AST_while) {
-        if (type_checker.used) type_checker_error(n, "The 'while' statement has no value and therefore can't be used in an expression.\n");
+        if (type_checker.used) type_checker_error(type_checker, n, "The 'while' statement has no value and therefore can't be used in an expression.\n");
         type_checker.used = true;
         annotate_used_visitor(n.AST_while.condition, type_checker);
         type_checker.used = false;
@@ -203,7 +202,7 @@ or to perform a null reference check.");
             return;
         }
         else {
-            type_checker_error(n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}'.\n");
+            type_checker_error(type_checker, n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}'.\n");
         }
     }
 
@@ -219,14 +218,14 @@ or to perform a null reference check.");
 
     if (target_type <==> get_ref_type_for(type_checker.type_cache, type_checker.type_cache.builtin_any)) {
         if (!is_reference_kind(original_type)) {
-            if (n.addressable == false) type_checker_error(n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}' because it is not addressable.\n");            
+            if (n.addressable == false) type_checker_error(type_checker, n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}' because it is not addressable.\n");            
             insert_take_reference(type_checker, n);
         }
         return; // any& can accept any reference type.
     }
 
     if (is_reference_kind(target_type) && !is_reference_kind(original_type)) {
-        if (n.addressable == false) type_checker_error(n, $"Can't convert {desc} of type '{ get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}' because it is not addressable.\n");
+        if (n.addressable == false) type_checker_error(type_checker, n, $"Can't convert {desc} of type '{ get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}' because it is not addressable.\n");
         insert_take_reference(type_checker, n);
     }
 
@@ -243,7 +242,7 @@ or to perform a null reference check.");
         ast_insert_node(type_checker.ast_allocator, n, make_cast(type_checker, target_type, n.type));
     }
     else {
-        type_checker_error(n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}'.\n");
+        type_checker_error(type_checker, n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}'.\n");
     }
 }
 
@@ -254,7 +253,7 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
 
     if (tk == TokenKind::TOK_bind_ref) {
         if (!is_reference_kind(n.AST_binary.left.type)) {
-            type_checker_error(n, $"Operator {token_kind_printable(tk)} requires a reference type on the left side. Have '{get_type_name_r(buf_1, n.AST_binary.left.type)}' and '{get_type_name_r(buf_2, n.AST_binary.right.type)}'.\n");
+            type_checker_error(type_checker, n, $"Operator {token_kind_printable(tk)} requires a reference type on the left side. Have '{get_type_name_r(buf_1, n.AST_binary.left.type)}' and '{get_type_name_r(buf_2, n.AST_binary.right.type)}'.\n");
         }
 
         if (n.AST_binary.right.type <==> type_checker.type_cache.builtin_null) {
@@ -262,7 +261,7 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
         else
         {
             if (!is_reference_kind(n.AST_binary.right.type)) {
-                if (!n.AST_binary.right.addressable) type_checker_error(n,
+                if (!n.AST_binary.right.addressable) type_checker_error(type_checker, n,
                     $"Operator {token_kind_printable(tk)} requires either another reference or something addressable on the right side. Have '{get_type_name_r(buf_1, n.AST_binary.left.type)}' and '{get_type_name_r(buf_2, n.AST_binary.right.type)}'.\n");
                 insert_take_reference(type_checker, n.AST_binary.right);
             }
@@ -270,7 +269,7 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
             let any_ref => get_ref_type_for(type_checker.type_cache, type_checker.type_cache.builtin_any);
 
             if (n.AST_binary.left.type <!=> n.AST_binary.right.type && n.AST_binary.left.type <!=> any_ref && n.AST_binary.right.type <!=> any_ref) {
-                type_checker_error(n, $"Operator {token_kind_printable(tk)} requires the type on the right side to be referenceable by the left type. Have '{get_type_name_r(buf_1, n.AST_binary.left.type)}' and '{get_type_name_r(buf_2, n.AST_binary.right.type)}'.\n");
+                type_checker_error(type_checker, n, $"Operator {token_kind_printable(tk)} requires the type on the right side to be referenceable by the left type. Have '{get_type_name_r(buf_1, n.AST_binary.left.type)}' and '{get_type_name_r(buf_2, n.AST_binary.right.type)}'.\n");
             }
         }
         
@@ -317,7 +316,7 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
             auto_dereference(type_checker, n.AST_binary.right);
             let okay = n.AST_binary.left.type <==>n.AST_binary.right.type || (is_integer_kind(n.AST_binary.left.type) && is_integer_kind(n.AST_binary.right.type));
             if (!okay) {
-                type_checker_error(n,
+                type_checker_error(type_checker, n,
                     $"Operator {token_kind_printable(tk)} can't accept arguments with different types. Have '{get_type_name_r(buf_1, n.AST_binary.left.type)}' and '{get_type_name_r(buf_2, n.AST_binary.right.type)}'.\n");
             }
             n.type => type_checker.type_cache.builtin_bool;
@@ -338,7 +337,7 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
                         || (is_null_kind(n.AST_binary.left.type) && is_reference_kind(n.AST_binary.right.type))
                         || (is_reference_kind(n.AST_binary.left.type) && is_null_kind(n.AST_binary.right.type));
             if (!okay) {
-                type_checker_error(n, $"Operator {token_kind_printable(tk)} can't accept arguments with different types. Have '{get_type_name_r(buf_1, n.AST_binary.left.type)}' and '{get_type_name_r(buf_2, n.AST_binary.right.type)}'")
+                type_checker_error(type_checker, n, $"Operator {token_kind_printable(tk)} can't accept arguments with different types. Have '{get_type_name_r(buf_1, n.AST_binary.left.type)}' and '{get_type_name_r(buf_2, n.AST_binary.right.type)}'")
             }
             n.type => type_checker.type_cache.builtin_bool;
             n.addressable = false;
@@ -381,7 +380,7 @@ fn type_check_variadic_operator (type_checker: TypeChecker&, n: AST_node&){
         }
 
         if (!all_same_type && !all_integer) {
-            type_checker_error(n, $"Chained operator {token_kind_printable(n.AST_variadic_operator.members[0].token_kind)} can't accept arguments with different types.");
+            type_checker_error(type_checker, n, $"Chained operator {token_kind_printable(n.AST_variadic_operator.members[0].token_kind)} can't accept arguments with different types.");
         }
         n.type => type_checker.type_cache.builtin_bool;
         n.addressable = false;
@@ -411,15 +410,15 @@ fn type_check_function_call(type_checker: TypeChecker&, n_call: AST_node&) {
     let fn_type => n_call.AST_call.target.type;
     if (is_reference_kind(fn_type)) fn_type => dereferenced_type(fn_type);
 
-    if (!is_function_kind(fn_type)) type_checker_error(n_call,
+    if (!is_function_kind(fn_type)) type_checker_error(type_checker, n_call,
             $"Trying to call something that is not a function. have '{get_type_name_r(buf, n_call.AST_call.target.type)}'");
     
     let num_args_expected = fn_type.T_function.argument_types.len;
     let num_args = ast_count_chain(n_call.AST_call.args);
-    if (num_args < num_args_expected) type_checker_error(n_call,
+    if (num_args < num_args_expected) type_checker_error(type_checker, n_call,
             $"Not enough arguments to function call. Expected {num_args_expected}, got {num_args}.\n");
 
-    if (num_args > num_args_expected) type_checker_error(n_call,
+    if (num_args > num_args_expected) type_checker_error(type_checker, n_call,
             $"Too many arguments to function call. Expected {num_args_expected}, got {num_args}.\n");
 
     let arg => n_call.AST_call.args;
@@ -430,7 +429,7 @@ fn type_check_function_call(type_checker: TypeChecker&, n_call: AST_node&) {
     }
     
     n_call.type => fn_type.T_function.return_type;
-    if (!n_call.type) type_checker_error(n_call,
+    if (!n_call.type) type_checker_error(type_checker, n_call,
         "Trying to call function that doesn't have a resolved return type yet. Please define the function's return type when it's definition follows the call.\n");
 }
 
@@ -513,7 +512,7 @@ fn encode_function_name (name: u8[], type: Type&, endlos: EndlosAllocator&) :u8[
 
 fn get_speciated_function_symbol(n: AST_node&, g: Symbol&, type_checker: TypeChecker&) : Symbol& {
     if (!g.source) {
-        type_checker_error(n, $"Cannot speciate non generic function '{g.name}'.\n");
+        type_checker_error(type_checker, n, $"Cannot speciate non generic function '{g.name}'.\n");
     }
     let source => <AST_node&>g.source;
 
@@ -535,8 +534,8 @@ fn get_speciated_function_symbol(n: AST_node&, g: Symbol&, type_checker: TypeChe
 
     ast_fn.AST_function.name = encoded_name;
 
-    type_resolver_speciate_generic(ast_generic, type_checker.generic_type, type_checker.symbol_cache, type_checker.endlos);
-    let s => resolver_speciate_generic(ast_generic, type_checker.generic_type, type_checker.symbol_cache, type_checker.endlos);
+    type_resolver_speciate_generic(ast_generic, type_checker.generic_type, type_checker.symbol_cache, type_checker.endlos, type_checker.error_handler);
+    let s => resolver_speciate_generic(ast_generic, type_checker.generic_type, type_checker.symbol_cache, type_checker.endlos, type_checker.error_handler);
 
     let tc_child: TypeChecker;
     tc_child.symbol_cache  => type_checker.symbol_cache;
@@ -570,7 +569,7 @@ fn type_check_symbol(n: AST_node&, type_checker: TypeChecker&)
 
         // Still no return type?
         if (!n.AST_symbol.symbol.type.T_function.return_type) {
-            type_checker_error(n,
+            type_checker_error(type_checker, n,
                 $"The return type for function '{n.AST_symbol.name}()' can't be determined automatically in recursive use. Please specify it!");
         }
     }
@@ -581,7 +580,7 @@ fn type_check_symbol(n: AST_node&, type_checker: TypeChecker&)
             n.AST_symbol.name = n.AST_symbol.symbol.name;
         }
         else {
-            type_checker_error(n, $"Generic speciation not allowed for {n.AST_symbol.symbol.kind.name}\n");
+            type_checker_error(type_checker, n, $"Generic speciation not allowed for {n.AST_symbol.symbol.kind.name}\n");
         }
     }
 
@@ -653,11 +652,11 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
             if (n.AST_var_decl.initializer_operator == TokenKind::TOK_equal_assign) {
                 t => n.AST_var_decl.initializer.type;
                 if (is_void_kind(t)) {
-                    type_checker_error(n, "Can't initialize variable with 'void' type.\n");
+                    type_checker_error(type_checker, n, "Can't initialize variable with 'void' type.\n");
                 }
                 let ord = get_ref_order(t);
                 if (ord >= 2) {
-                    type_checker_error(n, $"Can't dereference references of order >1 in value initialization. Have '{get_type_name_r(buf_1, t)}'");
+                    type_checker_error(type_checker, n, $"Can't dereference references of order >1 in value initialization. Have '{get_type_name_r(buf_1, t)}'");
                 }
                 else if (ord) {
                     insert_dereference(type_checker, n.AST_var_decl.initializer);
@@ -665,10 +664,10 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
                 }
             } else if (n.AST_var_decl.initializer_operator == TokenKind::TOK_bind_ref) {
                 if (n.AST_var_decl.initializer.type <==> type_checker.type_cache.builtin_void) {
-                    type_checker_error(n, "Can't bind a reference to 'void' type target.\n");
+                    type_checker_error(type_checker, n, "Can't bind a reference to 'void' type target.\n");
                 }
                 if (!is_reference_kind(n.AST_var_decl.initializer.type)) {
-                    if (!n.AST_var_decl.initializer.addressable) type_checker_error(n, "Can't bind a reference to a non addressable target.\n");
+                    if (!n.AST_var_decl.initializer.addressable) type_checker_error(type_checker, n, "Can't bind a reference to a non addressable target.\n");
                     t => get_ref_type_for(type_checker.type_cache, n.AST_var_decl.initializer.type);
                     insert_take_reference(type_checker, n.AST_var_decl.initializer);
                 }
@@ -725,7 +724,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
             type_checker.current_function_ret_type => ret_type;
         } else {
             if (type_checker.current_function_ret_type_decl && !(type_checker.current_function_ret_type_decl <==> type_checker.type_cache.builtin_void)) {
-                if (ret_type <==> type_checker.type_cache.builtin_void) type_checker_error(n, "'return' without a value in function returning non void.\n");
+                if (ret_type <==> type_checker.type_cache.builtin_void) type_checker_error(type_checker, n, "'return' without a value in function returning non void.\n");
                 try_convert_to_type_if_necessary(type_checker, n.AST_return.body, type_checker.current_function_ret_type_decl, "Return argument");
             }
             else if (is_reference_kind(type_checker.current_function_ret_type) && ret_type <==> type_checker.type_cache.builtin_null) {
@@ -734,7 +733,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
                 type_checker.current_function_ret_type => ret_type;
             }
             else if (!types_are_equivalent(type_checker.current_function_ret_type, ret_type)) {
-                type_checker_error(n, $"Returning different types from the same function. Have '{get_type_name_r(buf_1, type_checker.current_function_ret_type)}' and '{get_type_name_r(buf_2, ret_type)}'. Please declare a return type!\n");
+                type_checker_error(type_checker, n, $"Returning different types from the same function. Have '{get_type_name_r(buf_1, type_checker.current_function_ret_type)}' and '{get_type_name_r(buf_2, ret_type)}'. Please declare a return type!\n");
             }
         }
         n.type => type_checker.type_cache.builtin_void; // The return itself always has 'void' type.
@@ -768,7 +767,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
         let _if_type => n.AST_if.if_clause.type;
         let _else_type => if (n.AST_if.else_clause) n.AST_if.else_clause.type else &type_checker.type_cache.builtin_void;
         if (n.result_used && _if_type <!=> _else_type) {
-            type_checker_error(n,
+            type_checker_error(type_checker, n,
                 $"When the result of 'if' is used then it has to have an 'else', and both branches must have the same type. Have '{get_type_name_r(buf_1, _if_type)}' and '{get_type_name_r(buf_2, _else_type)}'.\n");
         }
         n.type => _if_type;
@@ -796,13 +795,13 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
             n.type => get_ref_type_for(type_checker.type_cache, get_slice_element_type(n.AST_array_access.array.type));
         }
         else {
-            type_checker_error(n,
+            type_checker_error(type_checker, n,
                 $"Invalid use of [] operator on something that is not an array or a slice. Have '{get_type_name_r(buf_1, n.AST_array_access.array.type)}'.\n");
         }
 
 
         if (!is_integer_kind(n.AST_array_access.index.type)) {
-            type_checker_error(n,
+            type_checker_error(type_checker, n,
                 $"Invalid use of non integer type '{get_type_name_r(buf_1, n.AST_array_access.index.type)}' as an array index.\n");
         }
         
@@ -811,7 +810,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
 
     else if (n.kind == AST_node::AST_dereference) {
         if (!is_reference_kind(n.AST_dereference.body.type)) {
-                type_checker_error(n,
+                type_checker_error(type_checker, n,
                     $"Dereferencing something that is not a reference. Have '{get_type_name_r(buf_1, n.AST_dereference.body.type)}'.\n");
         } else {
             n.type => dereferenced_type(n.AST_dereference.body.type);
@@ -820,7 +819,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
     }
 
     else if (n.kind == AST_node::AST_reference) {
-        if (!n.AST_reference.body.addressable) type_checker_error(n, "Can't take reference to something that is not addressable.\n");
+        if (!n.AST_reference.body.addressable) type_checker_error(type_checker, n, "Can't take reference to something that is not addressable.\n");
         n.type => get_ref_type_for(type_checker.type_cache, n.AST_reference.body.type);
         n.addressable = false;
     }
@@ -848,7 +847,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
             n.type => n.AST_plus_plus.body.type;
         }
         else{
-            type_checker_error(n, $"Operator '++' needs integer or slice type argument. Have '{get_type_name_r(buf_1, original_type)}'");
+            type_checker_error(type_checker, n, $"Operator '++' needs integer or slice type argument. Have '{get_type_name_r(buf_1, original_type)}'");
         }
         
     }
@@ -857,7 +856,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
         let  original_type => n.AST_minus_minus.body.type;
         auto_dereference(type_checker, n.AST_minus_minus.body);
         if (!is_integer_kind(n.AST_minus_minus.body.type)) {
-            type_checker_error(n, $"Operator '--' needs integer type argument. Have '{get_type_name_r(buf_1, original_type)}'");
+            type_checker_error(type_checker, n, $"Operator '--' needs integer type argument. Have '{get_type_name_r(buf_1, original_type)}'");
         }
         n.type => n.AST_minus_minus.body.type;
     }
@@ -878,7 +877,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
             if (is_structlike_kind(container) || is_union_kind(container)) {
                 let offset;
                 let t => get_member_type_and_offset_by_name(type_checker.type_cache, container, &n.AST_member_access.name, &offset);
-                if (!t) type_checker_error(n, $"Member '{n.AST_member_access.name}' not found in '{get_type_name_r(buf_1, container)}'.\n");
+                if (!t) type_checker_error(type_checker, n, $"Member '{n.AST_member_access.name}' not found in '{get_type_name_r(buf_1, container)}'.\n");
 
                 if (!is_reference_kind(n.AST_member_access.body.type))
                     insert_take_reference(type_checker, n.AST_member_access.body);
@@ -906,7 +905,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
                     n.type => type_checker.type_cache.builtin_i64;
                 }
                 else {
-                    type_checker_error(n, $"Tried to access non existent member '{n.AST_member_access.name}' on array type. Arrays only have the member 'len' available.\n");
+                    type_checker_error(type_checker, n, $"Tried to access non existent member '{n.AST_member_access.name}' on array type. Arrays only have the member 'len' available.\n");
                 }
             }
             else if (is_enum_kind(container) || is_enumerator_kind(container)) {
@@ -915,11 +914,11 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
                     n.type => get_slice_type (type_checker.type_cache, type_checker.type_cache.builtin_u8);
                 }
                 else {
-                    type_checker_error(n, $"Tried to access non existent member '{n.AST_member_access.name}' on enum type. Enums only have the member 'name' available.\n");
+                    type_checker_error(type_checker, n, $"Tried to access non existent member '{n.AST_member_access.name}' on enum type. Enums only have the member 'name' available.\n");
                 }
             }
             else {
-                type_checker_error(n, $"Tried to access a member in something that can't have members. Have '{get_type_name_r(buf_1, container)}'.\n");
+                type_checker_error(type_checker, n, $"Tried to access a member in something that can't have members. Have '{get_type_name_r(buf_1, container)}'.\n");
             }
 
         }
@@ -930,7 +929,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
         if (t.kind == Type::T_enum) {
             if (!get_enum_member_value (t, n.AST_namespace_access.name, &n.AST_namespace_access.enum_value))
             {
-                type_checker_error(n, $"Member '{n.AST_namespace_access.name}' not found in '{get_type_name_r(buf_1, t)}'.\n");
+                type_checker_error(type_checker, n, $"Member '{n.AST_namespace_access.name}' not found in '{get_type_name_r(buf_1, t)}'.\n");
             }
             n.type => t;
             n.addressable = false;
@@ -938,7 +937,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
         else if (t.kind == Type::T_union) {
             if (!get_union_member_value (t, &n.AST_namespace_access.name, &n.AST_namespace_access.enum_value))
             {
-                type_checker_error(n, $"Member '{n.AST_namespace_access.name}' not found in '{get_type_name_r(buf_1, t)}'.\n");
+                type_checker_error(type_checker, n, $"Member '{n.AST_namespace_access.name}' not found in '{get_type_name_r(buf_1, t)}'.\n");
             }
             n.type => get_enumerator_type_for(type_checker.type_cache, t);
             n.addressable = false;
@@ -1002,12 +1001,13 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
     ASSERT(n.type, $"All nodes should have a type after the type checker. Have {n.kind.name} with null type.\n");
 }
 
-fn type_checker_run(root: AST_node&, symbol_cache: SymbolCache&, ast_allocator: AST_Node_Allocator&, endlos: EndlosAllocator&) {
+fn type_checker_run(root: AST_node&, symbol_cache: SymbolCache&, ast_allocator: AST_Node_Allocator&, endlos: EndlosAllocator&, error_handler: fn (u8[], AST_node&, u8[]):void ) {
     let type_checker: TypeChecker;
     type_checker.type_cache => symbol_cache.type_cache;
     type_checker.symbol_cache => symbol_cache;
     type_checker.ast_allocator => ast_allocator;
     type_checker.endlos => endlos;
+    type_checker.error_handler => error_handler;
 
     annotate_used_visitor(root, type_checker);
     type_resolve_functions_visitor(root, type_checker);

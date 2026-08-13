@@ -3,15 +3,6 @@ import * from "endlos";
 import * from "ast";
 import * from "opcodes";
 
-fn il_gen_error(l: Location, s: u8[]) {
-    write(2, $"[FSM IL Gen] {l.module.filename}:{l.line} Error: {s}\n");
-    exit(1);
-}
-
-fn il_gen_warning(l: Location, s: u8[]) {
-    write(2, $"[FSM IL Gen] {l.module.filename}:{l.line} Warning: {s}\n");
-}
-
 struct IL_gen {
     opcodes: EndlosArr<Opcode>;
     type_cache: TypeCache&;
@@ -19,6 +10,15 @@ struct IL_gen {
     num_ifs;
     num_whiles;
     num_strings;
+}
+
+fn il_gen_error(l: Location, s: u8[]) {
+    write(2, $"[FSM IL Gen] {l.module.filename}:{l.line} Error: {s}\n");
+    exit(1);
+}
+
+fn il_gen_warning(l: Location, s: u8[]) {
+    write(2, $"[FSM IL Gen] {l.module.filename}:{l.line} Warning: {s}\n");
 }
 
 fn push_opcode_2(gen: IL_gen&, kind: OpKind, value: u8[]&, i64_value_0, i64_value_1, type: Type&, location: Location&) : Opcode& {
