@@ -431,6 +431,10 @@ static void gen_address_visitor(AST_node *n, IL_gen *gen) {
             ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
             break;
 
+        case AST_generic_speciation:
+            gen_address_visitor(n->generic_speciation.body, gen);
+            break;
+
         default:
             il_gen_error(n->location, "Trying to take the address of something for which it is not possible. Have %s.\n",
                     ast_kind_name(n->kind));

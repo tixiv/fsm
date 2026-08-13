@@ -1001,6 +1001,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
 
         case AST_generic_speciation:
             n->type = n->generic_speciation.body->type;
+            n->addressable = n->generic_speciation.body->addressable;
             break;
                 
         case AST_generic_implementation:

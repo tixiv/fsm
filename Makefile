@@ -17,6 +17,8 @@ FSM_SRCS += $(wildcard stdlib/*.fsm)
 
 all: $(FSM)
 
+cfsm: $(CFSM)
+
 $(FSM): $(FSM_SRCS)
 	$(FSM) compiler_fsm/fsm.fsm
 	fasm out1.asm

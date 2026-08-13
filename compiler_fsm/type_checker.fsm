@@ -965,6 +965,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
 
     else if (n.kind == AST_node::AST_generic_speciation) {
         n.type => n.AST_generic_speciation.body.type;
+        n.addressable = n.AST_generic_speciation.body.addressable;
     }
             
     else if (n.kind == AST_node::AST_generic_implementation) {

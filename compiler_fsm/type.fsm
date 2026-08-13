@@ -692,6 +692,21 @@ fn speciate_tree(tc: TypeCache&, t: Type&, speciation: Type&) : Type& {
             return new_struct;
         }
     }
+    else if (t.kind == Type::T_function) {
+        let need_to_copy = false;
+        let arg_types: EndlosArr<Type&>;
+        EndlosArr_begin~Type&(arg_types, tc.endlos);
+
+        for (let i = 0; i < t.T_function.argument_types.len; i++) {
+            EndlosArr_push_ref~Type&(arg_types, speciate_tree(tc, t.T_function.argument_types[i], speciation));
+        }
+
+        let new_fn_type => get_function_type(tc, speciate_tree(tc, t.T_function.return_type, speciation), arg_types.arr);
+
+        EndlosArr_free~Type&(arg_types, tc.endlos);
+
+        return new_fn_type;
+    }
     else if (t.kind == Type::T_reference) {
         return get_ref_type_for(tc, speciate_tree(tc, t.T_reference.target_type, speciation))
     }
@@ -701,7 +716,9 @@ fn speciate_tree(tc: TypeCache&, t: Type&, speciation: Type&) : Type& {
     else if (t.kind == Type::T_integer
                    |== Type::T_boolean
                    |== Type::T_enum
-                   |== Type::T_enumerator) {
+                   |== Type::T_enumerator
+                   |== Type::T_void
+                   |== Type::T_any) {
         return t;
     }
     else NOT_IMPLEMENTED(__LOCATION__, $"Speciating {get_type_name_r(buf, t)}");

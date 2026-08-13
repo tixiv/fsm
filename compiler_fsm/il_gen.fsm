@@ -397,6 +397,9 @@ fn gen_address_visitor(n: AST_node&, gen: IL_gen&) : void {
     else if (n.kind == AST_node::AST_dereference) {
         ast_visit_children(n, gen_value_visitor, gen);
     }
+    else if (n.kind == AST_node::AST_generic_speciation) {
+        gen_address_visitor(n.AST_generic_speciation.body, gen);
+    }
     else {
         il_gen_error(n.location, $"Trying to take the address of something for which it is not possible. Have {n.kind.name}.\n");
     }

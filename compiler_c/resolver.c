@@ -251,6 +251,7 @@ static void resolver_visitor(AST_node *n, Resolver *res) {
         case AST_type_ref:
         case AST_type_array:
         case AST_type_slice:
+        case AST_function_type:
         case AST_builder_string:
         case AST_user_cast:
         case AST_generic_speciation:

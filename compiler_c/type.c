@@ -577,6 +577,13 @@ static Type *speciate_tree(Type *t, Type *speciation) {
                 return new_struct;
             }
         }
+        case T_function: {
+            Type *arg_types[t->fun.num_arguments];
+            for (size_t i = 0; i < t->fun.num_arguments; i++) {
+                arg_types[i] = speciate_tree(t->fun.argument_types[i], speciation);
+            }
+            return get_function_type(speciate_tree(t->fun.return_type, speciation), arg_types, t->fun.num_arguments);
+        }
 
         case T_reference: return get_ref_type_for(speciate_tree(t->reference.target_type, speciation));
         case T_array:     return get_array_type(speciate_tree(t->_array.element_type, speciation), t->_array.n_elements);
@@ -586,9 +593,11 @@ static Type *speciate_tree(Type *t, Type *speciation) {
         case T_boolean:
         case T_enum:
         case T_enumerator:
+        case T_void:
+        case T_any:
             return t;
 
-        default: NOT_IMPLEMENTED("Speciating %s is not implemented yet.", get_type_name_r(buf, t));
+        default: NOT_IMPLEMENTED("Speciating %s is not implemented yet.\n", get_type_name_r(buf, t));
     }
 
 }
