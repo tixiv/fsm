@@ -4,7 +4,10 @@ asm/
 fsm
 out
 out.asm
+out1
+out1.asm
 build/
+bin/
 tests/*.out
 aoc_21/*.out
 compile_commands.json

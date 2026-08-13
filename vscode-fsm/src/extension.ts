@@ -1,17 +1,17 @@
 import * as vscode from "vscode";
+import { Delayer } from "vscode-languageclient/$test/common/utils/async";
 import {
     LanguageClient,
     LanguageClientOptions,
+    SelectedCompletionInfo,
     ServerOptions
 } from "vscode-languageclient/node";
 
-let client: LanguageClient;
+let client: LanguageClient | undefined;
 
-
-
-export function activate(context: vscode.ExtensionContext) {
+function createClient(): LanguageClient {
     const serverOptions: ServerOptions = {
-        command: "/home/tixiv/work/fsm/fsmd",
+        command: "/home/tixiv/work/fsm/bin/fsmd",
         args: []
     };
 
@@ -25,14 +25,66 @@ export function activate(context: vscode.ExtensionContext) {
         //traceOutputChannel: vscode.window.createOutputChannel("FSM Language Server")
     };
 
-    client = new LanguageClient(
+    return new LanguageClient(
         "fsmd",
         "FSM Language Server",
         serverOptions,
         clientOptions
     );
+}
 
-    client.start();
+export function activate(context: vscode.ExtensionContext) {
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            "fsm.startLanguageServer",
+            async () => {
+                await startLanguageServer();
+            }
+        )
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            "fsm.stopLanguageServer",
+            async () => {
+                await stopLanguageServer();
+            }
+        )
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            "fsm.restartLanguageServer",
+            async () => {
+                await restartLanguageServer();
+            }
+        )
+    );
+
+    startLanguageServer();
+}
+
+async function startLanguageServer() {
+    if (client !== undefined) {
+        return;
+    }
+
+    client = createClient();
+    await client.start();
+}
+
+async function stopLanguageServer() {
+    if (client === undefined) {
+        return;
+    }
+
+    await client.stop();
+    client = undefined;
+}
+
+async function restartLanguageServer() {
+    await stopLanguageServer();
+    await startLanguageServer();
 }
 
 export function deactivate(): Thenable<void> | undefined {

@@ -1,5 +1,6 @@
 
-FSM = fsm
+CFSM = bin/cfsm
+FSM = bin/fsm
 
 SRC_DIR = compiler_c
 BUILD_DIR = build
@@ -11,7 +12,17 @@ CFLAGS += -Wall -Wextra -g -O0 -MMD -MP
 
 C_SRCS = $(wildcard $(SRC_DIR)/*.c)
 
+FSM_SRCS = $(wildcard compiler_fsm/*.fsm)
+FSM_SRCS += $(wildcard stdlib/*.fsm)
+
 all: $(FSM)
+
+$(FSM): $(CFSM) $(FSM_SRCS)
+	$(CFSM) compiler_fsm/fsm.fsm
+	fasm out.asm
+	./out compiler_fsm/fsm.fsm
+	fasm out1.asm
+	cp out1 $(FSM)
 
 # Create build dir
 $(BUILD_DIR):
@@ -30,7 +41,7 @@ O_FILES += $(BUILD_DIR)/builtin_functions.o
 DEPS     = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.d,$(C_SRCS))
 
 # Link
-$(FSM): $(O_FILES)
+$(CFSM): $(O_FILES)
 	$(CC) $(CFLAGS) -o $@ $(O_FILES)
 
 $(BUILD_DIR)/builtin_functions.c: $(SRC_DIR)/builtin_functions.asm
@@ -44,7 +55,7 @@ TESTS += $(wildcard $(AOC21_DIR)/*.fsm)
 test: $(FSM)
 	@for t in $(TESTS); do \
 		echo "Testing $$t"; \
-		./$(FSM) $$t && \
+		$(FSM) $$t && \
 		fasm out1.asm out > /dev/null && \
 		./out > $$t.out && \
 		diff -u $$t.expected $$t.out || exit 1; \

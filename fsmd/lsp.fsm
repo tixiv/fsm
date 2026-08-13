@@ -1,0 +1,100 @@
+
+import * from "json";
+
+fn write_wrapped(fd, json: u8[]) {
+    write (fd, $"Content-Length: {json.len}\r\n\r\n");
+    write (fd, json);
+}
+
+fn send_initialize_response (id: u8[]) {
+write_wrapped (1, $"\{
+    \"jsonrpc\": \"2.0\",
+    \"id\": {id},
+    \"result\": \{
+        \"capabilities\": \{
+            \"textDocumentSync\": 1,
+            \"documentSymbolProvider\": true,
+            \"definitionProvider\": true,
+            \"renameProvider\": true
+        }
+    }
+}");
+}
+
+fn send_definition_response (id: u8[]) {
+write_wrapped (1, $"\{
+  \"jsonrpc\": \"2.0\",
+  \"id\": {id},
+  \"result\": \{
+    \"uri\": \"file:///home/tixiv/work/fsm/foo.fsm\",
+    \"range\": \{
+      \"start\": \{
+        \"line\": 3,
+        \"character\": 5
+      },
+      \"end\": \{
+        \"line\": 3,
+        \"character\": 8
+      }
+    }
+  }
+}");
+}
+
+struct StreamReader {
+    buffer: u8[];
+    arr: u8[];
+    fd;
+}
+
+fn sr_init(sr: StreamReader&, buffer: u8[], fd) {
+    sr.buffer = buffer;
+    sr.arr = buffer;
+    sr.arr.len = 0;
+    sr.fd = fd;
+}
+
+fn sr_read_some(sr: StreamReader&) {
+    let len = read(sr.fd, sr.buffer);
+    if (len > 0) {
+        sr.arr.len = sr.arr.len + len;
+        sr.buffer = sv_skip(sr.buffer, len);
+    }
+}
+
+fn sr_read_exact(sr: StreamReader&, num_bytes) : u8[] {
+    while (sr.arr.len < num_bytes) {
+        sr_read_some(sr);
+    }
+    let r = sr.arr;
+    r.len = num_bytes;
+    
+    sr.arr = sv_skip(sr.arr, num_bytes);
+
+    return r;
+}
+
+fn get_content_length(sr: StreamReader&) : i64 {
+    let arr = sr.arr;
+    for ( ; arr.len >= 4; arr++) {
+        if (sv_starts_with(arr, "\r\n\r\n")) {
+            let len = parse_integer(sr.arr);
+            sr.arr = sv_skip(arr, 4);
+            return len;
+        }
+    }
+    return -1;
+}
+
+fn read_header (sr: StreamReader&) : i64 {
+    let str_content_length = "Content-Length: ";
+
+    let header_1 = sr_read_exact(sr, str_content_length.len);
+
+    if (!sv_equal(header_1, str_content_length)) {
+        write (2, $"Error: expeceted '{str_content_length}' but got {header_1}\n");
+        exit(1);
+    }
+
+    return get_content_length(sr);
+}

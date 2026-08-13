@@ -1,0 +1,56 @@
+
+import * from "std";
+import * from "endlos";
+import * from "lsp";
+
+fn main () {
+
+    let O_WRONLY = 1;
+    let O_CREAT = 64;
+    let O_TRUNC = 512;
+
+    let filename = "/home/tixiv/work/fsm/fsmd1.log";
+
+    let log_fd = open(filename, O_WRONLY + O_CREAT + O_TRUNC);
+    if (log_fd < 0) {
+        write(2, $"Failed to open '{filename}' for writing: {strerror(log_fd)}\n")
+        exit(1);
+    }
+
+    // let endlos: EndlosAllocator;
+    // endlos_init(endlos);
+    // let buffer = endlos_begin~u8(endlos);
+    let buffer: u8[65536];
+
+    for(;;) {
+        let sr: StreamReader;
+        sr_init(sr, buffer, 0)
+        let content_length = read_header(sr);
+
+        let request = sr_read_exact(sr, content_length);
+
+        write(log_fd, "client: ");
+        write(log_fd, request);
+        write(log_fd, "\n");
+
+        let id = json_get_number(request, "id");
+        let method = json_get_string(request, "method");
+
+        //let params = json_get_element(request, "params");
+
+        if (sv_equal(method, "initialize")) {
+            write (log_fd, "initialize\n")
+            send_initialize_response(id);
+        }
+        else if (sv_equal(method, "shutdown")) {
+            write (log_fd, "shutdown\n")
+            write_wrapped(1, $"\{\"jsonrpc\":\"2.0\",\"id\":{id},\"result\":null}");
+        }
+        else if (sv_equal(method, "textDocument/definition")) {
+            send_definition_response(id);
+        }
+        else if (sv_equal(method, "exit")) {
+            exit(0);
+        }
+    }
+}

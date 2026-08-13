@@ -14,6 +14,20 @@
         "onLanguage:fsm"
     ],
     "contributes": {
+        "commands": [
+            {
+                "command": "fsm.startLanguageServer",
+                "title": "FSM: Start Language Server"
+            },
+            {
+                "command": "fsm.stopLanguageServer",
+                "title": "FSM: Stop Language Server"
+            },
+            {
+                "command": "fsm.restartLanguageServer",
+                "title": "FSM: Restart Language Server"
+            }
+        ],
         "languages": [
             {
                 "id": "fsm",
