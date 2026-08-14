@@ -71,10 +71,23 @@ fn sv_equal (s1: u8[], s2: u8[]) {
     return true;
 }
 
+fn sv_skip(str: u8[], start) {
+  if (start > str.len) start = str.len;
+  str.begin => str[start];
+  str.len = str.len - start;
+  return str;
+}
+
 fn sv_starts_with (s: u8[], start: u8[]) {
     if (s.len < start.len) return false
     s.len = start.len
     return sv_equal(s, start)
+}
+
+fn sv_ends_with (s: u8[], end: u8[]) {
+    if (s.len < end.len) return false
+    s = sv_skip(s, s.len - end.len);
+    return sv_equal(s, end)
 }
 
 fn sv_split(str: u8[]&, splitter: u8[]) : u8[] {

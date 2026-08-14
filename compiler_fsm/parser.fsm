@@ -1,4 +1,7 @@
 
+import * from "std";
+import * from "endlos";
+import * from "tokenizer";
 import * from "common";
 import * from "compiler_fsm/ast";
 

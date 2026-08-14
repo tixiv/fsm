@@ -1,4 +1,7 @@
 
+import * from "std";
+import * from "endlos";
+
 struct StructMember {
     name: u8[];
     type: Type&;

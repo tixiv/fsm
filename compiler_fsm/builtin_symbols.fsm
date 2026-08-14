@@ -1,0 +1,93 @@
+
+import * from "std";
+import * from "endlos";
+import * from "symbol_cache";
+import * from "type";
+import * from "symbol";
+
+fn declare_builtin_fn(tc: TypeCache&, sr: Symbol[]&, name :u8[], return_type: Type&, arg_types: Type&[]) : void {
+    let s => alloc_symbol(sr, SymbolKind::SYM_function, name, null);
+    s.type => get_function_type(tc, return_type, arg_types);
+}
+
+fn init_builtin_functions(tc: TypeCache&, sr: Symbol[]&) {
+    let tmp_arg_types: Type&[10];
+    let tmp_args: Type&[] = tmp_arg_types;
+
+    tmp_args.len = 1; tmp_args[0] => tc.builtin_i64;
+    declare_builtin_fn(tc, sr, "exit", tc.builtin_void, tmp_args);
+    declare_builtin_fn(tc, sr, "close", tc.builtin_i64, tmp_args);
+
+    tmp_args.len = 2; tmp_args[0] => get_ref_type_for(tc, tc.builtin_u8); tmp_args[1] => tc.builtin_i64;
+    declare_builtin_fn(tc, sr, "__open", tc.builtin_i64, tmp_args);
+
+    tmp_args.len = 2; tmp_args[0] => tc.builtin_i64; tmp_args[1] => get_slice_type(tc, tc.builtin_u8);
+    declare_builtin_fn(tc, sr, "read", tc.builtin_i64, tmp_args);
+    declare_builtin_fn(tc, sr, "write", tc.builtin_i64, tmp_args);
+    declare_builtin_fn(tc, sr, "connect", tc.builtin_i64, tmp_args);
+
+    tmp_args.len = 3; tmp_args[0] => tc.builtin_i64; tmp_args[1] => tc.builtin_i64; tmp_args[2] => tc.builtin_i64;
+    declare_builtin_fn(tc, sr, "socket", tc.builtin_i64, tmp_args);
+
+    tmp_args.len = 2; tmp_args[0] => get_ref_type_for(tc, tc.builtin_u8); tmp_args[1] => tc.builtin_i64;
+    declare_builtin_fn(tc, sr, "access", tc.builtin_i64, tmp_args);
+
+    // mmap(addr: any&, lenght: i64, prot: u64, flags: u64, fd: i64, offset: i64) : any &
+    tmp_args.len = 6; tmp_args[0] => get_ref_type_for(tc, tc.builtin_any); tmp_args[1] => tc.builtin_i64; tmp_args[2] => tc.builtin_u64;
+                      tmp_args[3] => tc.builtin_u64;                       tmp_args[4] => tc.builtin_i64; tmp_args[5] => tc.builtin_i64;
+    declare_builtin_fn(tc, sr, "mmap", get_ref_type_for(tc, tc.builtin_any), tmp_args);
+
+    tmp_args.len = 1; tmp_args[0] => tc.builtin_i64;
+    declare_builtin_fn(tc, sr, "print", tc.builtin_void, tmp_args);
+    declare_builtin_fn(tc, sr, "fsize", tc.builtin_i64, tmp_args);// fsize(fd: i64) : i64
+
+    tmp_args.len = 1; tmp_args[0] => tc.builtin_u8;
+    declare_builtin_fn(tc, sr, "putc", tc.builtin_void, tmp_args);
+
+    tmp_args.len = 1; tmp_args[0] => get_slice_type(tc, tc.builtin_u8);
+    declare_builtin_fn(tc, sr, "puts", tc.builtin_void, tmp_args);
+
+    // TODO: These should act like operators actually, and not like builtin functions, because we can then better handle different types of arguments
+    tmp_args.len = 2; tmp_args[0] => get_ref_type_for(tc, tc.builtin_any); tmp_args[1] => tc.builtin_i64;
+    declare_builtin_fn(tc, sr, "bittest", tc.builtin_bool, tmp_args);
+    declare_builtin_fn(tc, sr, "bitshift", tc.builtin_u64, tmp_args);
+
+    tmp_args.len = 3; tmp_args[0] => get_ref_type_for(tc, tc.builtin_any); tmp_args[1] => tc.builtin_i64; tmp_args[2] => tc.builtin_bool;
+    declare_builtin_fn(tc, sr, "setbit", tc.builtin_void, tmp_args);
+
+    tmp_args.len = 2; tmp_args[0] => tc.builtin_u64; tmp_args[1] => tc.builtin_u64;
+    declare_builtin_fn(tc, sr, "bitand", tc.builtin_u64, tmp_args);
+    declare_builtin_fn(tc, sr, "bitor", tc.builtin_u64, tmp_args);
+    declare_builtin_fn(tc, sr, "bitxor", tc.builtin_u64, tmp_args);
+
+    tmp_args.len = 1; tmp_args[0] => tc.builtin_u64;
+    declare_builtin_fn(tc, sr, "bitnot", tc.builtin_u64, tmp_args);
+}
+
+fn make_type_symbol(symbol_roll: Symbol[]&, name: u8[], type: Type&) : Symbol & {
+    let sym => alloc_symbol(symbol_roll, SymbolKind::SYM_type, name, null);
+    sym.type => type;
+    sym.location => null;
+    return sym;
+}
+
+fn make_builtin_symbols(type_cache: TypeCache&, endlos: EndlosAllocator&) {
+    let symbol_roll = endlos_begin~Symbol (endlos);
+
+    // Make type symbols for builtin types
+    make_type_symbol(symbol_roll, "void", type_cache.builtin_void);
+    make_type_symbol(symbol_roll, "any", type_cache.builtin_any);
+    make_type_symbol(symbol_roll, "bool", type_cache.builtin_bool);
+    make_type_symbol(symbol_roll, "u64", type_cache.builtin_u64);
+    make_type_symbol(symbol_roll, "i64", type_cache.builtin_i64);
+    make_type_symbol(symbol_roll, "u32", type_cache.builtin_u32);
+    make_type_symbol(symbol_roll, "i32", type_cache.builtin_i32);
+    make_type_symbol(symbol_roll, "u16", type_cache.builtin_u16);
+    make_type_symbol(symbol_roll, "i16", type_cache.builtin_i16);
+    make_type_symbol(symbol_roll,  "u8", type_cache.builtin_u8);
+    make_type_symbol(symbol_roll,  "i8", type_cache.builtin_i8);
+
+    init_builtin_functions(type_cache, symbol_roll);
+
+    return endlos_ripp_off~Symbol(endlos, symbol_roll);
+}

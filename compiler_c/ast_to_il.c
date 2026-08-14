@@ -787,6 +787,7 @@ static void il_gen_visitor(AST_node *n, IL_gen *gen) {
         case AST_type_ref:
         case AST_type_array:
         case AST_type_slice:
+        case AST_function_type:
         case AST_enum:
         case AST_enum_member:
         case AST_union:

@@ -1,8 +1,14 @@
 
 import * from "std";
 import * from "endlos";
+import * from "common";
 import * from "type";
 import * from "ast";
+import * from "symbol_cache";
+import * from "symbol";
+import * from "tokenizer";
+import * from "type_resolver";
+import * from "resolver";
 
 struct TypeChecker {
     type_cache: TypeCache&;

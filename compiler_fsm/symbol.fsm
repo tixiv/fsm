@@ -1,5 +1,7 @@
 
+import * from "std";
 import * from "endlos";
+import * from "common";
 import * from "type";
 
 enum SymbolKind {

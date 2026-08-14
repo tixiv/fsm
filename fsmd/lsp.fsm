@@ -1,4 +1,5 @@
 
+import * from "std";
 import * from "json";
 
 fn write_wrapped(fd, json: u8[]) {

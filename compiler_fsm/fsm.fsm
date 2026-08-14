@@ -1,11 +1,19 @@
 
+import * from "std";
 import * from "endlos";
+import * from "common";
+import * from "type";
+import * from "ast";
+import * from "tokenizer";
 import * from "parser";
+import * from "symbol";
 import * from "symbol_cache";
+import * from "builtin_symbols";
 import * from "module";
 import * from "gather_imports";
 import * from "type_resolver";
 import * from "resolver";
+import * from "opcodes";
 import * from "il_gen";
 import * from "type_checker";
 import * from "calculate_stacks";
@@ -66,9 +74,11 @@ struct ModuleWalker {
     modules: EndlosArr<Module>;
     ast_allocator: AST_Node_Allocator&;
     endlos: EndlosAllocator&;
-    symbol_cache: SymbolCache&;
+    type_cache: TypeCache&;
     error_handler_location: ErrorHandler<Location&>;
     error_handler_ast_node: ErrorHandler<AST_node&>;
+    current_imports: Import[];
+    builtin_symbols: Symbol[];
 }
 
 fn tokenize_module (mw: ModuleWalker&, module: Module&, code: u8[], endlos: EndlosAllocator&) {
@@ -87,15 +97,52 @@ fn tokenize_module (mw: ModuleWalker&, module: Module&, code: u8[], endlos: Endl
     // dump_tokens(module.tokens);
 }
 
-fn already_compiled(mw: ModuleWalker&, import_filename : u8[]) {
+fn find_already_compiled(mw: ModuleWalker&, import_filename : u8[]) : Module&{
     for (let i = 0; i < mw.modules.arr.len; i++) {
         if (sv_equal(import_filename, mw.modules.arr[i].header.filename))
-            return true;
+            return mw.modules.arr[i];
     }
-    return false;
+    return null;
 }
 
-fn compile_module (mw: ModuleWalker&, filename: u8[]) : void {
+fn lookup_builtin_symbol(name: u8[], mw: ModuleWalker&) {
+    let symbols => mw.builtin_symbols;
+    for (let i = 0; i < symbols.len; i++) {
+        if (sv_equal (symbols[i].name, name)) return &symbols[i];
+    }
+    return null;
+}
+
+fn lookup_symbol_from_module(name: u8[], module: Module&) : Symbol& {
+    let symbols => module.global_symbols;
+    for (let j = 0; j < symbols.len; j++) {
+        if (sv_equal (symbols[j].name, name)) return symbols[j];
+    }
+    return null;
+}
+
+fn lookup_stdlib_symbol(name: u8[], mw: ModuleWalker&) : Symbol& {
+    for (let i = 0; i < mw.modules.arr.len; i++) {
+        let filename = mw.modules.arr[i].header.filename;
+        if (sv_ends_with(filename, "stdlib/std.fsm")) {
+            return lookup_symbol_from_module(name, mw.modules.arr[i]);
+        }
+    }
+    return null;
+}
+
+fn lookup_external_symbol(name: u8[], mw: ModuleWalker&) : Symbol& {
+    let sym => lookup_builtin_symbol(name, mw);
+    if (sym) return sym;
+
+    for (let i = 0; i < mw.current_imports.len; i++) {
+        sym => lookup_symbol_from_module(name, mw.current_imports[i].module);
+        if (sym) return sym;
+    }
+    return null;
+}
+
+fn compile_module (mw: ModuleWalker&, filename: u8[]) : Module& {
     let verbose = false;
 
     let module => EndlosArr_push~Module(mw.modules);
@@ -125,8 +172,10 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : void {
         
         if (res) {
             import_filename.len--; // make the terminating 0 for C invisible to FSM
-            if (!already_compiled(mw, import_filename))
-                compile_module(mw, import_filename);
+            let compiled_module => find_already_compiled(mw, import_filename);
+            if (!compiled_module)
+                compiled_module => compile_module(mw, import_filename);
+            imp.module => compiled_module;
         }
         else {
             write(2, $"[FSM Modulizer] {filename}:{imp.location.line} Error: couldn't find import '{imp.name}'.\n")
@@ -134,25 +183,33 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : void {
         }
     }
 
+    mw.current_imports = imports;
+
+    let symbol_cache: SymbolCache;
+    SymbolCache_init(symbol_cache, mw.type_cache, mw.endlos, lookup_external_symbol, mw);
+
     if (verbose) $"Type Resolver {endlos_rolls_in_use(mw.endlos)} ...\n"
-    type_resolver_run(root, mw.symbol_cache, mw.endlos, mw.error_handler_ast_node);
+    type_resolver_run(root, symbol_cache, mw.endlos, mw.error_handler_ast_node);
     if (verbose) $"Type Resolver finished  {endlos_rolls_in_use(mw.endlos)} \n"
 
     if (verbose) $"Resolver  {endlos_rolls_in_use(mw.endlos)} ...\n"
-    resolver_run(root, mw.symbol_cache, mw.endlos, mw.error_handler_ast_node);
+    resolver_run(root, symbol_cache, mw.endlos, mw.error_handler_ast_node);
     if (verbose) $"Resolver finished {endlos_rolls_in_use(mw.endlos)} \n"
 
     // ast_dump_tree(root);
 
     if (verbose) $"Going to run type checker {endlos_rolls_in_use(mw.endlos)} ...\n"
-    type_checker_run(root, mw.symbol_cache, mw.ast_allocator, mw.endlos, mw.error_handler_ast_node);
+    type_checker_run(root, symbol_cache, mw.ast_allocator, mw.endlos, mw.error_handler_ast_node);
     if (verbose) $"Finished type checking. {endlos_rolls_in_use(mw.endlos)}\n"
 
     // ast_dump_tree(root);
 
     calculate_stacks(root, mw.endlos);
 
+    module.symbols = endlos_ripp_off~Symbol(mw.endlos, symbol_cache.symbol_roll);
+    module.global_symbols = EndlosArr_finalize~Symbol&(symbol_cache.global_symbols, mw.endlos);
     module.ast_root => root;
+    return module;
 }
 
 fn compile_program(initial_filename: u8[]) {
@@ -164,16 +221,14 @@ fn compile_program(initial_filename: u8[]) {
     let type_cache: TypeCache;
     TypeCache_init(type_cache, endlos)
 
-    let symbol_cache: SymbolCache;
-    SymbolCache_init(symbol_cache, type_cache, endlos);
-
     let ast_allocator: AST_Node_Allocator;
     AST_Node_Allocator_init(ast_allocator);
 
     let mw: ModuleWalker;
     mw.ast_allocator => ast_allocator;
     mw.endlos => endlos;
-    mw.symbol_cache => symbol_cache;
+    mw.type_cache => type_cache;
+    mw.builtin_symbols = make_builtin_symbols(type_cache, endlos);
     mw.error_handler_location.handler => error_handler_location;
     mw.error_handler_ast_node.handler => error_handler_ast_node;
     EndlosArr_begin~Module(mw.modules, endlos);
@@ -186,13 +241,16 @@ fn compile_program(initial_filename: u8[]) {
 
     let gen: IL_gen;
     gen.type_cache => type_cache;
-    gen.symbol_cache => symbol_cache;
+    gen.lookup_stdlib_symbol => lookup_stdlib_symbol;
+    gen.lookup_stdlib_symbol_arg => mw;
     gen.error_handler => mw.error_handler_ast_node;
     EndlosArr_begin~Opcode(gen.opcodes, endlos);
+    EndlosArr_begin~u8[](gen.generic_implementation_names, endlos);
 
     for (let i = 0; i < compiled_modules.len; i++) {
         il_gen_run(gen, compiled_modules[i].ast_root);
     }
+    EndlosArr_free~u8[](gen.generic_implementation_names, endlos);
     let opcodes = EndlosArr_finalize~Opcode(gen.opcodes, endlos);
 
     if (verbose) $"il gen finished\n"

@@ -1,8 +1,10 @@
 
 import * from "std";
+import * from "endlos";
 import * from "tokenizer";
 import * from "type";
 import * from "symbol";
+import * from "common";
 
 struct VariadicOperatorMember {
     token_kind: TokenKind;

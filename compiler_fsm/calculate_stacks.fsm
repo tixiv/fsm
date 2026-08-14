@@ -1,6 +1,7 @@
 
 import * from "std";
 import * from "endlos";
+import * from "ast";
 import * from "type";
 import * from "symbol";
 

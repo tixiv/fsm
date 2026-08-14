@@ -1,16 +1,24 @@
 
+import * from "std";
 import * from "endlos";
+import * from "tokenizer";
+import * from "parser";
 import * from "ast";
 import * from "opcodes";
+import * from "type";
+import * from "common";
+import * from "symbol";
 
 struct IL_gen {
     opcodes: EndlosArr<Opcode>;
     type_cache: TypeCache&;
-    symbol_cache: SymbolCache&;
+    generic_implementation_names: EndlosArr<u8[]>;
     num_ifs;
     num_whiles;
     num_strings;
     error_handler: ErrorHandler<AST_node&>&;
+    lookup_stdlib_symbol: fn (u8[], any&) : Symbol&;
+    lookup_stdlib_symbol_arg: any&;
 }
 
 fn il_gen_error(il_gen: IL_gen&, n: AST_node&, message: u8[]) {
@@ -412,8 +420,8 @@ fn gen_address_visitor(n: AST_node&, gen: IL_gen&) : void {
 fn gen_builder_string_put_struct (s_sb: Symbol&, arg: AST_node&, gen: IL_gen&) {
     let buf: u8[1024];
 
-    let sb_puts_symbol => get_global_symbol_by_name(gen.symbol_cache, "sb_puts");
-    let sb_puti_symbol => get_global_symbol_by_name(gen.symbol_cache, "sb_puti");
+    let sb_puts_symbol => gen.lookup_stdlib_symbol("sb_puts", gen.lookup_stdlib_symbol_arg);
+    let sb_puti_symbol => gen.lookup_stdlib_symbol("sb_puti", gen.lookup_stdlib_symbol_arg);
     ASSERT(sb_puts_symbol, "sb_puts not found.\n");
     ASSERT(sb_puti_symbol, "sb_puti not found.\n");
 
@@ -479,9 +487,9 @@ fn gen_builder_string (n: AST_node&, gen: IL_gen&) {
     let buf: u8[1024];
     let s_sb => n.AST_builder_string.var_decl_sb.AST_symbol.symbol;
     let s_arr => n.AST_builder_string.var_decl_arr.AST_symbol.symbol;
-    let sb_init_symbol => get_global_symbol_by_name(gen.symbol_cache, "sb_init");
-    let sb_puts_symbol => get_global_symbol_by_name(gen.symbol_cache, "sb_puts");
-    let sb_puti_symbol => get_global_symbol_by_name(gen.symbol_cache, "sb_puti");
+    let sb_init_symbol => gen.lookup_stdlib_symbol("sb_init", gen.lookup_stdlib_symbol_arg);
+    let sb_puts_symbol => gen.lookup_stdlib_symbol("sb_puts", gen.lookup_stdlib_symbol_arg);
+    let sb_puti_symbol => gen.lookup_stdlib_symbol("sb_puti", gen.lookup_stdlib_symbol_arg);
     ASSERT(sb_puts_symbol, "sb_puts not found.\n");
     ASSERT(sb_puti_symbol, "sb_puti not found.\n");
 
@@ -740,8 +748,23 @@ fn il_gen_visitor(n: AST_node&, gen: IL_gen&) : void {
         // Don't generate code for generic functions.
         // Their implementations for specific types live outside of generic blocks.
     }
-
-
+    else if (n.kind == AST_node::AST_generic_implementation) {
+        let body => n.AST_generic_implementation.body;
+        if (body.kind == AST_node::AST_function) {
+            let name = body.AST_function.name;
+            let names = gen.generic_implementation_names.arr;
+            let exists = false;
+            for (let i = 0; i < names.len; i++) {
+                if (sv_equal(names[i], name)) exists = true;
+            }
+            if (!exists) {
+                EndlosArr_push~u8[](gen.generic_implementation_names) = name;
+                ast_visit_children(n, il_gen_visitor, gen);
+            }
+        } else {
+            NOT_IMPLEMENTED(__LOCATION__, "Generic implementation for other than functions");
+        }
+    }
     else if (n.kind == AST_node::AST_cast
                     |== AST_node::AST_number
                     |== AST_node::AST_arg_list
@@ -758,7 +781,6 @@ fn il_gen_visitor(n: AST_node&, gen: IL_gen&) : void {
                     |== AST_node::AST_enum_member
                     |== AST_node::AST_union
                     |== AST_node::AST_union_member_def
-                    |== AST_node::AST_generic_implementation
                     |== AST_node::AST_type_generic_speciation
                     |== AST_node::AST_import)
     {

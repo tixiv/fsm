@@ -1,11 +1,13 @@
 
 import * from "std";
 import * from "endlos";
-import * from "lsp";
 import * from "compiler_fsm/common";
 import * from "compiler_fsm/tokenizer";
 import * from "compiler_fsm/ast";
 import * from "compiler_fsm/symbol_cache";
+import * from "json";
+import * from "lsp";
+
 
 struct Module {
     header: ModuleHeader;

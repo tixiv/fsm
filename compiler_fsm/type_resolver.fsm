@@ -2,7 +2,9 @@
 import * from "std";
 import * from "endlos";
 import * from "symbol";
+import * from "symbol_cache";
 import * from "tokenizer";
+import * from "common";
 import * from "type";
 import * from "ast";
 
@@ -56,7 +58,7 @@ fn get_type_by_name(symbol_cache: SymbolCache&, name: u8[], trs: TypeResolverSta
 fn push_named_type(trs: TypeResolverState&, name: u8[], type: Type&, n: AST_node&) : void {
     type.name = name;
 
-    let sym => alloc_symbol(trs.symbol_cache, SymbolKind::SYM_type, name, n.location);
+    let sym => alloc_symbol(trs.symbol_cache.symbol_roll, SymbolKind::SYM_type, name, n.location);
     sym.type => type;
 
     push_global_symbol(trs.symbol_cache, sym, n, trs.error_handler);

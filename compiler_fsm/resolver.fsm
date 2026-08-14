@@ -1,6 +1,11 @@
 
+import * from "std";
+import * from "endlos";
+import * from "common";
 import * from "ast";
+import * from "type";
 import * from "symbol";
+import * from "symbol_cache";
 
 struct Resolver {
     symbol_cache: SymbolCache&;
@@ -75,7 +80,7 @@ fn resolver_leave_scope(res: Resolver&) {
 
 fn resolve_globals_visitor (n: AST_node&, res: Resolver&) : void {
     if (n.kind == AST_node::AST_function) {
-        let s_fun => alloc_symbol(res.symbol_cache, SymbolKind::SYM_function, n.AST_function.name, n.location);
+        let s_fun => alloc_symbol(res.symbol_cache.symbol_roll, SymbolKind::SYM_function, n.AST_function.name, n.location);
         s_fun.source => res.current_generic;
         push_global_symbol(res.symbol_cache, s_fun, n, res.error_handler)
         n.AST_function.symbol => s_fun;
@@ -99,13 +104,13 @@ fn resolver_visitor(n: AST_node&, res: Resolver&) : void {
     }
     else if (n.kind == AST_node::AST_arg_decl) {
         ASSERT(res.current_function, $"{__LOCATION__}: Found function argument declaration for '{n.AST_arg_decl.name}' outside of function\n");
-        let s_arg => alloc_symbol(res.symbol_cache, SymbolKind::SYM_arg, n.AST_arg_decl.name, n.location);
+        let s_arg => alloc_symbol(res.symbol_cache.symbol_roll, SymbolKind::SYM_arg, n.AST_arg_decl.name, n.location);
         push_symbol(res, &res.local_symbols, s_arg, n);
         n.AST_arg_decl.symbol => s_arg;
     }
     else if (n.kind == AST_node::AST_var_decl) {
         ASSERT(res.current_function, $"{__LOCATION__}: Found local variable declaration for '{n.AST_var_decl.name}' outside of function\n");
-        let s_var => alloc_symbol(res.symbol_cache, SymbolKind::SYM_local, n.AST_var_decl.name, n.location);
+        let s_var => alloc_symbol(res.symbol_cache.symbol_roll, SymbolKind::SYM_local, n.AST_var_decl.name, n.location);
         push_symbol(res, &res.local_symbols, s_var, n);
         n.AST_var_decl.symbol => s_var;
         ast_visit_children(n, resolver_visitor, res);
@@ -125,7 +130,7 @@ fn resolver_visitor(n: AST_node&, res: Resolver&) : void {
     }
     else if (n.kind == AST_node::AST_generic) {
         res.current_generic => n;
-        res.generic_symbol => alloc_symbol(res.symbol_cache, SymbolKind::SYM_type, n.AST_generic.parameter_name, n.location);
+        res.generic_symbol => alloc_symbol(res.symbol_cache.symbol_roll, SymbolKind::SYM_type, n.AST_generic.parameter_name, n.location);
         if (res.current_generic_type)
             res.generic_symbol.type => res.current_generic_type
         else

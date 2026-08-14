@@ -1,11 +1,13 @@
 import * from "std";
 import * from "endlos";
 import * from "ast";
-
+import * from "common";
+import * from "module";
 
 struct Import {
     name: u8[];
     location: Location&;
+    module: Module&; // filled in by compile module
 }
 
 struct ImportsVisitor {

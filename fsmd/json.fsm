@@ -2,13 +2,6 @@
 import * from "std";
 import * from "endlos";
 
-fn sv_skip(str: u8[], start) {
-  if (start > str.len) start = str.len;
-  str.begin => str[start];
-  str.len = str.len - start;
-  return str;
-}
-
 fn take_number (str: u8[]&) : u8[]
 {
     while (!is_numeric(str.begin) && str.len) str++;
