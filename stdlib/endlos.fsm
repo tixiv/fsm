@@ -8,21 +8,25 @@ struct EndlosRoll {
 }
 
 struct EndlosAllocator {
-    rolls: EndlosRoll[256];
+    rolls: EndlosRoll[];
+    roll_capacity;
 }
 
-fn endlos_init(allocator: EndlosAllocator&) {
-    let roll_capacity = 1024 * 1024 * 1024;
-    for (let i = 0; i < 256; i++) {
-        allocator.rolls[i].buffer.begin => mmap_anonymous(roll_capacity);
-        allocator.rolls[i].buffer.len = roll_capacity;
-        allocator.rolls[i].alloc = allocator.rolls[i].buffer;
-    }
+fn endlos_roll_init(roll: EndlosRoll&, roll_capacity) {
+    roll.buffer.begin => mmap_anonymous(roll_capacity);
+    roll.buffer.len = roll_capacity;
+    roll.alloc = roll.buffer;
+}
+
+fn endlos_init(allocator: EndlosAllocator&, num_rolls, roll_capacity) {
+    allocator.roll_capacity = roll_capacity;
+    allocator.rolls.begin => mmap_anonymous(EndlosRoll.sizeof * num_rolls);
+    allocator.rolls.len = num_rolls;
 }
 
 fn endlos_rolls_in_use (allocator: EndlosAllocator&) {
     let count = 0;
-    for (let i = 0; i < 256; i++)
+    for (let i = 0; i < allocator.rolls.len; i++)
         if (allocator.rolls[i].latest.begin)
             count++;
     return count;
@@ -31,10 +35,16 @@ fn endlos_rolls_in_use (allocator: EndlosAllocator&) {
 generic T fn endlos_begin (allocator: EndlosAllocator&) : T[] {
     let align = T.sizeof;
     if (align > 8) align = 8;
-    for (let i = 0; i < 256; i++) {
+    for (let i = 0; i < allocator.rolls.len; i++) {
         if (!allocator.rolls[i].latest.begin) {
             let roll => allocator.rolls[i];
+            if (!roll.buffer.begin) {
+                endlos_roll_init(roll, allocator.roll_capacity);
+            }
+
+            // alignment
             while (<u64>roll.alloc.begin % align) roll.alloc++;
+
             roll.latest = roll.alloc;
             let t_roll: T[];
             t_roll.begin => <T&>roll.alloc.begin;

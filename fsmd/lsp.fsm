@@ -41,6 +41,33 @@ write_wrapped (1, $"\{
 }");
 }
 
+fn send_diagnostic_notification (id: u8[]) {
+write_wrapped (1, $"\{
+  \"jsonrpc\": \"2.0\",
+  \"method\": \"textDocument/publishDiagnostics\",
+  \"params\": \{
+    \"uri\": \"file:///home/tixiv/work/fsm/foo.fsm\",
+    \"diagnostics\": [
+      \{
+        \"range\": \{
+          \"start\": \{
+            \"line\": 11,
+            \"character\": 4
+          },
+          \"end\": \{
+            \"line\": 11,
+            \"character\": 10
+          }
+        },
+        \"severity\": 1,
+        \"message\": \"unknown identifier 'foobar'\",
+        \"source\": \"fsmd\"
+      }
+    ]
+  }
+}");
+}
+  
 struct StreamReader {
     buffer: u8[];
     arr: u8[];
@@ -98,3 +125,4 @@ fn read_header (sr: StreamReader&) : i64 {
 
     return get_content_length(sr);
 }
+

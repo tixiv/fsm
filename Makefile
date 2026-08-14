@@ -1,6 +1,7 @@
 
 CFSM = bin/cfsm
 FSM = bin/fsm
+FSMD = bin/fsmd
 
 SRC_DIR = compiler_c
 BUILD_DIR = build
@@ -15,7 +16,10 @@ C_SRCS = $(wildcard $(SRC_DIR)/*.c)
 FSM_SRCS = $(wildcard compiler_fsm/*.fsm)
 FSM_SRCS += $(wildcard stdlib/*.fsm)
 
-all: $(FSM)
+FSMD_SRCS = $(FSM_SRCS)
+FSMD_SRCS += $(wildcard fsmd/*.fsm)
+
+all: $(FSM) $(FSMD)
 
 cfsm: $(CFSM)
 
@@ -23,6 +27,11 @@ $(FSM): $(FSM_SRCS)
 	$(FSM) compiler_fsm/fsm.fsm
 	fasm out1.asm
 	cp out1 $(FSM)
+
+$(FSMD): $(FSMD_SRCS)
+	$(FSM) fsmd/fsmd.fsm
+	fasm out1.asm
+	cp out1 $(FSMD)
 
 bootstrap: $(CFSM) $(FSM_SRCS)
 	$(CFSM) compiler_fsm/fsm.fsm

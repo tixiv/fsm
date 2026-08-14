@@ -1,5 +1,6 @@
 
 import * from "std";
+import * from "endlos";
 
 fn sv_skip(str: u8[], start) {
   if (start > str.len) start = str.len;
@@ -37,20 +38,35 @@ fn json_take_object (json: u8[]&) {
     let obj = json;
     obj.len = 0;
     let depth = 0;
+    let in_string = false;
     while (json.len) {
         let c = json++;
-        if (c == '{') {
-            depth++;
-        }
-        else if (c == '}') {
-            depth--;
-            if (depth < 0) {
-                return obj;
+        if (in_string) {
+            if (c == '\\') {
+                json++;
+                obj.len++;
+            }
+            else if (c == '"') {
+                in_string = false;
             }
         }
-        else if (c == ',') {
-            if (depth == 0)
-                return obj;
+        else {
+            if (c == '{') {
+                depth++;
+            }
+            else if (c == '}') {
+                depth--;
+                if (depth < 0) {
+                    return obj;
+                }
+            }
+            else if (c == ',') {
+                if (depth == 0)
+                    return obj;
+            }
+            else if (c == '"') {
+                in_string = true;
+            }
         }
         obj.len++;
     }
@@ -91,4 +107,25 @@ fn json_get_string (json: u8[], id: u8[]) {
     if (e.begin == '"') e++;
     if (e[e.len-1] == '"') e.len--;
     return e;
+}
+
+
+fn json_unescape_string (escaped: u8[], endlos: EndlosAllocator&) : u8[] {
+    let sb: StringBuilder;
+    let unescaped = endlos_begin~u8(endlos);
+    for ( ; escaped.len; escaped++) {
+        let c = escaped.begin;
+        if (c == '\\') {
+            escaped++;
+            c = escaped.begin;
+                 if (c == 'n') unescaped++ = '\n'
+            else if (c == 'r') unescaped++ = '\r'
+            else if (c == 't') unescaped++ = '\t'
+            else unescaped++ = c;
+        }
+        else {
+            unescaped++ = c;
+        }
+    }
+    return endlos_ripp_off~u8(endlos, unescaped);
 }

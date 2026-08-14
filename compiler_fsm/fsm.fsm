@@ -159,7 +159,7 @@ fn compile_program(initial_filename: u8[]) {
     let verbose = true;
 
     let endlos: EndlosAllocator;
-    endlos_init(endlos);
+    endlos_init(endlos, 128, 1024 * 1024 * 64);
 
     let type_cache: TypeCache;
     TypeCache_init(type_cache, endlos)

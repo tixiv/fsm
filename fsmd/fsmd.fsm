@@ -2,6 +2,44 @@
 import * from "std";
 import * from "endlos";
 import * from "lsp";
+import * from "compiler_fsm/common";
+import * from "compiler_fsm/tokenizer";
+import * from "compiler_fsm/ast";
+import * from "compiler_fsm/symbol_cache";
+
+struct Module {
+    header: ModuleHeader;
+    tokens: Token[];
+    ast_root: AST_node&;
+}
+
+struct ModuleWalker {
+    modules: EndlosArr<Module>;
+    ast_allocator: AST_Node_Allocator&;
+    endlos: EndlosAllocator&;
+    symbol_cache: SymbolCache&;
+    error_handler_location: ErrorHandler<Location&>;
+    error_handler_ast_node: ErrorHandler<AST_node&>;
+}
+
+fn tokenize_module (mw: ModuleWalker&, module: Module&, code: u8[], endlos: EndlosAllocator&) {
+    let tokenizer: Tokenizer;
+
+    tokenizer.code = code;
+    tokenizer.location.module => module.header;
+    tokenizer.location.line = 1;
+    tokenizer.tokens = endlos_begin~Token(endlos);
+    tokenizer.error_handler => mw.error_handler_location;
+
+    tokenize_fsm(tokenizer);
+
+    module.tokens = endlos_ripp_off~Token(endlos, tokenizer.tokens);
+
+    // dump_tokens(module.tokens);
+}
+
+
+
 
 fn main () {
 
@@ -17,30 +55,29 @@ fn main () {
         exit(1);
     }
 
-    // let endlos: EndlosAllocator;
-    // endlos_init(endlos);
-    // let buffer = endlos_begin~u8(endlos);
-    let buffer: u8[65536];
+    write (log_fd, "FSMD 1 started\n"); 
+
+    let endlos: EndlosAllocator;
+    endlos_init(endlos, 4, 1024 * 1024 * 1024);
+    let buffer = endlos_begin~u8(endlos);
 
     for(;;) {
-        let sr: StreamReader;
+        let sr: StreamReader; 
         sr_init(sr, buffer, 0)
         let content_length = read_header(sr);
 
         let request = sr_read_exact(sr, content_length);
 
-        write(log_fd, "client: ");
-        write(log_fd, request);
-        write(log_fd, "\n");
-
         let id = json_get_number(request, "id");
         let method = json_get_string(request, "method");
+        let params = json_get_element(request, "params");
 
-        //let params = json_get_element(request, "params");
+        let print_request = true;
 
         if (sv_equal(method, "initialize")) {
             write (log_fd, "initialize\n")
             send_initialize_response(id);
+            print_request = false;
         }
         else if (sv_equal(method, "shutdown")) {
             write (log_fd, "shutdown\n")
@@ -49,8 +86,43 @@ fn main () {
         else if (sv_equal(method, "textDocument/definition")) {
             send_definition_response(id);
         }
+        else if (sv_equal(method, "textDocument/didChange")) {
+            let textDocument = json_get_element(params, "textDocument");
+            let uri = json_get_string(textDocument, "uri");
+            let contentChanges = json_get_element(params, "contentChanges");
+            let text = json_get_string(contentChanges, "text");
+            
+            write (log_fd, $"textDocument/didChange uri={uri}\n");
+
+            write (log_fd, text);
+
+            let code = json_unescape_string(text, endlos);
+
+            write (log_fd, code)
+
+            print_request = false;
+        }
+        else if (sv_equal(method, "textDocument/didOpen")) {
+            let textDocument = json_get_element(params, "textDocument");
+            let uri = json_get_string(textDocument, "uri");
+            let text = json_get_string(textDocument, "text");
+            
+            write (log_fd, $"textDocument/didOpen uri={uri}\n");
+
+            let code = json_unescape_string(text, endlos);
+
+            write (log_fd, code)
+
+            print_request = false;
+        }
         else if (sv_equal(method, "exit")) {
             exit(0);
+        }
+
+        if (print_request) {
+            write(log_fd, "client: ");
+            write(log_fd, request);
+            write(log_fd, "\n");
         }
     }
 }
