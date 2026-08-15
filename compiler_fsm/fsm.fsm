@@ -71,7 +71,6 @@ fn find_file(sb: StringBuilder&, name: u8[], parent_module_filename: u8[]) : boo
 
 struct ModuleWalker {
     modules: EndlosArr<Module>;
-    ast_allocator: AST_Node_Allocator&;
     endlos: EndlosAllocator&;
     type_cache: TypeCache&;
     error_handler_location: ErrorHandler<Location&>;
@@ -155,8 +154,11 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : Module& {
     tokenize_module(mw, module, code, mw.endlos);
     if (verbose) $"Tokenizing finished {endlos_rolls_in_use(mw.endlos)}\n"
 
+    let ast_allocator: AST_Node_Allocator;
+    AST_Node_Allocator_init(ast_allocator, mw.endlos);
+
     if (verbose) $"Parsing {endlos_rolls_in_use(mw.endlos)} ...\n"
-    let root => parse_program(module.tokens, mw.ast_allocator, mw.endlos, mw.error_handler_location)
+    let root => parse_program(module.tokens, ast_allocator, mw.endlos, mw.error_handler_location)
     if (verbose) $"Parsing finished {endlos_rolls_in_use(mw.endlos)} \n"
 
     let imports = gather_imports(root, mw.endlos);
@@ -198,8 +200,10 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : Module& {
     // ast_dump_tree(root);
 
     if (verbose) $"Going to run type checker {endlos_rolls_in_use(mw.endlos)} ...\n"
-    type_checker_run(root, symbol_cache, mw.ast_allocator, mw.endlos, mw.error_handler_ast_node);
+    type_checker_run(root, symbol_cache, ast_allocator, mw.endlos, mw.error_handler_ast_node);
     if (verbose) $"Finished type checking. {endlos_rolls_in_use(mw.endlos)}\n"
+
+    AST_Node_Allocator_finalize(ast_allocator, mw.endlos);
 
     // ast_dump_tree(root);
 
@@ -220,11 +224,7 @@ fn compile_program(initial_filename: u8[]) {
     let type_cache: TypeCache;
     TypeCache_init(type_cache, endlos)
 
-    let ast_allocator: AST_Node_Allocator;
-    AST_Node_Allocator_init(ast_allocator);
-
     let mw: ModuleWalker;
-    mw.ast_allocator => ast_allocator;
     mw.endlos => endlos;
     mw.type_cache => type_cache;
     mw.builtin_symbols = make_builtin_symbols(type_cache, endlos);

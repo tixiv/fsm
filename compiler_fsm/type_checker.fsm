@@ -900,7 +900,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
                 // We need to insert a dereference node now at this point in the tree.
                 // copy the current node to a new one:
                 let ast_member_access => ast_alloc(type_checker.ast_allocator, AST_node::AST_member_access, n.location);
-                objcopy~AST_node(ast_member_access, n);
+                obj_copy~AST_node(ast_member_access, n);
                 ast_member_access.next => null; // clear next pointer in case it was used
 
                 // Now we overwrite the current node, making it the dereference node with the member acces in it's body

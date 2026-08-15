@@ -688,7 +688,7 @@ fn speciate_tree(tc: TypeCache&, t: Type&, speciation: Type&) : Type& {
             members = endlos_ripp_off~StructMember(tc.endlos, members);
 
             let new_struct => type_alloc(tc, Type::T_struct);
-            objcopy~Type(new_struct, t);
+            obj_copy~Type(new_struct, t);
             new_struct.T_struct.members = members;
 
             calculate_storage_size(new_struct);

@@ -242,15 +242,15 @@ union AST_node enum kind {
 }
 
 struct AST_Node_Allocator {
-    buf: AST_node[];
     alloc: AST_node[];
 }
 
-fn AST_Node_Allocator_init (allocator: AST_Node_Allocator&) {
-    let num_nodes = 1024*1024;
-    allocator.buf.begin => mmap_anonymous(num_nodes * AST_node.sizeof);
-    allocator.buf.len = num_nodes;
-    allocator.alloc = allocator.buf;
+fn AST_Node_Allocator_init (allocator: AST_Node_Allocator&, endlos: EndlosAllocator&) {
+    allocator.alloc = endlos_begin~AST_node(endlos);
+}
+
+fn AST_Node_Allocator_finalize (allocator: AST_Node_Allocator&, endlos: EndlosAllocator&) {
+    allocator.alloc = endlos_ripp_off~AST_node(endlos, allocator.alloc);
 }
 
 fn ast_alloc(allocator: AST_Node_Allocator&, kind, location: Location) : AST_node& {
@@ -258,9 +258,8 @@ fn ast_alloc(allocator: AST_Node_Allocator&, kind, location: Location) : AST_nod
         $"Error: out of AST nodes.\n"
         exit(1);
     }
-    let node => allocator.alloc.begin;
-    allocator.alloc++;
-
+    let node => allocator.alloc++;
+    obj_zero~AST_node(node);
     node.kind = kind;
     node.location = location;
 
@@ -294,7 +293,7 @@ fn ast_insert_node(allocator: AST_Node_Allocator&, at: AST_node&, new_node: AST_
     // We overwrite the old node with the new one.
     // make a copy first.
     let at_copy => ast_alloc(allocator, at.kind, at.location);
-    objcopy~AST_node(at_copy, at);
+    obj_copy~AST_node(at_copy, at);
 
     at_copy.next => null; // zero chain pointer in case it was used
 
@@ -311,7 +310,7 @@ fn ast_insert_node(allocator: AST_Node_Allocator&, at: AST_node&, new_node: AST_
 
     // overwrite the old node with the new one that has the old
     // ones copy linked
-    objcopy~AST_node(at, new_node);
+    obj_copy~AST_node(at, new_node);
 }
 
 /*
@@ -523,7 +522,7 @@ fn ast_copy_chain(alloc: AllocatorsForTreeCopy&, n: AST_node&) : AST_node& {
 fn ast_copy_tree(alloc: AllocatorsForTreeCopy&, n: AST_node&) : AST_node& {
     if (!n) return null;
     let nn => ast_alloc(alloc.ast_alloc, n.kind, n.location);
-    objcopy~AST_node(nn, n);
+    obj_copy~AST_node(nn, n);
     nn.next => null;
 
     if (n.kind == AST_node::AST_generic) {
@@ -622,7 +621,7 @@ fn ast_copy_tree(alloc: AllocatorsForTreeCopy&, n: AST_node&) : AST_node& {
         let members = endlos_begin~VariadicOperatorMember(alloc.endlos);
         for (let i = 0; i < n.AST_variadic_operator.members.len; i++) {
             let m => members++;
-            objcopy~VariadicOperatorMember(m, n.AST_variadic_operator.members[i]);
+            obj_copy~VariadicOperatorMember(m, n.AST_variadic_operator.members[i]);
             m.right => ast_copy_tree(alloc, n.AST_variadic_operator.members[i].right);
         }
         nn.AST_variadic_operator.members = endlos_ripp_off~VariadicOperatorMember(alloc.endlos, members);

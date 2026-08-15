@@ -155,8 +155,11 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : Module& {
     tokenize_module(mw, module, code, mw.endlos);
     if (verbose) $"Tokenizing finished {endlos_rolls_in_use(mw.endlos)}\n"
 
+    let ast_allocator: AST_Node_Allocator;
+    AST_Node_Allocator_init(ast_allocator, mw.endlos);
+
     if (verbose) $"Parsing {endlos_rolls_in_use(mw.endlos)} ...\n"
-    let root => parse_program(module.tokens, mw.ast_allocator, mw.endlos, mw.error_handler_location)
+    let root => parse_program(module.tokens, ast_allocator, mw.endlos, mw.error_handler_location)
     if (verbose) $"Parsing finished {endlos_rolls_in_use(mw.endlos)} \n"
 
     let imports = gather_imports(root, mw.endlos);
@@ -198,42 +201,10 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : Module& {
     // ast_dump_tree(root);
 
     if (verbose) $"Going to run type checker {endlos_rolls_in_use(mw.endlos)} ...\n"
-    type_checker_run(root, symbol_cache, mw.ast_allocator, mw.endlos, mw.error_handler_ast_node);
+    type_checker_run(root, symbol_cache, ast_allocator, mw.endlos, mw.error_handler_ast_node);
     if (verbose) $"Finished type checking. {endlos_rolls_in_use(mw.endlos)}\n"
 
-
-    module.symbols = endlos_ripp_off~Symbol(mw.endlos, symbol_cache.symbol_roll);
-    module.global_symbols = EndlosArr_finalize~Symbol&(symbol_cache.global_symbols, mw.endlos);
-    module.ast_root => root;
-    return module;
-}
-
-fn compile_program(initial_filename: u8[]) {
-    let verbose = true;
-
-    let endlos: EndlosAllocator;
-    endlos_root_init(endlos, 128, 1024 * 1024 * 64);
-
-    let type_cache: TypeCache;
-    TypeCache_init(type_cache, endlos)
-
-    let ast_allocator: AST_Node_Allocator;
-    AST_Node_Allocator_init(ast_allocator);
-
-    let mw: ModuleWalker;
-    mw.ast_allocator => ast_allocator;
-    mw.endlos => endlos;
-    mw.type_cache => type_cache;
-    mw.builtin_symbols = make_builtin_symbols(type_cache, endlos);
-    mw.error_handler_location.handler => error_handler_location;
-    mw.error_handler_ast_node.handler => error_handler_ast_node;
-    EndlosArr_begin~Module(mw.modules, endlos);
-
-    compile_module(mw, initial_filename);
-
-    let compiled_modules = EndlosArr_finalize~Module(mw.modules, endlos);
-
-    if (verbose) $"Going to run il gen...\n"
+    AST_Node_Allocator_finalize(ast_allocator, mw.endlos);
 
     let gen: IL_gen;
     gen.type_cache => type_cache;
@@ -248,6 +219,21 @@ fn compile_program(initial_filename: u8[]) {
     }
     EndlosArr_free~u8[](gen.generic_implementation_names, endlos);
     EndlosArr_free~Opcode(gen.opcodes, endlos);
+
+
+    module.symbols = endlos_ripp_off~Symbol(mw.endlos, symbol_cache.symbol_roll);
+    module.global_symbols = EndlosArr_finalize~Symbol&(symbol_cache.global_symbols, mw.endlos);
+    module.ast_root => root;
+    return module;
+}
+
+fn compile_program(mw: ModuleWalker, initial_filename: u8[]) {
+    let verbose = true;
+
+    compile_module(mw, initial_filename);
+
+    if (verbose) $"Going to run il gen...\n"
+
 
     if (verbose) $"il gen finished\n"
 
@@ -268,11 +254,29 @@ fn main () {
         exit(1);
     }
 
-    write (log_fd, "FSMD 1 started\n"); 
+    write (log_fd, "FSMD 2 started\n"); 
+
+
 
     let endlos: EndlosAllocator;
-    endlos_root_init(endlos, 4, 1024 * 1024 * 1024);
+    endlos_root_init(endlos, 256, 1024 * 1024 * 64);
     let buffer = endlos_begin~u8(endlos);
+
+    let type_cache: TypeCache;
+    TypeCache_init(type_cache, endlos)
+
+    let mw: ModuleWalker;
+    mw.ast_allocator => ast_allocator;
+    mw.endlos => endlos;
+    mw.type_cache => type_cache;
+    mw.builtin_symbols = make_builtin_symbols(type_cache, endlos);
+    mw.error_handler_location.handler => error_handler_location;
+    mw.error_handler_ast_node.handler => error_handler_ast_node;
+    EndlosArr_begin~Module(mw.modules, endlos);
+
+
+
+
 
     for(;;) {
         let sr: StreamReader; 

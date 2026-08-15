@@ -250,8 +250,14 @@ fn ASSERT(condition: bool, s: u8[]) {
     }
 }
 
-generic T fn objcopy(dest: T&, src: T&) : void {
+generic T fn obj_copy(dest: T&, src: T&) : void {
     for (let i = 0; i < T.sizeof; i++) {
         *<u8&>(<u64>dest + i) = *<u8&>(<u64>src + i);
+    }
+}
+
+generic T fn obj_zero(dest: T&) : void {
+    for (let i = 0; i < T.sizeof; i++) {
+        *<u8&>(<u64>dest + i) = 0;
     }
 }
