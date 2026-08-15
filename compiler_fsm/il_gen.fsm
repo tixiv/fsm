@@ -112,7 +112,7 @@ fn gen_binary_operators(n: AST_node&, gen: IL_gen&, result_used: bool) {
     }
     else if (TokenKind::TOK_equal_assign == n.AST_binary.token_kind || TokenKind::TOK_bind_ref == n.AST_binary.token_kind) {
         if (!n.AST_binary.left.addressable) {
-            il_gen_error(gen, n, $"Trying to assign to something that is not addressable. Have {n.AST_binary.left.kind.name}.\n");
+            il_gen_error(gen, n, $"Trying to assign to something that is not addressable. Have {n.AST_binary.left.kind.name}.");
         }
         gen_address_visitor(n.AST_binary.left, gen);
         gen_value_visitor(n.AST_binary.right, gen);
@@ -145,7 +145,7 @@ fn gen_binary_operators(n: AST_node&, gen: IL_gen&, result_used: bool) {
         else if (tk == TokenKind::TOK_reference_target_equal) {   if (result_used) push_opcode(gen, OpKind::OP_equal,   null, 0, null, n.location); }
         else if (tk == TokenKind::TOK_reference_target_unequal) { if (result_used) push_opcode(gen, OpKind::OP_unequal, null, 0, null, n.location); }
 
-        else NOT_IMPLEMENTED(__LOCATION__, $"Generating IL for binary operator {n.AST_binary.token_kind.name} is not implemented yet.\n");
+        else NOT_IMPLEMENTED(__LOCATION__, $"Generating IL for binary operator {n.AST_binary.token_kind.name}");
     }
 }
 
@@ -239,7 +239,7 @@ fn gen_cast(n: AST_node&, gen: IL_gen&, result_used: bool) {
     }
     
     if (!result_used) {
-        il_gen_error(gen, n, "Cast with unused result is not supported.\n");
+        il_gen_error(gen, n, "Cast with unused result is not supported.");
     }
 
     if (is_boolean_kind(to) && is_integer_kind(from)) {
@@ -413,7 +413,7 @@ fn gen_address_visitor(n: AST_node&, gen: IL_gen&) : void {
         gen_address_visitor(n.AST_generic_speciation.body, gen);
     }
     else {
-        il_gen_error(gen, n, $"Trying to take the address of something for which it is not possible. Have {n.kind.name}.\n");
+        il_gen_error(gen, n, $"Trying to take the address of something for which it is not possible. Have {n.kind.name}.");
     }
 }
 
@@ -422,8 +422,11 @@ fn gen_builder_string_put_struct (s_sb: Symbol&, arg: AST_node&, gen: IL_gen&) {
 
     let sb_puts_symbol => gen.lookup_stdlib_symbol("sb_puts", gen.lookup_stdlib_symbol_arg);
     let sb_puti_symbol => gen.lookup_stdlib_symbol("sb_puti", gen.lookup_stdlib_symbol_arg);
-    ASSERT(sb_puts_symbol, "sb_puts not found.\n");
-    ASSERT(sb_puti_symbol, "sb_puti not found.\n");
+
+    if (!(sb_puts_symbol && sb_puti_symbol)) {
+        il_gen_error(gen, arg, "Failed to find 'sb_puts' or 'sb_puti'. Are you importing \"std\"?");
+        return;
+    }
 
     let str_lbrace  = "{\n";
     let str_tab     = "    ";
@@ -469,8 +472,7 @@ fn gen_builder_string_put_struct (s_sb: Symbol&, arg: AST_node&, gen: IL_gen&) {
                 push_opcode(gen, OpKind::OP_load, null, 0, member.type, arg.location);
                 push_opcode(gen, OpKind::OP_call, &sb_puts_symbol.name, 0, sb_puts_symbol.type, arg.location);
             }
-            else NOT_IMPLEMENTED("Printing %s inside a struct or record in builder string is not implemented yet.\n",
-                    get_type_name_r(buf, member.type));
+            else NOT_IMPLEMENTED(__LOCATION__, $"Printing {get_type_name_r(buf, member.type)} inside a struct or record in builder string");
             
             push_opcode(gen, OpKind::OP_push_local_var_address, null, s_sb.offset, null, arg.location);
             push_opcode(gen, OpKind::OP_push_string_literal, str_newline, gen.num_strings++, null, arg.location);
@@ -490,8 +492,11 @@ fn gen_builder_string (n: AST_node&, gen: IL_gen&) {
     let sb_init_symbol => gen.lookup_stdlib_symbol("sb_init", gen.lookup_stdlib_symbol_arg);
     let sb_puts_symbol => gen.lookup_stdlib_symbol("sb_puts", gen.lookup_stdlib_symbol_arg);
     let sb_puti_symbol => gen.lookup_stdlib_symbol("sb_puti", gen.lookup_stdlib_symbol_arg);
-    ASSERT(sb_puts_symbol, "sb_puts not found.\n");
-    ASSERT(sb_puti_symbol, "sb_puti not found.\n");
+    
+    if (!(sb_init_symbol && sb_puts_symbol && sb_puti_symbol)) {
+        il_gen_error(gen, n, "Failed to find 'sb_init' or 'sb_puts' or 'sb_puti' which are required to implement builder string. Are you importing \"std\"?");
+        return;
+    }
 
     push_opcode(gen, OpKind::OP_push_local_var_address, null, s_sb.offset, null, n.location);
     push_opcode(gen, OpKind::OP_push_literal, null, 1024, null, n.location);

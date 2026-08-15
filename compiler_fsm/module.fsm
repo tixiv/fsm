@@ -1,5 +1,6 @@
 
 import * from "std";
+import * from "endlos";
 import * from "common";
 import * from "type";
 import * from "ast";
@@ -7,10 +8,10 @@ import * from "tokenizer";
 import * from "symbol";
 
 struct Module {
-    header: ModuleHeader;
     code: u8[];
-    tokens: Token[];
+    header: ModuleHeader;
     symbols: Symbol[];
     global_symbols: Symbol&[];
     ast_root: AST_node&;
+    endlos: EndlosAllocator;
 }

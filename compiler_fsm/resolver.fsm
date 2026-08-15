@@ -51,8 +51,10 @@ fn resolver_lookup_symbol(res: Resolver&, name: u8[], n: AST_node&, do_undefined
         return res.generic_symbol;
     }
 
-    if(do_undefined_error)
+    if(do_undefined_error) {
         resolver_error(res, n, $"Undefined symbol {name}");
+        return get_undefined_symbol(res.symbol_cache, name, n.location);
+    }
     
     return null;
 }

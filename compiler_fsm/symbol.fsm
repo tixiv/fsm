@@ -5,6 +5,7 @@ import * from "common";
 import * from "type";
 
 enum SymbolKind {
+    SYM_undefined,
     SYM_function,
     SYM_local,
     SYM_arg,

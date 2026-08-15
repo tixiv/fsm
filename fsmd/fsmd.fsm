@@ -19,19 +19,29 @@ import * from "compiler_fsm/type_checker";
 
 import * from "json";
 import * from "lsp";
+import * from "helpers";
 
 fn error_handler_location(facility: u8[], location: Location&, message: u8[], _: any&) {
-    $"{facility} {location.module.filename}:{location.line}:{location.col} Error: ";
-    puts(message);
-    putc('\n');
-    exit(1);
+    write(2, $"{facility} {location.module.filename}:{location.line}:{location.col} Error: {message}\n");
 }
 
 fn error_handler_ast_node(facility: u8[], n: AST_node&, message: u8[], _: any&) {
-    $"{facility} {n.location.module.filename}:{n.location.line}:{n.location.col} Error: ";
-    puts(message);
-    putc('\n');
-    exit(1);
+    write(2, $"{facility} {n.location.module.filename}:{n.location.line}:{n.location.col} Error: {message}\n");
+}
+
+fn open_log_file() {
+    let O_WRONLY = 1;
+    let O_CREAT = 64;
+    let O_TRUNC = 512;
+
+    let filename = "/home/tixiv/work/fsm/fsmd1.log";
+
+    let log_fd = open(filename, O_WRONLY + O_CREAT + O_TRUNC);
+    if (log_fd < 0) {
+        write(2, $"Failed to open '{filename}' for writing: {strerror(log_fd)}\n")
+        exit(1);
+    }
+    return log_fd;
 }
 
 fn get_path(filename: u8[]) : u8[] {
@@ -68,7 +78,6 @@ fn find_file(sb: StringBuilder&, name: u8[], parent_module_filename: u8[]) : boo
     return false;
 }
 
-
 struct ModuleWalker {
     modules: EndlosArr<Module>;
     ast_allocator: AST_Node_Allocator&;
@@ -78,6 +87,8 @@ struct ModuleWalker {
     error_handler_ast_node: ErrorHandler<AST_node&>;
     current_imports: Import[];
     builtin_symbols: Symbol[];
+    project_root: u8[];
+    log_fd;
 }
 
 fn tokenize_module (mw: ModuleWalker&, module: Module&, code: u8[], endlos: EndlosAllocator&) {
@@ -86,14 +97,13 @@ fn tokenize_module (mw: ModuleWalker&, module: Module&, code: u8[], endlos: Endl
     tokenizer.code = code;
     tokenizer.location.module => module.header;
     tokenizer.location.line = 1;
+    tokenizer.location.col = 1;
     tokenizer.tokens = endlos_begin~Token(endlos);
     tokenizer.error_handler => mw.error_handler_location;
 
     tokenize_fsm(tokenizer);
 
-    module.tokens = endlos_ripp_off~Token(endlos, tokenizer.tokens);
-
-    // dump_tokens(module.tokens);
+    return endlos_ripp_off~Token(endlos, tokenizer.tokens);
 }
 
 fn find_already_compiled(mw: ModuleWalker&, import_filename : u8[]) : Module&{
@@ -141,141 +151,155 @@ fn lookup_external_symbol(name: u8[], mw: ModuleWalker&) : Symbol& {
     return null;
 }
 
-fn compile_module (mw: ModuleWalker&, filename: u8[]) : Module& {
-    let verbose = false;
+fn compile_module (mw: ModuleWalker&, module: Module&) : void {
+    let verbose = true;
 
-    let module => EndlosArr_push~Module(mw.modules);
-
-    module.header.filename = filename
-
-    if (verbose) $"Reading '{filename}'\n"
-    let code = read_file (filename);
-
-    if (verbose) $"Tokenizing {endlos_rolls_in_use(mw.endlos)}...\n"
-    tokenize_module(mw, module, code, mw.endlos);
-    if (verbose) $"Tokenizing finished {endlos_rolls_in_use(mw.endlos)}\n"
+    if (verbose) write(2, $"Tokenizing {endlos_rolls_in_use(mw.endlos)}...\n");
+    let tokens = tokenize_module(mw, module, module.code, module.endlos);
+    if (verbose) write(2, $"Tokenizing finished {endlos_rolls_in_use(mw.endlos)}\n");
 
     let ast_allocator: AST_Node_Allocator;
-    AST_Node_Allocator_init(ast_allocator, mw.endlos);
+    AST_Node_Allocator_init(ast_allocator, module.endlos);
 
-    if (verbose) $"Parsing {endlos_rolls_in_use(mw.endlos)} ...\n"
-    let root => parse_program(module.tokens, ast_allocator, mw.endlos, mw.error_handler_location)
-    if (verbose) $"Parsing finished {endlos_rolls_in_use(mw.endlos)} \n"
+    if (verbose) write(2, $"Parsing {endlos_rolls_in_use(mw.endlos)} ...\n");
+    let root => parse_program(tokens, ast_allocator, module.endlos, mw.error_handler_location)
+    if (verbose) write(2, $"Parsing finished {endlos_rolls_in_use(mw.endlos)} \n");
 
-    let imports = gather_imports(root, mw.endlos);
+    let imports = gather_imports(root, module.endlos);
+    mw.current_imports = imports;
+    handle_imports(mw, module.header.filename, imports);
 
+    let symbol_cache: SymbolCache;
+    SymbolCache_init(symbol_cache, mw.type_cache, module.endlos, lookup_external_symbol, mw);
+
+    if (verbose) write(2, $"Type Resolver {endlos_rolls_in_use(mw.endlos)} ...\n");
+    type_resolver_run(root, symbol_cache, module.endlos, mw.error_handler_ast_node);
+    if (verbose) write(2, $"Type Resolver finished  {endlos_rolls_in_use(mw.endlos)} \n");
+
+    if (verbose) write(2, $"Resolver  {endlos_rolls_in_use(mw.endlos)} ...\n");
+    resolver_run(root, symbol_cache, module.endlos, mw.error_handler_ast_node);
+    if (verbose) write(2, $"Resolver finished {endlos_rolls_in_use(mw.endlos)} \n");
+
+    // ast_dump_tree(root);
+
+    if (verbose) write(2, $"Going to run type checker {endlos_rolls_in_use(mw.endlos)} ...\n");
+    type_checker_run(root, symbol_cache, ast_allocator, module.endlos, mw.error_handler_ast_node);
+    if (verbose) write(2, $"Finished type checking. {endlos_rolls_in_use(mw.endlos)}\n");
+
+    AST_Node_Allocator_finalize(ast_allocator, module.endlos);
+
+    // The IL gen is only run for the diagnostic messages here
+    let gen: IL_gen;
+    gen.type_cache => mw.type_cache;
+    gen.lookup_stdlib_symbol => lookup_stdlib_symbol;
+    gen.lookup_stdlib_symbol_arg => mw;
+    gen.error_handler => mw.error_handler_ast_node;
+    EndlosArr_begin~Opcode(gen.opcodes, mw.endlos);
+    EndlosArr_begin~u8[](gen.generic_implementation_names, mw.endlos);
+
+    il_gen_run(gen, root);
+
+    EndlosArr_free~u8[](gen.generic_implementation_names, mw.endlos);
+    EndlosArr_free~Opcode(gen.opcodes, mw.endlos);
+
+    module.symbols = endlos_ripp_off~Symbol(module.endlos, symbol_cache.symbol_roll);
+    module.global_symbols = EndlosArr_finalize~Symbol&(symbol_cache.global_symbols, module.endlos);
+    module.ast_root => root;
+}
+
+fn endlos_read_file(endlos: EndlosAllocator&, filename: u8[]) : u8[] {
+    let O_RDONLY = 0
+    let fd = open (filename, O_RDONLY)
+
+    if (fd < 0) {
+        write(2, $"Error: failed to read file '{filename}': {strerror(fd)}\n");
+        let a: u8[];
+        return a;
+    }
+
+    let buffer = endlos_begin~u8(endlos);
+    let size = fsize(fd)
+    let read_size = read(fd, buffer);
+    ASSERT(read_size == size, __LOCATION__);
+
+    close(fd);
+
+    return endlos_ripp_off~u8(endlos, sv_skip(buffer, read_size));
+}
+
+fn handle_imports(mw: ModuleWalker&, module_filename: u8[], imports: Import[]) : void {
     for (let i = 0; i < imports.len; i++) {
         let imp => imports[i];
 
         let sb: StringBuilder;
-        sb_init(sb, endlos_begin~u8(mw.endlos));
-        let res = find_file(sb, imp.name, filename);
-        let import_filename = endlos_ripp_off~u8(mw.endlos, sb.buffer);
+        let buf: u8[1024];
+        sb_init(sb, buf);
+
+        let res = find_file(sb, imp.name, module_filename);
         
         if (res) {
-            import_filename.len--; // make the terminating 0 for C invisible to FSM
-            let compiled_module => find_already_compiled(mw, import_filename);
-            if (!compiled_module)
-                compiled_module => compile_module(mw, import_filename);
-            imp.module => compiled_module;
+            sb.str.len--; // make the terminating 0 for C invisible to FSM
+            let module => find_already_compiled(mw, sb.str);
+            if (!module) {
+                write (2, $"Module {sb.str} doesn't exist, creating\n")
+                module => EndlosArr_push~Module(mw.modules);
+                module.header.filename = endlos_copy~u8(sb.str, mw.endlos);
+                endlos_follower_init(module.endlos, mw.endlos, 128);
+                module.code = endlos_read_file(module.endlos, module.header.filename);
+                compile_module(mw, module);
+            }
+            imp.module => module;
         }
         else {
-            write(2, $"[FSM Modulizer] {filename}:{imp.location.line} Error: couldn't find import '{imp.name}'.\n")
+            write(2, $"[FSM Modulizer] {module_filename}:{imp.location.line} Error: couldn't find import '{imp.name}'.\n")
             exit(1);
         }
     }
-
-    mw.current_imports = imports;
-
-    let symbol_cache: SymbolCache;
-    SymbolCache_init(symbol_cache, mw.type_cache, mw.endlos, lookup_external_symbol, mw);
-
-    if (verbose) $"Type Resolver {endlos_rolls_in_use(mw.endlos)} ...\n"
-    type_resolver_run(root, symbol_cache, mw.endlos, mw.error_handler_ast_node);
-    if (verbose) $"Type Resolver finished  {endlos_rolls_in_use(mw.endlos)} \n"
-
-    if (verbose) $"Resolver  {endlos_rolls_in_use(mw.endlos)} ...\n"
-    resolver_run(root, symbol_cache, mw.endlos, mw.error_handler_ast_node);
-    if (verbose) $"Resolver finished {endlos_rolls_in_use(mw.endlos)} \n"
-
-    // ast_dump_tree(root);
-
-    if (verbose) $"Going to run type checker {endlos_rolls_in_use(mw.endlos)} ...\n"
-    type_checker_run(root, symbol_cache, ast_allocator, mw.endlos, mw.error_handler_ast_node);
-    if (verbose) $"Finished type checking. {endlos_rolls_in_use(mw.endlos)}\n"
-
-    AST_Node_Allocator_finalize(ast_allocator, mw.endlos);
-
-    let gen: IL_gen;
-    gen.type_cache => type_cache;
-    gen.lookup_stdlib_symbol => lookup_stdlib_symbol;
-    gen.lookup_stdlib_symbol_arg => mw;
-    gen.error_handler => mw.error_handler_ast_node;
-    EndlosArr_begin~Opcode(gen.opcodes, endlos);
-    EndlosArr_begin~u8[](gen.generic_implementation_names, endlos);
-
-    for (let i = 0; i < compiled_modules.len; i++) {
-        il_gen_run(gen, compiled_modules[i].ast_root);
-    }
-    EndlosArr_free~u8[](gen.generic_implementation_names, endlos);
-    EndlosArr_free~Opcode(gen.opcodes, endlos);
-
-
-    module.symbols = endlos_ripp_off~Symbol(mw.endlos, symbol_cache.symbol_roll);
-    module.global_symbols = EndlosArr_finalize~Symbol&(symbol_cache.global_symbols, mw.endlos);
-    module.ast_root => root;
-    return module;
 }
+ 
+fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[]) {
+    let filename = uri_to_file_path(mw.project_root, uri);
+    let module => find_already_compiled(mw, filename);
+    if (module) {
+        write (2, $"Module {uri} exists, freeing\n")
+        endlos_free (module.endlos);
+    }
+    else {
+        write (2, $"Module {uri} doesn't exist, creating\n")
+        module => EndlosArr_push~Module(mw.modules);
+        module.header.filename = endlos_copy~u8(filename, mw.endlos);
+    }
+    // endlos_follower_init(module.endlos, mw.endlos, 128);
+    endlos_root_init(module.endlos, 128, 1024 * 1024 * 64);
+    module.code = endlos_copy~u8(content, module.endlos);
 
-fn compile_program(mw: ModuleWalker, initial_filename: u8[]) {
-    let verbose = true;
+    write (mw.log_fd, $"copied code: ({module.header.filename})\n");
+    write (mw.log_fd, module.code);
 
-    compile_module(mw, initial_filename);
-
-    if (verbose) $"Going to run il gen...\n"
-
-
-    if (verbose) $"il gen finished\n"
-
-    // dump_opcodes(opcodes);
+    compile_module(mw, module);
 }
 
 fn main () {
+    let log_fd = open_log_file();
 
-    let O_WRONLY = 1;
-    let O_CREAT = 64;
-    let O_TRUNC = 512;
-
-    let filename = "/home/tixiv/work/fsm/fsmd1.log";
-
-    let log_fd = open(filename, O_WRONLY + O_CREAT + O_TRUNC);
-    if (log_fd < 0) {
-        write(2, $"Failed to open '{filename}' for writing: {strerror(log_fd)}\n")
-        exit(1);
-    }
-
-    write (log_fd, "FSMD 2 started\n"); 
-
-
+    write (log_fd, "FSMD 3 started\n"); 
 
     let endlos: EndlosAllocator;
-    endlos_root_init(endlos, 256, 1024 * 1024 * 64);
+    endlos_root_init(endlos, 512, 1024 * 1024 * 64);
     let buffer = endlos_begin~u8(endlos);
 
     let type_cache: TypeCache;
     TypeCache_init(type_cache, endlos)
 
     let mw: ModuleWalker;
-    mw.ast_allocator => ast_allocator;
     mw.endlos => endlos;
     mw.type_cache => type_cache;
     mw.builtin_symbols = make_builtin_symbols(type_cache, endlos);
     mw.error_handler_location.handler => error_handler_location;
     mw.error_handler_ast_node.handler => error_handler_ast_node;
+    mw.project_root = "/home/tixiv/work/fsm";
+    mw.log_fd = log_fd;
     EndlosArr_begin~Module(mw.modules, endlos);
-
-
-
 
 
     for(;;) {
@@ -309,13 +333,11 @@ fn main () {
             let contentChanges = json_get_element(params, "contentChanges");
             let text = json_get_string(contentChanges, "text");
             
-            write (log_fd, $"textDocument/didChange uri={uri}\n");
-
-            write (log_fd, text);
+            write (log_fd, $"textDocument/didChange uri={uri} path={uri_to_file_path(mw.project_root, uri)}\n");
 
             let code = json_unescape_string(text, endlos);
 
-            write (log_fd, code)
+            handle_document_updated(mw, uri, code);
 
             print_request = false;
         }
@@ -324,13 +346,15 @@ fn main () {
             let uri = json_get_string(textDocument, "uri");
             let text = json_get_string(textDocument, "text");
             
-            write (log_fd, $"textDocument/didOpen uri={uri}\n");
+            write (log_fd, $"textDocument/didOpen uri={uri} path={uri_to_file_path(mw.project_root, uri)}\n");
 
             let code = json_unescape_string(text, endlos);
 
-            write (log_fd, code)
+            write(log_fd, code);
 
-            print_request = false;
+            handle_document_updated(mw, uri, code);
+            
+            print_request = true;
         }
         else if (sv_equal(method, "exit")) {
             exit(0);

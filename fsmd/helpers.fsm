@@ -1,0 +1,14 @@
+
+import * from "std";
+
+fn uri_to_file_path (project_root: u8[], uri: u8[]) {
+    if (!sv_starts_with (uri, "file://"))
+        NOT_IMPLEMENTED(__LOCATION__, $"URIs that don't start with 'file://' (Have '{uri}')");
+    
+    uri = sv_skip(uri, 7);
+
+    if (!sv_starts_with (uri, project_root))
+        NOT_IMPLEMENTED(__LOCATION__, $"URIs whos path doesn't lie in project root (Have '{uri}')");
+    
+    return sv_skip(uri, project_root.len + 1); // skip one extra slash
+}

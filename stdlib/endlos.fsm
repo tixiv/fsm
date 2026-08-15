@@ -32,7 +32,7 @@ fn endlos_root_init(allocator: EndlosAllocator&, num_rolls, roll_capacity) {
     allocator.rolls.len = num_rolls;
 }
 
-fn endlos_folower_init(follower: EndlosAllocator&, root: EndlosAllocator&, num_rolls) {
+fn endlos_follower_init(follower: EndlosAllocator&, root: EndlosAllocator&, num_rolls) {
     follower.kind = EndlosAllocator::Follower;
     follower.Follower.root => root;
     follower.rolls.begin => mmap_anonymous(EndlosRoll.sizeof * num_rolls);
@@ -159,6 +159,14 @@ generic T fn endlos_ripp_off_n (allocator: EndlosAllocator&, n) : T[] {
     s.begin => s[n];
     s.len = s.len - n;
     return endlos_ripp_off(allocator, s);
+}
+
+generic T fn endlos_copy (source: T[], endlos: EndlosAllocator&) : T[] {
+    let dest = endlos_begin~T(endlos);
+    while (source.len)
+        obj_copy~T(dest++, source++);
+
+    return endlos_ripp_off~T(endlos, dest);
 }
 
 generic T struct EndlosArr {

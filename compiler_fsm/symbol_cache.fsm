@@ -54,3 +54,10 @@ fn push_global_symbol(symbol_cache: SymbolCache&, s: Symbol&, n: AST_node&, erro
 
     EndlosArr_push_ref~Symbol&(symbol_cache.global_symbols, s);
 }
+
+fn get_undefined_symbol (symbol_cache: SymbolCache&, name: u8[], location: Location&) {
+    // Todo: link undefined symbols with the same name
+    let sym => alloc_symbol(symbol_cache.symbol_roll, SymbolKind::SYM_undefined, name, location);
+    sym.type => symbol_cache.type_cache.builtin_void;
+    return sym;
+}
