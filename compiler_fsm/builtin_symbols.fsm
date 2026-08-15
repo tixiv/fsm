@@ -37,6 +37,9 @@ fn init_builtin_functions(tc: TypeCache&, sr: Symbol[]&) {
                       tmp_args[3] => tc.builtin_u64;                       tmp_args[4] => tc.builtin_i64; tmp_args[5] => tc.builtin_i64;
     declare_builtin_fn(tc, sr, "mmap", get_ref_type_for(tc, tc.builtin_any), tmp_args);
 
+    tmp_args.len = 2; tmp_args[0] => get_ref_type_for(tc, tc.builtin_any); tmp_args[1] => tc.builtin_i64;
+    declare_builtin_fn(tc, sr, "munmap", tc.builtin_i64, tmp_args);
+
     tmp_args.len = 1; tmp_args[0] => tc.builtin_i64;
     declare_builtin_fn(tc, sr, "print", tc.builtin_void, tmp_args);
     declare_builtin_fn(tc, sr, "fsize", tc.builtin_i64, tmp_args);// fsize(fd: i64) : i64

@@ -7,9 +7,16 @@ struct EndlosRoll {
     latest: u8[];
 }
 
-struct EndlosAllocator {
-    rolls: EndlosRoll[];
-    roll_capacity;
+union EndlosAllocator enum kind {
+    struct {
+        rolls: EndlosRoll[];
+    }
+    struct Root {
+        roll_capacity;
+    }
+    struct Follower {
+        root: EndlosAllocator&;
+    }
 }
 
 fn endlos_roll_init(roll: EndlosRoll&, roll_capacity) {
@@ -18,10 +25,79 @@ fn endlos_roll_init(roll: EndlosRoll&, roll_capacity) {
     roll.alloc = roll.buffer;
 }
 
-fn endlos_init(allocator: EndlosAllocator&, num_rolls, roll_capacity) {
-    allocator.roll_capacity = roll_capacity;
+fn endlos_root_init(allocator: EndlosAllocator&, num_rolls, roll_capacity) {
+    allocator.kind = EndlosAllocator::Root;
+    allocator.Root.roll_capacity = roll_capacity;
     allocator.rolls.begin => mmap_anonymous(EndlosRoll.sizeof * num_rolls);
     allocator.rolls.len = num_rolls;
+}
+
+fn endlos_folower_init(follower: EndlosAllocator&, root: EndlosAllocator&, num_rolls) {
+    follower.kind = EndlosAllocator::Follower;
+    follower.Follower.root => root;
+    follower.rolls.begin => mmap_anonymous(EndlosRoll.sizeof * num_rolls);
+    follower.rolls.len = num_rolls;
+}
+
+fn endlos_free(allocator: EndlosAllocator&) {
+    if (allocator.kind == EndlosAllocator::Root) {
+        for (let i = 0; i < allocator.rolls.len; i++) {
+            let roll => allocator.rolls[i];
+            if (roll.buffer.begin)
+                munmap(roll.buffer.begin, allocator.Root.roll_capacity);
+        }
+    }
+    else {
+        for (let i = 0; i < allocator.rolls.len; i++) {
+            let roll => allocator.rolls[i];
+            if (roll.buffer.begin) {
+                endlos_ripp_off~u8(allocator.Follower.root, roll.buffer);
+            }
+        }
+    }
+    munmap(allocator.rolls.begin, allocator.rolls.len * EndlosRoll.sizeof)
+}
+
+fn endlos_root_accquire_roll (allocator: EndlosAllocator&) : EndlosRoll & {
+    for (let i = 0; i < allocator.rolls.len; i++) {
+        if (!allocator.rolls[i].latest.begin) {
+            let roll => allocator.rolls[i];
+            if (!roll.buffer.begin) {
+                endlos_roll_init(roll, allocator.Root.roll_capacity);
+            }
+            return roll;
+        }
+    }
+    $"{__LOCATION__} Error: Endlos root allocator has no free rolls available.\n"
+    exit(1);
+    return null;
+}
+
+fn endlos_follower_accquire_roll (follower: EndlosAllocator&) : EndlosRoll & {
+    for (let i = 0; i < follower.rolls.len; i++) {
+        if (!follower.rolls[i].latest.begin) {
+            let roll => follower.rolls[i];
+            if (!roll.buffer.begin) {
+                roll.buffer = endlos_begin~u8(follower.Follower.root);
+                roll.alloc = roll.buffer;
+            }
+            return roll;
+        }
+    }
+    $"{__LOCATION__} Error: Endlos follower allocator has no free roll slots available.\n"
+    exit(1);
+    return null;
+}
+
+fn endlos_accquire_roll (allocator: EndlosAllocator&) : EndlosRoll & {
+    if (allocator.kind == EndlosAllocator::Root) {
+        return endlos_root_accquire_roll (allocator);
+    }
+    else
+    {
+        return endlos_follower_accquire_roll (allocator);
+    }
+    return null;
 }
 
 fn endlos_rolls_in_use (allocator: EndlosAllocator&) {
@@ -35,49 +111,54 @@ fn endlos_rolls_in_use (allocator: EndlosAllocator&) {
 generic T fn endlos_begin (allocator: EndlosAllocator&) : T[] {
     let align = T.sizeof;
     if (align > 8) align = 8;
+
+    let roll => endlos_accquire_roll(allocator);
+    // alignment
+    while (<u64>roll.alloc.begin % align) roll.alloc++;
+
+    roll.latest = roll.alloc;
+    let t_roll: T[];
+    t_roll.begin => <T&>roll.alloc.begin;
+    t_roll.len = roll.alloc.len / T.sizeof;
+    return t_roll;
+}
+
+fn endlos_find_returned_roll(allocator: EndlosAllocator&, addr: any&) : EndlosRoll& {
     for (let i = 0; i < allocator.rolls.len; i++) {
-        if (!allocator.rolls[i].latest.begin) {
-            let roll => allocator.rolls[i];
-            if (!roll.buffer.begin) {
-                endlos_roll_init(roll, allocator.roll_capacity);
+        if (allocator.rolls[i].latest.begin) {
+            let r => allocator.rolls[i];
+            if (<i64>r.alloc.begin <= <i64>addr < <i64>r.alloc.begin + r.alloc.len) {
+                return r;
             }
-
-            // alignment
-            while (<u64>roll.alloc.begin % align) roll.alloc++;
-
-            roll.latest = roll.alloc;
-            let t_roll: T[];
-            t_roll.begin => <T&>roll.alloc.begin;
-            t_roll.len = roll.alloc.len / T.sizeof;
-            return t_roll;
         }
     }
-    $"{__LOCATION__} Error: Endlos allocator has no free rolls available.\n"
-    exit(1);
-    let a: T[];
-    return a;
+    return null;
 }
 
 generic T fn endlos_ripp_off (allocator: EndlosAllocator&, returned_roll: T[]) : T[] {
-    for (let i = 0; i < 256; i++) {
-        if (allocator.rolls[i].latest.begin) {
-            let r => allocator.rolls[i];
-            if (<i64>r.alloc.begin <= <i64>returned_roll.begin < <i64>r.alloc.begin + r.alloc.len) {
-                let finalized: T[];
-                finalized.begin => <T&> r.latest.begin;
-                finalized.len = (r.latest.len - returned_roll.len * T.sizeof) / T.sizeof;
-                r.alloc.begin => <u8&> returned_roll.begin;
-                r.alloc.len = returned_roll.len * T.sizeof;
-                r.latest.begin => null;
-                r.latest.len = 0;
-                return finalized;
-            }
-        }
+    let r => endlos_find_returned_roll(allocator, returned_roll.begin)
+    if (!r) {
+        $"{__LOCATION__} Error: endlos_ripp_off() was called on something that didn't come from a roll.\n"
+        exit(1);
+        let a: T[];
+        return a;
     }
-    $"{__LOCATION__} Error: endlos_ripp_off() was called on something that didn't come from a roll.\n"
-    exit(1);
-    let a: T[];
-    return a;
+
+    let finalized: T[];
+    finalized.begin => <T&> r.latest.begin;
+    finalized.len = (r.latest.len - returned_roll.len * T.sizeof) / T.sizeof;
+    r.alloc.begin => <u8&> returned_roll.begin;
+    r.alloc.len = returned_roll.len * T.sizeof;
+    r.latest.begin => null;
+    r.latest.len = 0;
+    return finalized;
+}
+
+generic T fn endlos_ripp_off_n (allocator: EndlosAllocator&, n) : T[] {
+    let s = endlos_begin~T(allocator);
+    s.begin => s[n];
+    s.len = s.len - n;
+    return endlos_ripp_off(allocator, s);
 }
 
 generic T struct EndlosArr {

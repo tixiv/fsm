@@ -34,7 +34,7 @@ fn blarg (allocator: EndlosAllocator&, level) : void {
 
 fn main () {
     let allocator: EndlosAllocator;
-    endlos_init(allocator, 256, 4096);
+    endlos_root_init(allocator, 256, 4096);
 
     blarg(allocator, 255);
 

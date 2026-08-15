@@ -70,6 +70,7 @@ void init_builtin_functions() {
 
     // mmap(addr: any&, lenght: i64, prot: u64, flags: u64, fd: i64, offset: i64) : any &
     declare_builtin_fn(mkSV("mmap"), get_ref_type_for(&builtin_any), 6, (Type*[]){get_ref_type_for(&builtin_any), &builtin_i64, &builtin_u64, &builtin_u64, &builtin_i64, &builtin_i64});
+    declare_builtin_fn(mkSV("munmap"), &builtin_i64, 2, (Type*[]){get_ref_type_for(&builtin_any), &builtin_i64});
 
     declare_builtin_fn(mkSV("print"), &builtin_void, 1, (Type*[]){&builtin_i64});
     declare_builtin_fn(mkSV("putc"), &builtin_void, 1, (Type*[]){&builtin_u8});

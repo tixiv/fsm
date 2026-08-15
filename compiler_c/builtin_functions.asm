@@ -82,6 +82,7 @@ SYS_OPEN    = 2
 SYS_CLOSE   = 3
 SYS_FSTAT   = 5
 SYS_MMAP    = 9
+SYS_MUNMAP  = 11
 SYS_ACCESS  = 21
 SYS_SOCKET  = 41
 SYS_CONNECT = 42
@@ -158,6 +159,13 @@ fn_mmap: ; mmap(addr: any&, lenght: i64, prot: u64, flags: u64, fd: i64, offset:
    mov     r10, [rsp+24]     ; flags
    mov     r8,  [rsp+16]     ; fd
    mov     r9,  [rsp+8]      ; offset
+   syscall
+   ret
+
+fn_munmap: ; munmap(addr: any&, length: i64) : i64
+   mov     rax, SYS_MUNMAP
+   mov     rdi, [rsp+16]    ; addr
+   mov     rsi, [rsp+8]     ; length
    syscall
    ret
 
