@@ -738,7 +738,8 @@ fn il_gen_visitor(n: AST_node&, gen: IL_gen&) : void {
     else if (n.kind == AST_node::AST_dereference
                     |== AST_node::AST_member_access
                     |== AST_node::AST_reference
-                    |== AST_node::AST_symbol)
+                    |== AST_node::AST_symbol
+                    |== AST_node::AST_string)
     {
         il_gen_warning(n.location, "unused code.");
         ast_visit_children(n, il_gen_visitor, gen);

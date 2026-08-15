@@ -153,30 +153,46 @@ fn tokenizer_error(tokenizer: Tokenizer&, message: u8[]) {
     eh.handler("[FSM Tokenizer]", tokenizer.location, message, eh.arg);
 }
 
-fn read_word(input: u8[]&) {
+fn tokenizer_pop(tokenizer: Tokenizer&) {
+    let c = tokenizer.code++
+    if (c == '\n') {
+        tokenizer.location.line++
+        tokenizer.location.col = 1
+    }
+    else {
+        tokenizer.location.col++
+    }
+    return c;
+}
+
+fn tokenizer_pop_n(tokenizer: Tokenizer&, n) {
+    while (n--) tokenizer_pop(tokenizer)
+}
+
+fn read_word(tokenizer: Tokenizer&) {
     let word: u8[];
-    word.begin => input.begin;
+    word.begin => tokenizer.code.begin;
     word.len = 0;
-    while(input.len && is_allowed_in_identifier(input.begin) ) {
-        input++
+    while(tokenizer.code.len && is_allowed_in_identifier(tokenizer.code.begin) ) {
+        tokenizer_pop(tokenizer)
         word.len++
     }
     return word;
 }
 
-fn read_number(input: u8[]&) {
+fn read_number(tokenizer: Tokenizer&) {
     let num: u8[];
-    num.begin => input.begin;
+    num.begin => tokenizer.code.begin;
     num.len = 0;
     let hex = false;
 
-    if (sv_starts_with(input, "0x")) {
-        input++ input++
+    if (sv_starts_with(tokenizer.code, "0x")) {
+        tokenizer_pop_n(tokenizer, 2)
         num.len = 2
         hex = true
     }
-    while(input.len && if (hex) is_hex_digit(input.begin) else is_numeric(input.begin)) {
-        input++
+    while(tokenizer.code.len && if (hex) is_hex_digit(tokenizer.code.begin) else is_numeric(tokenizer.code.begin)) {
+        tokenizer_pop(tokenizer)
         num.len++;
     }
     return num;
@@ -257,57 +273,55 @@ fn handle_word(tokenizer: Tokenizer&, word: u8[]) {
 }
 
 fn read_string(tokenizer: Tokenizer&) {
-    tokenizer.code++; // initial '"'
+    tokenizer_pop(tokenizer); // initial '"'
     let str: u8[];
     str.begin => tokenizer.code.begin;
     str.len = 0;
     while(tokenizer.code.len && '"' != tokenizer.code.begin) {
         if (sv_starts_with(tokenizer.code, "\\")) {
-            str.len = str.len + 2; tokenizer.code++; tokenizer.code++;
+            str.len = str.len + 2; tokenizer_pop_n(tokenizer, 2)
         }
         else {
-            if ('\n' == tokenizer.code.begin) tokenizer.location.line++;
-            tokenizer.code++;
+            tokenizer_pop(tokenizer);
             str.len++;
         }
     }
     if (tokenizer.code.len) {
-        tokenizer.code++; // closing '"'
+        tokenizer_pop(tokenizer); // closing '"'
     } else {
-        tokenizer_error(tokenizer, "Error: unmatched '\"'. Quitting.");
+        tokenizer_error(tokenizer, "Unmatched '\"'.");
         // exit(EXIT_FAILURE);
     }
     return str;
 }
 
 fn read_char_constant(tokenizer: Tokenizer&) {
-    tokenizer.code++; // initial '
+    tokenizer_pop(tokenizer); // initial '
     let str = tokenizer.code;
     str.len = 0;
     while(tokenizer.code.len) {
         if (sv_starts_with(tokenizer.code, "\\")) {
-            tokenizer.code++;
+            tokenizer_pop(tokenizer);
             str.len++;
         }
         else if ('\'' == tokenizer.code.begin) {
-            tokenizer.code++;
+            tokenizer_pop(tokenizer);
             return str;
         }
-        if ('\n' == tokenizer.code.begin) tokenizer.location.line++;
-        tokenizer.code++;
+        tokenizer_pop(tokenizer);
         str.len++;
     }
     if (tokenizer.code.len) {
-        tokenizer.code++; // closing '''
+        tokenizer_pop(tokenizer); // closing '''
     } else {
-        tokenizer_error(tokenizer, "Error: unmatched '\''. Quitting.");
+        tokenizer_error(tokenizer, "Unmatched '\''.");
         //exit(EXIT_FAILURE);
     }
     return str;
 }
 
 fn read_builder_string(tokenizer: Tokenizer&) {
-    tokenizer.code++; tokenizer.code++; // skip $"
+    tokenizer_pop_n(tokenizer, 2) // skip $"
 
     push_token(tokenizer, TokenKind::TOK_builder_string_begin, null);
 
@@ -318,17 +332,12 @@ fn read_builder_string(tokenizer: Tokenizer&) {
            || sv_starts_with(&tokenizer.code, "\\{")
            || sv_starts_with(&tokenizer.code, "\\}"))
         {
-            str.len++; str.len++; tokenizer.code++; tokenizer.code++;
+            str.len++; str.len++; tokenizer_pop_n(tokenizer, 2);
         }
         else {
-            let c = tokenizer.code.begin;
-            tokenizer.code++;
+            let c = tokenizer_pop(tokenizer);
 
-            if (c == '\n') {
-                tokenizer.location.line++;
-                str.len++;
-            }
-            else if (c == '{') {
+            if (c == '{') {
                 push_token(tokenizer, TokenKind::TOK_string, str);
                 tokenizer.inside_builder_string = true;
                 tokenize_fsm(tokenizer);
@@ -346,9 +355,9 @@ fn read_builder_string(tokenizer: Tokenizer&) {
     if (str.len) push_token(tokenizer, TokenKind::TOK_string, &str);
 
     if (tokenizer.code.len) {
-        tokenizer.code++; // closing '"'
+        tokenizer_pop(tokenizer); // closing '"'
     } else {
-        tokenizer_error(tokenizer,  "Error: unmatched '\"'. Quitting.");
+        tokenizer_error(tokenizer,  "Unmatched '\"'.");
     }
 
     push_token(tokenizer, TokenKind::TOK_builder_string_end, null);
@@ -361,175 +370,170 @@ fn tokenize_fsm (tokenizer: Tokenizer&) : void {
         let c = code.begin;
         
         if (is_numeric(c)) {
-            let num = read_number(code);
+            let num = read_number(tokenizer);
             push_token(tokenizer, TokenKind::TOK_number, &num);
         }
-        else if (is_whitespace(c)) {
-            code++
-        }
-        else if ('\n' == c) {
-            code++
-            tokenizer.location.line++;
+        else if (is_whitespace(c) || '\n' == c) {
+            tokenizer_pop(tokenizer)
         }
         else if ('(' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_lparen, null);
         }
         else if (')' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_rparen, null);
         }
         else if ('{' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_lbrace, null);
         }
         else if ('}' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             if (tokenizer.inside_builder_string) {
                 return;
             }
             push_token(tokenizer, TokenKind::TOK_rbrace, null);
         }
         else if ('[' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_lbracket, null);
         }
         else if (']' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_rbracket, null);
         }
         else if (sv_starts_with(code, "::")) {
-            code++  code++
+            tokenizer_pop_n(tokenizer, 2);
             push_token(tokenizer, TokenKind::TOK_colon_colon, null);
         }
         else if (':' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_colon, null);
         }
         else if (';' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_semicolon, null);
         }
         else if ('.' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_dot, null);
         }
         else if (',' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_komma, null);
         }
         else if (sv_starts_with(code, "++")) {
-            code++  code++
+            tokenizer_pop_n(tokenizer, 2)
             push_token(tokenizer, TokenKind::TOK_plus_plus, null);
         }
         else if (sv_starts_with(code, "--")) {
-            code++  code++
+            tokenizer_pop_n(tokenizer, 2)
             push_token(tokenizer, TokenKind::TOK_minus_minus, null);
         }
         else if ('+' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_plus, null);
         }
         else if ('-' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_minus, null);
         }
         else if ('*' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_asterisk, null);
         }
         else if ('^' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_up_arrow, null);
         }
         else if ('~' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_tilde, null);
         }
         else if (sv_starts_with(code, "//")) {
             while(code.len && code.begin != '\n')
-                code++
+                tokenizer_pop(tokenizer)
         }
         else if (sv_starts_with(code, "/*")) {
             while(code.len && !sv_starts_with(code, "*/")) {
-                if ('\n' == code.begin) tokenizer.location.line++;
-                code++
+                tokenizer_pop(tokenizer)
             }
-            code++ code++
+            tokenizer_pop_n(tokenizer, 2)
         }
         else if (sv_starts_with(code, "*/")) {
-            tokenizer_error(tokenizer, "Encountered '*/' outside of comment.\n");
+            tokenizer_error(tokenizer, "Encountered '*/' outside of comment.");
         }
         else if ('/' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_slash, null);
         }
         else if ('%' == c) {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_percent, null);
         }
         else if (sv_starts_with(code, "<==>")) {
-            code++  code++ code++; code++;
+            tokenizer_pop_n(tokenizer, 4)
             push_token(tokenizer, TokenKind::TOK_reference_target_equal, null);
         }
         else if (sv_starts_with(code, "<!=>")) {
-            code++  code++ code++; code++;
+            tokenizer_pop_n(tokenizer, 4)
             push_token(tokenizer, TokenKind::TOK_reference_target_unequal, null);
         }
         else if (sv_starts_with(code, "=>")) {
-            code++  code++
+            tokenizer_pop_n(tokenizer, 2)
             push_token(tokenizer, TokenKind::TOK_bind_ref, null);
         }
         else if (sv_starts_with(code, "==")) {
-            code++  code++
+            tokenizer_pop_n(tokenizer, 2)
             push_token(tokenizer, TokenKind::TOK_equal, null);
         }
         else if (sv_starts_with(code, "|==")) {
-            code++  code++ code++
+            tokenizer_pop_n(tokenizer, 3)
             push_token(tokenizer, TokenKind::TOK_or_equal_to, null);
         }
         else if (sv_starts_with(code, "&!=")) {
-            code++  code++ code++
+            tokenizer_pop_n(tokenizer, 3)
             push_token(tokenizer, TokenKind::TOK_and_not_equal_to, null);
         }
         else if (sv_starts_with(code, "!=")) {
-            code++  code++
+            tokenizer_pop_n(tokenizer, 2)
             push_token(tokenizer, TokenKind::TOK_unequal, null);
         }
         else if (sv_starts_with(code, ">=")) {
-            code++  code++
+            tokenizer_pop_n(tokenizer, 2)
             push_token(tokenizer, TokenKind::TOK_greater_equal, null);
         }
         else if (sv_starts_with(code, "<=")) {
-            code++  code++
+            tokenizer_pop_n(tokenizer, 2)
             push_token(tokenizer, TokenKind::TOK_lower_equal, null);
         }
         else if (sv_starts_with(code, "&&")) {
-            code++  code++
+            tokenizer_pop_n(tokenizer, 2)
             push_token(tokenizer, TokenKind::TOK_boolean_and, null);
         }
         else if (sv_starts_with(code, "||")) {
-            code++  code++
+            tokenizer_pop_n(tokenizer, 2)
             push_token(tokenizer, TokenKind::TOK_boolean_or, null);
         }
         else if (c == '>') {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_greater, null);
         }
         else if (c == '<') {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_lower, null);
         }
         else if (c == '=') {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_equal_assign, null);
         }
         else if (c == '&') {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_ampersand, null);
         }
         else if (c == '!') {
-            code++
+            tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_exclam, null);
         }
         else if (sv_starts_with(code, "$\"")) {
@@ -544,12 +548,13 @@ fn tokenize_fsm (tokenizer: Tokenizer&) : void {
             push_token(tokenizer, TokenKind::TOK_char_constant, &str);
         }
         else if (is_allowed_at_start_of_identifier(c)) {
-            handle_word(tokenizer, read_word(code)); 
+            handle_word(tokenizer, read_word(tokenizer)); 
         }
         else {
             let a = code;
             a.len = 1;
-            tokenizer_error(tokenizer,  $"encountered unhandled character {c} = '{a}'. Quitting.\n");
+            tokenizer_error(tokenizer,  $"Encountered unhandled character {c} = '{a}'.");
+            tokenizer_pop(tokenizer);
         }
     }
     push_token(tokenizer, TokenKind::TOK_eof, null);

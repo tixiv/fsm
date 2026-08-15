@@ -17,7 +17,6 @@ import * from "opcodes";
 import * from "il_gen";
 import * from "type_checker";
 import * from "calculate_stacks";
-import * from "il_gen";
 import * from "generator";
 
 
