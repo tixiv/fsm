@@ -297,7 +297,7 @@ fn gen_cast(n: AST_node&, gen: IL_gen&, result_used: bool) {
         ast_visit_children(n, gen_value_visitor, gen);
     }
     else {
-        NOT_IMPLEMENTED_EC(7, __LOCATION__, $"Generating IL for cast to '{get_type_name_r(buf_1, to)}' from '{get_type_name_r(buf_2, from)}'");
+        il_gen_error(gen, n, $"Generating IL for cast from '{get_type_name_r(buf_2, from)}' to '{get_type_name_r(buf_1, to)}' is not implemented.");
     }
 }
 

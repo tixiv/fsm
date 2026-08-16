@@ -21,16 +21,6 @@ import * from "json";
 import * from "lsp";
 import * from "helpers";
 
-fn error_handler_location(facility: u8[], location: Location&, message: u8[], mw: ModuleWalker&) {
-    write(2, $"{facility} {location.module.filename}:{location.line}:{location.col} Error: {message}\n");
-    send_diagnostic_notification(location, message);
-}
-
-fn error_handler_ast_node(facility: u8[], n: AST_node&, message: u8[], mw: ModuleWalker&) {
-    write(2, $"{facility} {n.location.module.filename}:{n.location.line}:{n.location.col} Error: {message}\n");
-    send_diagnostic_notification(n.location, message);
-}
-
 fn open_log_file() {
     let O_WRONLY = 1;
     let O_CREAT = 64;
@@ -87,10 +77,38 @@ struct ModuleWalker {
     type_cache: TypeCache&;
     error_handler_location: ErrorHandler<Location&>;
     error_handler_ast_node: ErrorHandler<AST_node&>;
-    current_imports: Import[];
     builtin_symbols: Symbol[];
     project_root: u8[];
     log_fd;
+    current_module: Module&;
+}
+
+fn push_diagnostic(location: Location&, message: u8[]) {
+    let module => <Module&> location.module;
+    let diag => EndlosArr_push~Diagnostic(module.diagnostics);
+    diag.message = endlos_copy~u8(message, module.endlos);
+    diag.start_line = location.line-1;
+    diag.end_line = diag.start_line;
+    diag.start_col = location.col-6;
+    diag.end_col = location.col-1;
+    if (diag.start_col < 0) diag.start_col = 0;
+}
+
+fn publish_diagnostics(mw: ModuleWalker&) {
+    for (let i = 0; i < mw.modules.arr.len; i++) {
+        let module => mw.modules.arr[i];
+        send_diagnostic_notifications(module.header.filename, module.diagnostics.arr);
+    }
+}
+
+fn error_handler_location(facility: u8[], location: Location&, message: u8[], mw: ModuleWalker&) {
+    write(2, $"{facility} {location.module.filename}:{location.line}:{location.col} Error: {message}\n");
+    push_diagnostic(location, message);
+}
+
+fn error_handler_ast_node(facility: u8[], n: AST_node&, message: u8[], mw: ModuleWalker&) {
+    write(2, $"{facility} {n.location.module.filename}:{n.location.line}:{n.location.col} Error: {message}\n");
+    push_diagnostic(n.location, message);
 }
 
 fn tokenize_module (mw: ModuleWalker&, module: Module&, code: u8[], endlos: EndlosAllocator&) {
@@ -146,21 +164,25 @@ fn lookup_external_symbol(name: u8[], mw: ModuleWalker&) : Symbol& {
     let sym => lookup_builtin_symbol(name, mw);
     if (sym) return sym;
 
-    write(2, $"Looking up external symbol {name} {mw.current_imports.len}\n");
+    let imports = mw.current_module.imports;
 
-    for (let i = 0; i < mw.current_imports.len; i++) {
-        write(2, $"    Looking in {mw.current_imports[i].module.header.filename}\n");
-        sym => lookup_symbol_from_module(name, mw.current_imports[i].module);
+    // write(2, $"Looking up external symbol {name} {imports.len}\n");
+
+    for (let i = 0; i < imports.len; i++) {
+        // write(2, $"    Looking in {imports[i].module.header.filename}\n");
+        sym => lookup_symbol_from_module(name, imports[i].module);
         if (sym) return sym;
     }
 
-    write(2, $"    Not found\n");
+    // write(2, $"    Not found\n");
 
     return null;
 }
 
 fn compile_module (mw: ModuleWalker&, module: Module&) : void {
     let verbose = true;
+
+    mw.current_module => module;
 
     if (verbose) write(2, $"Compiling module {module.header.filename}...\n");
 
@@ -176,8 +198,11 @@ fn compile_module (mw: ModuleWalker&, module: Module&) : void {
     if (verbose) write(2, $"Parsing finished {endlos_rolls_in_use(mw.endlos)} \n");
 
     let imports = gather_imports(root, module.endlos);
-    mw.current_imports = imports;
+    module.imports = imports;
     handle_imports(mw, module.header.filename, imports);
+
+    // Restoring current module is needed because it will change during importing more stuffs from other imports
+    mw.current_module => module;
 
     let symbol_cache: SymbolCache;
     SymbolCache_init(symbol_cache, mw.type_cache, module.endlos, lookup_external_symbol, mw);
@@ -202,6 +227,7 @@ fn compile_module (mw: ModuleWalker&, module: Module&) : void {
     module.global_symbols = EndlosArr_finalize~Symbol&(symbol_cache.global_symbols, module.endlos);
     module.ast_root => root;
 
+    if (verbose) write(2, $"Going to run IL gen {endlos_rolls_in_use(mw.endlos)} ...\n");
 
     // The IL gen is only run for the diagnostic messages here
     let gen: IL_gen;
@@ -209,15 +235,16 @@ fn compile_module (mw: ModuleWalker&, module: Module&) : void {
     gen.lookup_stdlib_symbol => lookup_stdlib_symbol;
     gen.lookup_stdlib_symbol_arg => mw;
     gen.error_handler => mw.error_handler_ast_node;
+
     EndlosArr_begin~Opcode(gen.opcodes, mw.endlos);
     EndlosArr_begin~u8[](gen.generic_implementation_names, mw.endlos);
 
-    if (verbose) write(2, $"Going to run IL gen {endlos_rolls_in_use(mw.endlos)} ...\n");
     il_gen_run(gen, root);
-    if (verbose) write(2, $"Finished IL gen. {endlos_rolls_in_use(mw.endlos)}\n");
-  
+
     EndlosArr_free~u8[](gen.generic_implementation_names, mw.endlos);
     EndlosArr_free~Opcode(gen.opcodes, mw.endlos);
+
+    if (verbose) write(2, $"Finished IL gen. {endlos_rolls_in_use(mw.endlos)}\n");  
 }
 
 fn endlos_read_file(endlos: EndlosAllocator&, filename: u8[]) : u8[] {
@@ -259,6 +286,7 @@ fn handle_imports(mw: ModuleWalker&, module_filename: u8[], imports: Import[]) :
                 module.header.filename = endlos_copy~u8(sb.str, mw.endlos);
                 endlos_follower_init(module.endlos, mw.endlos, 128);
                 module.code = endlos_read_file(module.endlos, module.header.filename);
+                EndlosArr_begin~Diagnostic(module.diagnostics, module.endlos);
                 compile_module(mw, module);
             }
             imp.module => module;
@@ -285,11 +313,11 @@ fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[]) {
     // endlos_follower_init(module.endlos, mw.endlos, 128);
     endlos_root_init(module.endlos, 128, 1024 * 1024 * 64);
     module.code = json_unescape_string(content, module.endlos);
-
-    write (mw.log_fd, $"copied code: ({module.header.filename})\n");
-    write (mw.log_fd, module.code);
+    EndlosArr_begin~Diagnostic(module.diagnostics, module.endlos);
 
     compile_module(mw, module);
+
+    publish_diagnostics(mw);
 }
 
 fn main () {

@@ -2,6 +2,7 @@
 import * from "std";
 import * from "json";
 import * from "compiler_fsm/common";
+import * from "compiler_fsm/module";
 
 fn write_wrapped(fd, json: u8[]) {
     write (fd, $"Content-Length: {json.len}\r\n\r\n");
@@ -44,37 +45,43 @@ write_wrapped (1, $"\{
 }");
 }
 
-fn send_diagnostic_notification (location: Location, message: u8[]) {
-    for (let i = 0; i < message.len; i++) {
-        let c => message[i];
-        if (!is_alpha(c) && !is_numeric(c) && !is_whitespace(c)) c = 'A';
-    }
-
-
-write_wrapped (1, $"\{
+fn send_diagnostic_notifications (filename: u8[], diagnostics: Diagnostic[]) {
+    let sb: StringBuilder;
+    let buf: u8[131072];
+    sb_init(sb, buf);
+    sb_puts(sb, $"\{
     \"jsonrpc\": \"2.0\",
     \"method\": \"textDocument/publishDiagnostics\",
     \"params\": \{
-        \"uri\": \"file:///home/tixiv/work/fsm/{location.module.filename}\",
-        \"diagnostics\": [
+        \"uri\": \"file:///home/tixiv/work/fsm/{filename}\",
+        \"diagnostics\": [")
+
+    for (let i = 0; i < diagnostics.len; i++) {
+        let d => diagnostics[i];
+        sb_puts(sb,$"
             \{
                 \"range\": \{
                     \"start\": \{
-                        \"line\": {location.line},
-                        \"character\": {if (location.col>=6) location.col - 5 else 1}
+                        \"line\": {d.start_line},
+                        \"character\": {d.start_col}
                     },
                     \"end\": \{
-                        \"line\": {location.line},
-                        \"character\": {location.col}
+                        \"line\": {d.end_line},
+                        \"character\": {d.end_col}
                     }
                 },
                 \"severity\": 1,
-                \"message\": \"{message}\",
+                \"message\": \"{d.message}\",
                 \"source\": \"fsmd\"
-            }
+            }");
+        if (i + 1 < diagnostics.len) sb_puts(sb, ",");
+    }
+    sb_puts(sb,  "
         ]
     }
 }");
+
+    write_wrapped(1, sb.str);
 }
 
 struct StreamReader {
@@ -139,7 +146,7 @@ fn read_header (sr: StreamReader&) : i64 {
         write (2, $"Error: expeceted '{str_content_length}' but got {header_1}\n");
         exit(1);
     }
-
+    
     return get_content_length(sr);
 }
 

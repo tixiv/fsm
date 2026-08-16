@@ -980,7 +980,7 @@ static AST_node *parse_enum() {
                 }
             }
             else {
-                parser_error(&CT->location, "Expected '}' or struct member definition but got %s",
+                parser_error(&CT->location, "Expected '}' or enum member definition but got %s",
                     token_kind_name(CT->kind));
             }
         }

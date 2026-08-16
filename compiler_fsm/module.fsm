@@ -7,11 +7,27 @@ import * from "ast";
 import * from "tokenizer";
 import * from "symbol";
 
+struct Import {
+    name: u8[];
+    location: Location&;
+    module: Module&; // filled in by compile module
+}
+
+struct Diagnostic {
+    message: u8[];
+    start_line: i32;
+    end_line: i32;
+    start_col:i32;
+    end_col:i32;
+}
+
 struct Module {
-    code: u8[];
     header: ModuleHeader;
+    code: u8[];
     symbols: Symbol[];
     global_symbols: Symbol&[];
     ast_root: AST_node&;
     endlos: EndlosAllocator;
+    diagnostics: EndlosArr<Diagnostic>;
+    imports: Import[];
 }

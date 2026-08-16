@@ -693,26 +693,26 @@ fn parse_struct_body(parser: Parser&, ast_struct: AST_node&) : void {
     {
         let latest: AST_node& => null;
 
-        while (parser.CT.kind != TokenKind::TOK_rbrace) {
-            if(parser.CT.kind == TokenKind::TOK_identifier) {
-                let member => ast_alloc(parser.allocator, AST_node::AST_member_def, parser.CT.location);
-                member.AST_member_def.name = parser.CT.value;
-                MOVE_NEXT(parser);
-                member.AST_member_def._typedef => try_parse_typedecl(parser);
+        while (parser.CT.kind == TokenKind::TOK_identifier) {
+            let member => ast_alloc(parser.allocator, AST_node::AST_member_def, parser.CT.location);
+            member.AST_member_def.name = parser.CT.value;
+            MOVE_NEXT(parser);
+            member.AST_member_def._typedef => try_parse_typedecl(parser);
 
-                if (latest) {
-                    latest.next => member;
-                } else {
-                    ast_struct.AST_struct.body => member;
-                }
-                latest => member;
+            if (latest) {
+                latest.next => member;
+            } else {
+                ast_struct.AST_struct.body => member;
+            }
+            latest => member;
 
-                take_expected(parser, TokenKind::TOK_semicolon);
-            }
-            else {
-                parser_error(parser, $"Expected '}' or struct member definition but got {parser.CT.kind.name}");
-            }
+            take_expected(parser, TokenKind::TOK_semicolon);            
         }
+
+        if(parser.CT.kind != TokenKind::TOK_rbrace) {
+            parser_error(parser, $"Expected '}' or struct member definition but got {parser.CT.kind.name}");
+        }
+
         MOVE_NEXT(parser);
     }
 }
@@ -762,64 +762,65 @@ fn parse_union(parser: Parser&) : AST_node& {
         let latest: AST_node& => null;
         let latest_value = 0;
 
-        while (parser.CT.kind != TokenKind::TOK_rbrace) {
-            if(parser.CT.kind == TokenKind::TOK_keyword_struct) {
-                let member => ast_alloc(parser.allocator, AST_node::AST_union_member_def, parser.CT.location);
+        while (parser.CT.kind == TokenKind::TOK_keyword_struct) {
+            let member => ast_alloc(parser.allocator, AST_node::AST_union_member_def, parser.CT.location);
+            MOVE_NEXT(parser);
+
+            if (parser.CT.kind == TokenKind::TOK_identifier) {
+                member.AST_union_member_def.name = parser.CT.value;
                 MOVE_NEXT(parser);
-
-                if (parser.CT.kind == TokenKind::TOK_identifier) {
-                    member.AST_union_member_def.name = parser.CT.value;
+                if (parser.CT.kind == TokenKind::TOK_equal_assign) {
                     MOVE_NEXT(parser);
-                    if (parser.CT.kind == TokenKind::TOK_equal_assign) {
-                        MOVE_NEXT(parser);
-                        let neg = parser.CT.kind == TokenKind::TOK_minus;
-                        if (neg) MOVE_NEXT(parser);
-                        expect_token(parser, TokenKind::TOK_number);
-                        latest_value = parse_integer(parser.CT.value);
-                        if (neg) latest_value = -latest_value;
-                        MOVE_NEXT(parser);
-                    }
-                    member.AST_union_member_def.enum_value = latest_value++;
-
-                    let ast_struct => ast_alloc(parser.allocator, AST_node::AST_struct, parser.CT.location);
-                    ast_struct.AST_struct.name = member.AST_union_member_def.name;
-                    parse_struct_body(parser, ast_struct);
-                    
-                    member.AST_union_member_def._typedef => ast_struct;
-
-                    if (latest) {
-                        latest.next => member;
-                    } else {
-                        ast_union.AST_union.body => member;
-                    }
-                    latest => member;
-
-                    if (parser.CT.kind == TokenKind::TOK_semicolon || parser.CT.kind == TokenKind::TOK_komma) {
-                        MOVE_NEXT(parser);
-                    }
+                    let neg = parser.CT.kind == TokenKind::TOK_minus;
+                    if (neg) MOVE_NEXT(parser);
+                    expect_token(parser, TokenKind::TOK_number);
+                    latest_value = parse_integer(parser.CT.value);
+                    if (neg) latest_value = -latest_value;
+                    MOVE_NEXT(parser);
                 }
-                else if (parser.CT.kind == TokenKind::TOK_lbrace) {
-                    let ast_struct => ast_alloc(parser.allocator, AST_node::AST_struct, parser.CT.location);
-                    parse_struct_body(parser, ast_struct);
-                    
-                    member.AST_union_member_def._typedef => ast_struct;
+                member.AST_union_member_def.enum_value = latest_value++;
 
-                    if (latest) {
-                        latest.next => member;
-                    } else {
-                        ast_union.AST_union.body => member;
-                    }
-                    latest => member;
+                let ast_struct => ast_alloc(parser.allocator, AST_node::AST_struct, parser.CT.location);
+                ast_struct.AST_struct.name = member.AST_union_member_def.name;
+                parse_struct_body(parser, ast_struct);
+                
+                member.AST_union_member_def._typedef => ast_struct;
 
-                    if (parser.CT.kind == TokenKind::TOK_semicolon || parser.CT.kind == TokenKind::TOK_komma) {
-                        MOVE_NEXT(parser);
-                    }
+                if (latest) {
+                    latest.next => member;
+                } else {
+                    ast_union.AST_union.body => member;
                 }
-                else NOT_IMPLEMENTED(__LOCATION__, "union stuffs");
+                latest => member;
+
+                if (parser.CT.kind == TokenKind::TOK_semicolon || parser.CT.kind == TokenKind::TOK_komma) {
+                    MOVE_NEXT(parser);
+                }
+            }
+            else if (parser.CT.kind == TokenKind::TOK_lbrace) {
+                let ast_struct => ast_alloc(parser.allocator, AST_node::AST_struct, parser.CT.location);
+                parse_struct_body(parser, ast_struct);
+                
+                member.AST_union_member_def._typedef => ast_struct;
+
+                if (latest) {
+                    latest.next => member;
+                } else {
+                    ast_union.AST_union.body => member;
+                }
+                latest => member;
+
+                if (parser.CT.kind == TokenKind::TOK_semicolon || parser.CT.kind == TokenKind::TOK_komma) {
+                    MOVE_NEXT(parser);
+                }
             }
             else {
-                parser_error(parser, $"Expected '}' or union member definition but got {parser.CT.kind.name}");
+                parser_error(parser, $"Expected '\{' or struct name but got {parser.CT.kind.name}");
             }
+        }
+
+        if (parser.CT.kind != TokenKind::TOK_rbrace) {
+            parser_error(parser, $"Expected '}' or union member definition but got {parser.CT.kind.name}");
         }
     }
 
@@ -844,37 +845,40 @@ fn parse_enum(parser: Parser&) : AST_node& {
         let latest :AST_node& => null;
         let latest_value = 0;
 
-        while (parser.CT.kind != TokenKind::TOK_rbrace) {
-            if(parser.CT.kind == TokenKind::TOK_identifier) {
-                let member => ast_alloc(parser.allocator, AST_node::AST_enum_member, parser.CT.location);
-                member.AST_enum_member.name = parser.CT.value;
+        while (parser.CT.kind == TokenKind::TOK_identifier) {
+            let member => ast_alloc(parser.allocator, AST_node::AST_enum_member, parser.CT.location);
+            member.AST_enum_member.name = parser.CT.value;
+            MOVE_NEXT(parser);
+            if (parser.CT.kind == TokenKind::TOK_equal_assign) {
                 MOVE_NEXT(parser);
-                if (parser.CT.kind == TokenKind::TOK_equal_assign) {
-                    MOVE_NEXT(parser);
-                    let neg = parser.CT.kind == TokenKind::TOK_minus;
-                    if (neg) MOVE_NEXT(parser);
-                    expect_token(parser, TokenKind::TOK_number);
-                    latest_value = parse_integer(parser.CT.value);
-                    if (neg) latest_value = -latest_value;
-                    MOVE_NEXT(parser);
-                }
-                member.AST_enum_member.value = latest_value++;
+                let neg = parser.CT.kind == TokenKind::TOK_minus;
+                if (neg) MOVE_NEXT(parser);
+                expect_token(parser, TokenKind::TOK_number);
+                latest_value = parse_integer(parser.CT.value);
+                if (neg) latest_value = -latest_value;
+                MOVE_NEXT(parser);
+            }
+            member.AST_enum_member.value = latest_value++;
 
-                if (latest) {
-                    latest.next => member;
-                } else {
-                    ast_enum.AST_enum.body => member;
-                }
-                latest => member;
+            if (latest) {
+                latest.next => member;
+            } else {
+                ast_enum.AST_enum.body => member;
+            }
+            latest => member;
 
-                if (parser.CT.kind == TokenKind::TOK_semicolon || parser.CT.kind == TokenKind::TOK_komma) {
-                    MOVE_NEXT(parser);
-                }
+            if (parser.CT.kind == TokenKind::TOK_semicolon || parser.CT.kind == TokenKind::TOK_komma) {
+                MOVE_NEXT(parser);
             }
             else {
-                parser_error(parser, $"Expected '}' or struct member definition but got {parser.CT.kind.name}");
+                parser_error(parser, $"Expected ';' or ',' or '}' but got {parser.CT.kind.name}.");
             }
         }
+
+        if (parser.CT.kind != TokenKind::TOK_rbrace) {
+            parser_error(parser, $"Expected '}' or enum member definition but got {parser.CT.kind.name}");
+        }
+
         MOVE_NEXT(parser);
     }
     
