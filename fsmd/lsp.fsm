@@ -1,10 +1,12 @@
 
 import * from "std";
 import * from "json";
+import * from "compiler_fsm/common";
 
 fn write_wrapped(fd, json: u8[]) {
     write (fd, $"Content-Length: {json.len}\r\n\r\n");
     write (fd, json);
+    write (3, json);
 }
 
 fn send_initialize_response (id: u8[]) {
@@ -24,51 +26,57 @@ write_wrapped (1, $"\{
 
 fn send_definition_response (id: u8[]) {
 write_wrapped (1, $"\{
-  \"jsonrpc\": \"2.0\",
-  \"id\": {id},
-  \"result\": \{
-    \"uri\": \"file:///home/tixiv/work/fsm/foo.fsm\",
-    \"range\": \{
-      \"start\": \{
-        \"line\": 3,
-        \"character\": 5
-      },
-      \"end\": \{
-        \"line\": 3,
-        \"character\": 8
-      }
+    \"jsonrpc\": \"2.0\",
+    \"id\": {id},
+    \"result\": \{
+        \"uri\": \"file:///home/tixiv/work/fsm/foo.fsm\",
+        \"range\": \{
+            \"start\": \{
+                \"line\": 3,
+                \"character\": 5
+            },
+            \"end\": \{
+                \"line\": 3,
+                \"character\": 8
+            }
+        }
     }
-  }
 }");
 }
 
-fn send_diagnostic_notification (id: u8[]) {
+fn send_diagnostic_notification (location: Location, message: u8[]) {
+    for (let i = 0; i < message.len; i++) {
+        let c => message[i];
+        if (!is_alpha(c) && !is_numeric(c) && !is_whitespace(c)) c = 'A';
+    }
+
+
 write_wrapped (1, $"\{
-  \"jsonrpc\": \"2.0\",
-  \"method\": \"textDocument/publishDiagnostics\",
-  \"params\": \{
-    \"uri\": \"file:///home/tixiv/work/fsm/foo.fsm\",
-    \"diagnostics\": [
-      \{
-        \"range\": \{
-          \"start\": \{
-            \"line\": 11,
-            \"character\": 4
-          },
-          \"end\": \{
-            \"line\": 11,
-            \"character\": 10
-          }
-        },
-        \"severity\": 1,
-        \"message\": \"unknown identifier 'foobar'\",
-        \"source\": \"fsmd\"
-      }
-    ]
-  }
+    \"jsonrpc\": \"2.0\",
+    \"method\": \"textDocument/publishDiagnostics\",
+    \"params\": \{
+        \"uri\": \"file:///home/tixiv/work/fsm/{location.module.filename}\",
+        \"diagnostics\": [
+            \{
+                \"range\": \{
+                    \"start\": \{
+                        \"line\": {location.line},
+                        \"character\": {if (location.col>=6) location.col - 5 else 1}
+                    },
+                    \"end\": \{
+                        \"line\": {location.line},
+                        \"character\": {location.col}
+                    }
+                },
+                \"severity\": 1,
+                \"message\": \"{message}\",
+                \"source\": \"fsmd\"
+            }
+        ]
+    }
 }");
 }
-  
+
 struct StreamReader {
     buffer: u8[];
     arr: u8[];
@@ -80,6 +88,14 @@ fn sr_init(sr: StreamReader&, buffer: u8[], fd) {
     sr.arr = buffer;
     sr.arr.len = 0;
     sr.fd = fd;
+}
+
+fn sr_defrag(sr: StreamReader&, buffer: u8[]) {
+  sr.buffer = buffer;
+  for (let i = 0; i < sr.arr.len; i++) {
+    sr.buffer++ = sr.arr[i];
+  }
+  sr.arr.begin => buffer.begin;
 }
 
 fn sr_read_some(sr: StreamReader&) {

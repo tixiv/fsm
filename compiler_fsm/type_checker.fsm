@@ -354,7 +354,7 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
             n.addressable = false;
         }
         else {
-            NOT_IMPLEMENTED(__LOCATION__, $"Type checking binary operator {token_kind_printable(n.AST_binary.token_kind)}");
+            NOT_IMPLEMENTED_EC(40, __LOCATION__, $"Type checking binary operator {token_kind_printable(n.AST_binary.token_kind)}");
         }
     }
 }
@@ -397,7 +397,7 @@ fn type_check_variadic_operator (type_checker: TypeChecker&, n: AST_node&){
         n.addressable = false;
     }
     else {
-        NOT_IMPLEMENTED(__LOCATION__, $"Type checking variadic operator {token_kind_printable(n.AST_variadic_operator.members[0].token_kind)}")
+        NOT_IMPLEMENTED_EC(41, __LOCATION__, $"Type checking variadic operator {token_kind_printable(n.AST_variadic_operator.members[0].token_kind)}")
     }
 }
 
@@ -698,7 +698,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
                     t => n.AST_var_decl.initializer.type;
                 }
             } else {
-                NOT_IMPLEMENTED(__LOCATION__, $"Initialization with operator {n.AST_var_decl.initializer_operator.name}");
+                NOT_IMPLEMENTED_EC(42, __LOCATION__, $"Initialization with operator {n.AST_var_decl.initializer_operator.name}");
             }
         }
         else {
@@ -820,6 +820,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
         else {
             type_checker_error(type_checker, n,
                 $"Invalid use of [] operator on something that is not an array or a slice. Have '{get_type_name_r(buf_1, n.AST_array_access.array.type)}'.");
+            n.type => type_checker.type_cache.builtin_undefined;
         }
 
 
@@ -835,6 +836,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
         if (!is_reference_kind(n.AST_dereference.body.type)) {
                 type_checker_error(type_checker, n,
                     $"Dereferencing something that is not a reference. Have '{get_type_name_r(buf_1, n.AST_dereference.body.type)}'.");
+            n.type => type_checker.type_cache.builtin_undefined;
         } else {
             n.type => dereferenced_type(n.AST_dereference.body.type);
             n.addressable = true;
@@ -856,7 +858,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
             try_convert_to_type_if_necessary(type_checker, n.AST_unary.body, type_checker.type_cache.builtin_i64, "Argument of unary '-'");
             n.type => type_checker.type_cache.builtin_i64;
         }
-        else NOT_IMPLEMENTED(__LOCATION__, $"Type checking unary operator {token_kind_printable(n.AST_unary.token_kind)}");
+        else NOT_IMPLEMENTED_EC(43, __LOCATION__, $"Type checking unary operator {token_kind_printable(n.AST_unary.token_kind)}");
         n.addressable = false;
     }
     
@@ -871,6 +873,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
         }
         else{
             type_checker_error(type_checker, n, $"Operator '++' needs integer or slice type argument. Have '{get_type_name_r(buf_1, original_type)}'");
+            n.type => type_checker.type_cache.builtin_undefined;
         }
         
     }
@@ -929,6 +932,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
                 }
                 else {
                     type_checker_error(type_checker, n, $"Tried to access non existent member '{n.AST_member_access.name}' on array type. Arrays only have the member 'len' available.");
+                    n.type => type_checker.type_cache.builtin_undefined;
                 }
             }
             else if (is_enum_kind(container) || is_enumerator_kind(container)) {
@@ -938,10 +942,12 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
                 }
                 else {
                     type_checker_error(type_checker, n, $"Tried to access non existent member '{n.AST_member_access.name}' on enum type. Enums only have the member 'name' available.");
+                    n.type => type_checker.type_cache.builtin_undefined;
                 }
             }
             else {
                 type_checker_error(type_checker, n, $"Tried to access a member in something that can't have members. Have '{get_type_name_r(buf_1, container)}'.");
+                n.type => type_checker.type_cache.builtin_undefined;
             }
 
         }
@@ -965,7 +971,10 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
             n.type => get_enumerator_type_for(type_checker.type_cache, t);
             n.addressable = false;
         }
-        else NOT_IMPLEMENTED(__LOCATION__, $"Namespace access is for typ {get_type_name_r(buf_1, t)}.\n");
+        else {
+            type_checker_error(type_checker, n, $"Namespace access for typ {get_type_name_r(buf_1, t)} is not supported.");
+            n.type => type_checker.type_cache.builtin_undefined;
+        }
     }
 
     else if (n.kind == AST_node::AST_variadic_operator) {
@@ -1018,7 +1027,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
         n.type => type_checker.type_cache.builtin_void;
     }
     else {
-        NOT_IMPLEMENTED(__LOCATION__, $"Type checking {n.kind.name}");
+        NOT_IMPLEMENTED_EC(45, __LOCATION__, $"Type checking {n.kind.name}");
     }
 
     ASSERT(n.type, $"All nodes should have a type after the type checker. Have {n.kind.name} with null type.");

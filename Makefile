@@ -25,8 +25,10 @@ cfsm: $(CFSM)
 
 $(FSM): $(FSM_SRCS)
 	$(FSM) compiler_fsm/fsm.fsm
-	fasm out1.asm
+	fasm out1.asm -s symbols/fsm.fas
 	cp out1 $(FSM)
+	symbols symbols/fsm.fas symbols/fsm.sym
+	listing symbols/fsm.fas symbols/fsm.lst
 
 $(FSMD): $(FSMD_SRCS)
 	$(FSM) fsmd/fsmd.fsm
@@ -37,8 +39,10 @@ bootstrap: $(CFSM) $(FSM_SRCS)
 	$(CFSM) compiler_fsm/fsm.fsm
 	fasm out.asm
 	./out compiler_fsm/fsm.fsm
-	fasm out1.asm
+	fasm out1.asm -s symbols/fsm.fas
 	cp out1 $(FSM)
+	symbols symbols/fsm.fas symbols/fsm.sym
+	listing symbols/fsm.fas symbols/fsm.lst
 
 # Create build dir
 $(BUILD_DIR):

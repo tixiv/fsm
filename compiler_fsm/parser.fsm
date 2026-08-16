@@ -27,8 +27,9 @@ fn make_location_string(parser: Parser&) : u8[] {
 }
 
 fn MOVE_NEXT(parser: Parser&) {
-    parser.tokens++;
-    parser.CT => parser.tokens.begin;
+    if (parser.tokens.len > 1) {
+        parser.CT => ++parser.tokens;
+    }
 }
 
 fn expect_token(parser: Parser&, tok: TokenKind) {
@@ -444,6 +445,7 @@ fn parse_primary(parser: Parser&) : AST_node&
     }
     else {
         parser_error(parser, $"Expected expression but got {parser.CT.kind.name}");
+        return ast_alloc(parser.allocator, AST_node::AST_null, parser.CT.location);
     }
 
     n => parse_postfix_operators(parser, n);
@@ -585,6 +587,7 @@ fn parse_scope_body(parser: Parser&) : AST_node& {
     while(parser.CT.kind != TokenKind::TOK_rbrace) {
         if (parser.CT.kind == TokenKind::TOK_eof) {
             parser_error(parser, "encountered EOF while parsing block");
+            return ast_scope;
         }
         else if (parser.CT.kind == TokenKind::TOK_semicolon) {
             MOVE_NEXT(parser);
@@ -643,30 +646,31 @@ fn parse_function(parser: Parser&) : AST_node& {
 
         let latest_arg: AST_node& => null;
 
-        while (parser.CT.kind != TokenKind::TOK_rparen) {
-            if (parser.CT.kind == TokenKind::TOK_rparen) {
+        while (parser.CT.kind == TokenKind::TOK_identifier) {
+            let ast_arg => ast_alloc(parser.allocator, AST_node::AST_arg_decl, parser.CT.location);
+            ast_arg.AST_arg_decl.name = parser.CT.value;
+            MOVE_NEXT(parser);
+
+            ast_arg.AST_arg_decl._typedecl => try_parse_typedecl(parser);
+            
+            if (latest_arg) {
+                latest_arg.next => ast_arg;
+            } else {
+                ast_arglist.AST_arg_list.body => ast_arg;
             }
-            else if(parser.CT.kind == TokenKind::TOK_identifier) {
-                let ast_arg => ast_alloc(parser.allocator, AST_node::AST_arg_decl, parser.CT.location);
-                ast_arg.AST_arg_decl.name = parser.CT.value;
+            latest_arg => ast_arg;
+
+            if(parser.CT.kind == TokenKind::TOK_komma) {
                 MOVE_NEXT(parser);
-
-                ast_arg.AST_arg_decl._typedecl => try_parse_typedecl(parser);
-                
-                if (latest_arg) {
-                    latest_arg.next => ast_arg;
-                } else {
-                    ast_arglist.AST_arg_list.body => ast_arg;
-                }
-                latest_arg => ast_arg;
-
-                if(parser.CT.kind == TokenKind::TOK_komma) {
-                    MOVE_NEXT(parser);
-                }
+            }
+            else if (parser.CT.kind == TokenKind::TOK_rparen) {
             }
             else {
-                parser_error(parser, $"Expected ')' or function argument but got {parser.CT.kind.name}")
+                parser_error(parser, $"Expected ')' or ',' but got {parser.CT.kind.name}")
             }
+        }
+        if (parser.CT.kind != TokenKind::TOK_rparen) {
+            parser_error(parser, $"Expected ')' or function argument but got {parser.CT.kind.name}")
         }
     }
 
@@ -941,6 +945,7 @@ fn parse_program(tokens: Token[], allocator: AST_Node_Allocator&, endlos: Endlos
         }
         else {
             parser_error(parser, $"Expected top level definition or EOF but got {parser.CT.kind.name}");
+            MOVE_NEXT(parser);
         }
     }
     return root;

@@ -67,6 +67,8 @@ union Type enum kind {
     }
     struct T_generic {
     }
+    struct T_undefined {
+    }
 }
 
 struct SpeciatedType {
@@ -116,6 +118,7 @@ struct TypeCache {
     builtin_bool: Type;
     builtin_any: Type;
     builtin_generic: Type;
+    builtin_undefined: Type;
     builtin_u64: Type;
     builtin_i64: Type;
     builtin_u32: Type;
@@ -143,6 +146,7 @@ fn TypeCache_init(cache: TypeCache&, endlos: EndlosAllocator&) {
     t => cache.builtin_null;         t.kind = Type::T_null;
     t => cache.builtin_any;          t.kind = Type::T_any;
     t => cache.builtin_generic;      t.kind = Type::T_generic;
+    t => cache.builtin_undefined;    t.kind = Type::T_undefined;
     t => cache.builtin_bool;         t.kind = Type::T_boolean;   t.storage_size = 1;
     t => cache.builtin_u64;          t.kind = Type::T_integer;   t.storage_size = 8; t.T_integer.signed = false;  t.T_integer.num_bits = 64;
     t => cache.builtin_i64;          t.kind = Type::T_integer;   t.storage_size = 8; t.T_integer.signed = true;   t.T_integer.num_bits = 64;
@@ -184,12 +188,13 @@ fn print_array_type(sb: StringBuilder&, arr_t: Type&, encoded: bool) : void {
 }
 
 fn get_type_name_r_impl(print_buf: u8[1024]&, type: Type&, encoded: bool) : u8[] {
-    if (!type)                        return "(null type)";
-    if (type.kind == Type::T_void)    return "void";
-    if (type.kind == Type::T_null)    return "null";
-    if (type.kind == Type::T_boolean) return "bool";
-    if (type.kind == Type::T_any)     return "any";
-    if (type.kind == Type::T_generic) return "generic";
+    if (!type)                          return "(null type)";
+    if (type.kind == Type::T_void)      return "void";
+    if (type.kind == Type::T_null)      return "null";
+    if (type.kind == Type::T_boolean)   return "bool";
+    if (type.kind == Type::T_any)       return "any";
+    if (type.kind == Type::T_generic)   return "generic";
+    if (type.kind == Type::T_undefined) return "undefined";
     if (type.kind == Type::T_integer) {
         if (type.T_integer.num_bits == 64) return if (type.T_integer.signed) "i64" else "u64";
         if (type.T_integer.num_bits == 32) return if (type.T_integer.signed) "i32" else "u32";

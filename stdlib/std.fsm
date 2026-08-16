@@ -243,6 +243,11 @@ fn NOT_IMPLEMENTED(location: u8[], what:u8[]) {
     exit(1);
 }
 
+fn NOT_IMPLEMENTED_EC(exit_code, location: u8[], what:u8[]) {
+    $"{location}: {what} is not implemented yet.\n"
+    exit(exit_code);
+}
+
 fn ASSERT(condition: bool, s: u8[]) {
     if (!condition) {
         $"Assertion failed: {s}";

@@ -60,8 +60,11 @@ fn il_gen_push_symbol_address(gen: IL_gen&, s: Symbol&, n: AST_node&) {
     else if (s.kind == SymbolKind::SYM_type) {
         il_gen_error(gen, n, $"Pushing type symbol '{s.name}' is not supported.");
     }
+    else if (s.kind == SymbolKind::SYM_undefined) {
+        // The error about the undefined symbol has been reported allready. Do nothing.
+    }
     else {
-        NOT_IMPLEMENTED(__LOCATION__, $"Pushing address for symbol kind {s.kind.name}");
+        NOT_IMPLEMENTED_EC(2, __LOCATION__, $"Pushing address for symbol kind {s.kind.name}");
     }
 }
 
@@ -71,7 +74,7 @@ fn il_gen_push_symbol(gen: IL_gen&, s: Symbol&, location: Location&) {
     } else if (s.kind == SymbolKind::SYM_local) {
         push_opcode(gen, OpKind::OP_push_local_var, null,  s.offset, s.type, location);
     } else {
-        NOT_IMPLEMENTED(__LOCATION__, $"Pushing symbol kind {s.kind.name}");
+        NOT_IMPLEMENTED_EC(3, __LOCATION__, $"Pushing symbol kind {s.kind.name}");
     }
 }
 
@@ -145,7 +148,7 @@ fn gen_binary_operators(n: AST_node&, gen: IL_gen&, result_used: bool) {
         else if (tk == TokenKind::TOK_reference_target_equal) {   if (result_used) push_opcode(gen, OpKind::OP_equal,   null, 0, null, n.location); }
         else if (tk == TokenKind::TOK_reference_target_unequal) { if (result_used) push_opcode(gen, OpKind::OP_unequal, null, 0, null, n.location); }
 
-        else NOT_IMPLEMENTED(__LOCATION__, $"Generating IL for binary operator {n.AST_binary.token_kind.name}");
+        else NOT_IMPLEMENTED_EC(4, __LOCATION__, $"Generating IL for binary operator {n.AST_binary.token_kind.name}");
     }
 }
 
@@ -217,7 +220,7 @@ fn gen_variadic_operators(n: AST_node&, gen: IL_gen&, result_used: bool) {
         gen_value_visitor(n.AST_variadic_operator.left, gen);
         gen_variadic_operator_members_or(n, gen, 0);
     }
-    else NOT_IMPLEMENTED(__LOCATION__, $"Generating IL for variadic operator {first_token.name}");
+    else NOT_IMPLEMENTED_EC(5, __LOCATION__, $"Generating IL for variadic operator {first_token.name}");
 
     if (!result_used) push_opcode(gen, OpKind::OP_pop, null, 0, null, n.location);
 }
@@ -235,7 +238,7 @@ fn gen_cast(n: AST_node&, gen: IL_gen&, result_used: bool) {
         from => n.AST_user_cast.body.type;
     }
     else {
-        NOT_IMPLEMENTED(__LOCATION__, $"gen_cast for {n.kind.name}");
+        NOT_IMPLEMENTED_EC(6, __LOCATION__, $"gen_cast for {n.kind.name}");
     }
     
     if (!result_used) {
@@ -294,7 +297,7 @@ fn gen_cast(n: AST_node&, gen: IL_gen&, result_used: bool) {
         ast_visit_children(n, gen_value_visitor, gen);
     }
     else {
-        NOT_IMPLEMENTED(__LOCATION__, $"Generating IL for cast to '{get_type_name_r(buf_1, to)}' from '{get_type_name_r(buf_2, from)}'");
+        NOT_IMPLEMENTED_EC(7, __LOCATION__, $"Generating IL for cast to '{get_type_name_r(buf_1, to)}' from '{get_type_name_r(buf_2, from)}'");
     }
 }
 
@@ -354,7 +357,7 @@ fn gen_call(n: AST_node&, gen: IL_gen&, result_used: bool) {
             push_opcode(gen, OpKind::OP_push_result, null, 0, n.type, n.location);
     }
     else {
-        NOT_IMPLEMENTED(__LOCATION__, "Calling something");
+        il_gen_error(gen, n, "Can't call something that is not a function.");
     }
 }
 
@@ -381,7 +384,9 @@ fn gen_plus_plus(n: AST_node&, gen: IL_gen&, result_used: bool) {
         push_opcode(gen, OpKind::OP_slice_plus_plus, null,
             if (result_used) n.AST_plus_plus.postfix + 1 else 0, element_type, n.location);
     }
-    else NOT_IMPLEMENTED(__LOCATION__, "AST_plus_plus for anything that is not an integer or a slice")
+    else {
+        il_gen_error(gen, n, "Operator '++' is not supported for anything but integers or slices.")
+    }
 }
 
 fn gen_for(n: AST_node&, gen: IL_gen&, result_used: bool) {
@@ -472,7 +477,9 @@ fn gen_builder_string_put_struct (s_sb: Symbol&, arg: AST_node&, gen: IL_gen&) {
                 push_opcode(gen, OpKind::OP_load, null, 0, member.type, arg.location);
                 push_opcode(gen, OpKind::OP_call, &sb_puts_symbol.name, 0, sb_puts_symbol.type, arg.location);
             }
-            else NOT_IMPLEMENTED(__LOCATION__, $"Printing {get_type_name_r(buf, member.type)} inside a struct or record in builder string");
+            else {
+                il_gen_error(gen, arg, $"Printing {get_type_name_r(buf, member.type)} inside a struct or record in builder string is not supported.");
+            }
             
             push_opcode(gen, OpKind::OP_push_local_var_address, null, s_sb.offset, null, arg.location);
             push_opcode(gen, OpKind::OP_push_string_literal, str_newline, gen.num_strings++, null, arg.location);
@@ -517,7 +524,9 @@ fn gen_builder_string (n: AST_node&, gen: IL_gen&) {
         else if (is_struct_kind(arg.type) || is_record_kind(arg.type)){
             gen_builder_string_put_struct(s_sb, arg, gen);
         }
-        else NOT_IMPLEMENTED("Generating IL for type %s in builder string is not implemented yet.\n", get_type_name_r(buf, arg.type));
+        else {
+            il_gen_error(gen, arg, $"Generating IL for type '{get_type_name_r(buf, arg.type)}' in builder string is not supported.");
+        }
     }
 
     push_opcode(gen, OpKind::OP_push_local_var_address, null, s_sb.offset, null, n.location);
@@ -580,7 +589,7 @@ fn gen_value_visitor(n: AST_node&, gen: IL_gen&) : void {
         ast_visit_children(n, gen_value_visitor, gen);
              if (n.AST_unary.token_kind == TokenKind::TOK_exclam) push_opcode(gen, OpKind::OP_not, null, 0, null, n.location)
         else if (n.AST_unary.token_kind == TokenKind::TOK_minus) push_opcode(gen, OpKind::OP_neg, null, 0, null, n.location)
-        else NOT_IMPLEMENTED(__LOCATION__, $"Generating IL for unary operator {token_kind_printable(n.AST_unary.token_kind)}");
+        else NOT_IMPLEMENTED_EC(9, __LOCATION__, $"Generating IL for unary operator {token_kind_printable(n.AST_unary.token_kind)}");
     }
 
     else if (n.kind == AST_node::AST_array_to_slice) {
@@ -619,7 +628,9 @@ fn gen_value_visitor(n: AST_node&, gen: IL_gen&) : void {
             gen_value_visitor(n.AST_array_access.index, gen);
             push_opcode(gen, OpKind::OP_array_access, null, 0, get_slice_element_type(n.AST_array_access.array.type), n.location);
         }
-        else NOT_IMPLEMENTED(__LOCATION__, "AST_array_access for anything that is not an array or a slice")
+        else {
+            il_gen_error (gen, n, "Can't generate AST_array_access for anything that is not an array or a slice.")
+        }
 
     }
     
@@ -648,8 +659,9 @@ fn gen_value_visitor(n: AST_node&, gen: IL_gen&) : void {
             ast_visit_children(n, gen_value_visitor, gen);
             push_opcode(gen, OpKind::OP_get_enum_member_name, null, 0, t, n.location);
         }
-        else NOT_IMPLEMENTED("Member acces for type %s is not implemented yet.\n",
-            get_type_name_r(buf, t));
+        else {
+            il_gen_error(gen, n, $"Member acces for type {get_type_name_r(buf, t)} is not implemented.");
+        }
     }
     else if (n.kind == AST_node::AST_namespace_access) {
         if (is_enum_kind(n.type)) {
@@ -658,7 +670,9 @@ fn gen_value_visitor(n: AST_node&, gen: IL_gen&) : void {
         else if (is_enumerator_kind(n.type)) {
             push_opcode(gen, OpKind::OP_push_literal, null, n.AST_namespace_access.enum_value, null, n.location);
         }
-        else NOT_IMPLEMENTED(__LOCATION__, $"Generating IL for namespace acces for type {get_type_name_r(buf, n.type)}");
+        else {
+            il_gen_error(gen, n, $"Generating IL for namespace acces for type {get_type_name_r(buf, n.type)} is not implemented");
+        }
     }
 
     else if (n.kind == AST_node::AST_builder_string) {
@@ -672,7 +686,7 @@ fn gen_value_visitor(n: AST_node&, gen: IL_gen&) : void {
     }
 
     else {
-        NOT_IMPLEMENTED(__LOCATION__, $"gen_value_visitor for {n.kind.name}");
+        NOT_IMPLEMENTED_EC(13, __LOCATION__, $"gen_value_visitor for {n.kind.name}");
     }
 }
 
@@ -768,7 +782,7 @@ fn il_gen_visitor(n: AST_node&, gen: IL_gen&) : void {
                 ast_visit_children(n, il_gen_visitor, gen);
             }
         } else {
-            NOT_IMPLEMENTED(__LOCATION__, "Generic implementation for other than functions");
+            NOT_IMPLEMENTED_EC(14, __LOCATION__, "Generic implementation for other than functions");
         }
     }
     else if (n.kind == AST_node::AST_cast
@@ -793,7 +807,7 @@ fn il_gen_visitor(n: AST_node&, gen: IL_gen&) : void {
         ast_visit_children(n, il_gen_visitor, gen);
     }
     else {
-        NOT_IMPLEMENTED(__LOCATION__, $" {n.location.module.filename}:{n.location.line} il_gen_visitor for {n.kind.name}");
+        NOT_IMPLEMENTED_EC(15, __LOCATION__, $" {n.location.module.filename}:{n.location.line} il_gen_visitor for {n.kind.name}");
     }
 }
 

@@ -21,12 +21,14 @@ import * from "json";
 import * from "lsp";
 import * from "helpers";
 
-fn error_handler_location(facility: u8[], location: Location&, message: u8[], _: any&) {
+fn error_handler_location(facility: u8[], location: Location&, message: u8[], mw: ModuleWalker&) {
     write(2, $"{facility} {location.module.filename}:{location.line}:{location.col} Error: {message}\n");
+    send_diagnostic_notification(location, message);
 }
 
-fn error_handler_ast_node(facility: u8[], n: AST_node&, message: u8[], _: any&) {
+fn error_handler_ast_node(facility: u8[], n: AST_node&, message: u8[], mw: ModuleWalker&) {
     write(2, $"{facility} {n.location.module.filename}:{n.location.line}:{n.location.col} Error: {message}\n");
+    send_diagnostic_notification(n.location, message);
 }
 
 fn open_log_file() {
@@ -144,15 +146,23 @@ fn lookup_external_symbol(name: u8[], mw: ModuleWalker&) : Symbol& {
     let sym => lookup_builtin_symbol(name, mw);
     if (sym) return sym;
 
+    write(2, $"Looking up external symbol {name} {mw.current_imports.len}\n");
+
     for (let i = 0; i < mw.current_imports.len; i++) {
+        write(2, $"    Looking in {mw.current_imports[i].module.header.filename}\n");
         sym => lookup_symbol_from_module(name, mw.current_imports[i].module);
         if (sym) return sym;
     }
+
+    write(2, $"    Not found\n");
+
     return null;
 }
 
 fn compile_module (mw: ModuleWalker&, module: Module&) : void {
     let verbose = true;
+
+    if (verbose) write(2, $"Compiling module {module.header.filename}...\n");
 
     if (verbose) write(2, $"Tokenizing {endlos_rolls_in_use(mw.endlos)}...\n");
     let tokens = tokenize_module(mw, module, module.code, module.endlos);
@@ -188,6 +198,11 @@ fn compile_module (mw: ModuleWalker&, module: Module&) : void {
 
     AST_Node_Allocator_finalize(ast_allocator, module.endlos);
 
+    module.symbols = endlos_ripp_off~Symbol(module.endlos, symbol_cache.symbol_roll);
+    module.global_symbols = EndlosArr_finalize~Symbol&(symbol_cache.global_symbols, module.endlos);
+    module.ast_root => root;
+
+
     // The IL gen is only run for the diagnostic messages here
     let gen: IL_gen;
     gen.type_cache => mw.type_cache;
@@ -197,14 +212,12 @@ fn compile_module (mw: ModuleWalker&, module: Module&) : void {
     EndlosArr_begin~Opcode(gen.opcodes, mw.endlos);
     EndlosArr_begin~u8[](gen.generic_implementation_names, mw.endlos);
 
+    if (verbose) write(2, $"Going to run IL gen {endlos_rolls_in_use(mw.endlos)} ...\n");
     il_gen_run(gen, root);
-
+    if (verbose) write(2, $"Finished IL gen. {endlos_rolls_in_use(mw.endlos)}\n");
+  
     EndlosArr_free~u8[](gen.generic_implementation_names, mw.endlos);
     EndlosArr_free~Opcode(gen.opcodes, mw.endlos);
-
-    module.symbols = endlos_ripp_off~Symbol(module.endlos, symbol_cache.symbol_roll);
-    module.global_symbols = EndlosArr_finalize~Symbol&(symbol_cache.global_symbols, module.endlos);
-    module.ast_root => root;
 }
 
 fn endlos_read_file(endlos: EndlosAllocator&, filename: u8[]) : u8[] {
@@ -271,7 +284,7 @@ fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[]) {
     }
     // endlos_follower_init(module.endlos, mw.endlos, 128);
     endlos_root_init(module.endlos, 128, 1024 * 1024 * 64);
-    module.code = endlos_copy~u8(content, module.endlos);
+    module.code = json_unescape_string(content, module.endlos);
 
     write (mw.log_fd, $"copied code: ({module.header.filename})\n");
     write (mw.log_fd, module.code);
@@ -301,10 +314,10 @@ fn main () {
     mw.log_fd = log_fd;
     EndlosArr_begin~Module(mw.modules, endlos);
 
+    let sr: StreamReader; 
+    sr_init(sr, buffer, 0)
 
     for(;;) {
-        let sr: StreamReader; 
-        sr_init(sr, buffer, 0)
         let content_length = read_header(sr);
 
         let request = sr_read_exact(sr, content_length);
@@ -335,9 +348,7 @@ fn main () {
             
             write (log_fd, $"textDocument/didChange uri={uri} path={uri_to_file_path(mw.project_root, uri)}\n");
 
-            let code = json_unescape_string(text, endlos);
-
-            handle_document_updated(mw, uri, code);
+            handle_document_updated(mw, uri, text);
 
             print_request = false;
         }
@@ -348,11 +359,7 @@ fn main () {
             
             write (log_fd, $"textDocument/didOpen uri={uri} path={uri_to_file_path(mw.project_root, uri)}\n");
 
-            let code = json_unescape_string(text, endlos);
-
-            write(log_fd, code);
-
-            handle_document_updated(mw, uri, code);
+            handle_document_updated(mw, uri, text);
             
             print_request = true;
         }
@@ -365,5 +372,7 @@ fn main () {
             write(log_fd, request);
             write(log_fd, "\n");
         }
+
+        sr_defrag(sr, buffer);
     }
 }
