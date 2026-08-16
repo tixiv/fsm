@@ -87,11 +87,11 @@ fn push_diagnostic(location: Location&, message: u8[]) {
     let module => <Module&> location.module;
     let diag => EndlosArr_push~Diagnostic(module.diagnostics);
     diag.message = endlos_copy~u8(message, module.endlos);
-    diag.start_line = location.line-1;
-    diag.end_line = diag.start_line;
-    diag.start_col = location.col-6;
-    diag.end_col = location.col-1;
-    if (diag.start_col < 0) diag.start_col = 0;
+    diag.range.start_line = location.line-1;
+    diag.range.end_line = diag.range.start_line;
+    diag.range.start_col = location.col-6;
+    diag.range.end_col = location.col-1;
+    if (diag.range.start_col < 0) diag.range.start_col = 0;
 }
 
 fn publish_diagnostics(mw: ModuleWalker&) {
@@ -169,9 +169,11 @@ fn lookup_external_symbol(name: u8[], mw: ModuleWalker&) : Symbol& {
     // write(2, $"Looking up external symbol {name} {imports.len}\n");
 
     for (let i = 0; i < imports.len; i++) {
-        // write(2, $"    Looking in {imports[i].module.header.filename}\n");
-        sym => lookup_symbol_from_module(name, imports[i].module);
-        if (sym) return sym;
+        if (imports[i].module) {
+            // write(2, $"    Looking in {imports[i].module.header.filename}\n");
+            sym => lookup_symbol_from_module(name, imports[i].module);
+            if (sym) return sym;
+        }
     }
 
     // write(2, $"    Not found\n");
@@ -292,16 +294,20 @@ fn handle_imports(mw: ModuleWalker&, module_filename: u8[], imports: Import[]) :
             imp.module => module;
         }
         else {
-            write(2, $"[FSM Modulizer] {module_filename}:{imp.location.line} Error: couldn't find import '{imp.name}'.\n")
-            exit(1);
+            error_handler_location("[FSM Modulizer]", imp.location, $"Couldn't find import '{imp.name}'", mw);
+            imp.module => null;
         }
     }
 }
  
-fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[]) {
+fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[], changed: bool) {
     let filename = uri_to_file_path(mw.project_root, uri);
     let module => find_already_compiled(mw, filename);
     if (module) {
+        if (!changed) { // (only opened, not edited)
+            return;
+        }
+
         write (2, $"Module {uri} exists, freeing\n")
         endlos_free (module.endlos);
     }
@@ -318,6 +324,17 @@ fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[]) {
     compile_module(mw, module);
 
     publish_diagnostics(mw);
+}
+
+fn find_definition(mw: ModuleWalker&, range: LocationRange&, uri: u8[], line, col) : u8[] {
+    let filename = uri_to_file_path(mw.project_root, uri);
+    let module => find_already_compiled(mw, filename);
+    let out_filename: u8[];
+    if (!module) return out_filename;
+
+    //for (let i = 0; i < )
+
+    return out_filename;
 }
 
 fn main () {
@@ -366,6 +383,15 @@ fn main () {
             write_wrapped(1, $"\{\"jsonrpc\":\"2.0\",\"id\":{id},\"result\":null}");
         }
         else if (sv_equal(method, "textDocument/definition")) {
+            let textDocument = json_get_element(params, "textDocument");
+            let uri = json_get_string(textDocument, "uri");
+            let position = json_get_element(params, "position");
+            let line = parse_integer(json_get_number(position, "line"));
+            let col = parse_integer(json_get_number(position, "character"));
+
+            let range: LocationRange;
+            let def_uri = find_definition(mw, range, uri, line, col);
+            
             send_definition_response(id);
         }
         else if (sv_equal(method, "textDocument/didChange")) {
@@ -376,7 +402,7 @@ fn main () {
             
             write (log_fd, $"textDocument/didChange uri={uri} path={uri_to_file_path(mw.project_root, uri)}\n");
 
-            handle_document_updated(mw, uri, text);
+            handle_document_updated(mw, uri, text, true);
 
             print_request = false;
         }
@@ -387,7 +413,7 @@ fn main () {
             
             write (log_fd, $"textDocument/didOpen uri={uri} path={uri_to_file_path(mw.project_root, uri)}\n");
 
-            handle_document_updated(mw, uri, text);
+            handle_document_updated(mw, uri, text, false);
             
             print_request = true;
         }

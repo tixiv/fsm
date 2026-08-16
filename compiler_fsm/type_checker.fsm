@@ -747,8 +747,12 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
             type_checker.current_function_ret_type => ret_type;
         } else {
             if (type_checker.current_function_ret_type_decl && !(type_checker.current_function_ret_type_decl <==> type_checker.type_cache.builtin_void)) {
-                if (ret_type <==> type_checker.type_cache.builtin_void) type_checker_error(type_checker, n, "'return' without a value in function returning non void.");
-                try_convert_to_type_if_necessary(type_checker, n.AST_return.body, type_checker.current_function_ret_type_decl, "Return argument");
+                if (ret_type <==> type_checker.type_cache.builtin_void) {
+                    type_checker_error(type_checker, n, "'return' without a value in function returning non void.");
+                }
+                else {
+                    try_convert_to_type_if_necessary(type_checker, n.AST_return.body, type_checker.current_function_ret_type_decl, "Return argument");
+                }
             }
             else if (is_reference_kind(type_checker.current_function_ret_type) && ret_type <==> type_checker.type_cache.builtin_null) {
             }

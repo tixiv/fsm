@@ -62,12 +62,12 @@ fn send_diagnostic_notifications (filename: u8[], diagnostics: Diagnostic[]) {
             \{
                 \"range\": \{
                     \"start\": \{
-                        \"line\": {d.start_line},
-                        \"character\": {d.start_col}
+                        \"line\": {d.range.start_line},
+                        \"character\": {d.range.start_col}
                     },
                     \"end\": \{
-                        \"line\": {d.end_line},
-                        \"character\": {d.end_col}
+                        \"line\": {d.range.end_line},
+                        \"character\": {d.range.end_col}
                     }
                 },
                 \"severity\": 1,

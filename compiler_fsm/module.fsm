@@ -13,12 +13,16 @@ struct Import {
     module: Module&; // filled in by compile module
 }
 
-struct Diagnostic {
-    message: u8[];
+struct LocationRange {
     start_line: i32;
     end_line: i32;
     start_col:i32;
     end_col:i32;
+}
+
+struct Diagnostic {
+    message: u8[];
+    range: LocationRange;
 }
 
 struct Module {

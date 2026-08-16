@@ -445,7 +445,8 @@ fn parse_primary(parser: Parser&) : AST_node&
     }
     else {
         parser_error(parser, $"Expected expression but got {parser.CT.kind.name}");
-        return ast_alloc(parser.allocator, AST_node::AST_null, parser.CT.location);
+        MOVE_NEXT(parser);
+        return null;
     }
 
     n => parse_postfix_operators(parser, n);
