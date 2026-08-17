@@ -680,7 +680,8 @@ fn gen_value_visitor(n: AST_node&, gen: IL_gen&) : void {
     }
     
     else if (n.kind == AST_node::AST_typename
-                   |== AST_node::AST_type_ref)
+                   |== AST_node::AST_type_ref
+                   |== AST_node::AST_undefined)
     {
         // Nothing to be done
     }

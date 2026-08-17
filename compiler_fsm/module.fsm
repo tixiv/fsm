@@ -25,13 +25,21 @@ struct Diagnostic {
     range: LocationRange;
 }
 
+enum ModuleState {
+    NotCompiled,
+    Compiling,
+    CompilationFailed,
+    Compiled,
+}
+
 struct Module {
     header: ModuleHeader;
+    code_buffer: u8[];
     code: u8[];
     symbols: Symbol[];
     global_symbols: Symbol&[];
     ast_root: AST_node&;
-    endlos: EndlosAllocator;
     diagnostics: EndlosArr<Diagnostic>;
     imports: Import[];
+    state: ModuleState;
 }

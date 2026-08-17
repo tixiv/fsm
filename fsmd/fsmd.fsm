@@ -73,20 +73,22 @@ fn find_file(sb: StringBuilder&, name: u8[], parent_module_filename: u8[]) : boo
 struct ModuleWalker {
     modules: EndlosArr<Module>;
     ast_allocator: AST_Node_Allocator&;
-    endlos: EndlosAllocator&;
-    type_cache: TypeCache&;
+    endlos_main: EndlosAllocator;      // lives forever
+    endlos_compile: EndlosAllocator;   // gets reset when we recompile
+    type_cache: TypeCache;
     error_handler_location: ErrorHandler<Location&>;
     error_handler_ast_node: ErrorHandler<AST_node&>;
     builtin_symbols: Symbol[];
     project_root: u8[];
     log_fd;
     current_module: Module&;
+    num_errors;
 }
 
-fn push_diagnostic(location: Location&, message: u8[]) {
+fn push_diagnostic(mw: ModuleWalker&, location: Location&, message: u8[]) {
     let module => <Module&> location.module;
     let diag => EndlosArr_push~Diagnostic(module.diagnostics);
-    diag.message = endlos_copy~u8(message, module.endlos);
+    diag.message = endlos_copy~u8(message, mw.endlos_compile);
     diag.range.start_line = location.line-1;
     diag.range.end_line = diag.range.start_line;
     diag.range.start_col = location.col-6;
@@ -102,13 +104,15 @@ fn publish_diagnostics(mw: ModuleWalker&) {
 }
 
 fn error_handler_location(facility: u8[], location: Location&, message: u8[], mw: ModuleWalker&) {
-    write(2, $"{facility} {location.module.filename}:{location.line}:{location.col} Error: {message}\n");
-    push_diagnostic(location, message);
+    write(mw.log_fd, $"{facility} {location.module.filename}:{location.line}:{location.col} Error: {message}\n");
+    push_diagnostic(mw, location, message);
+    mw.num_errors++;
 }
 
 fn error_handler_ast_node(facility: u8[], n: AST_node&, message: u8[], mw: ModuleWalker&) {
-    write(2, $"{facility} {n.location.module.filename}:{n.location.line}:{n.location.col} Error: {message}\n");
-    push_diagnostic(n.location, message);
+    write(mw.log_fd, $"{facility} {n.location.module.filename}:{n.location.line}:{n.location.col} Error: {message}\n");
+    push_diagnostic(mw, n.location, message);
+    mw.num_errors++;
 }
 
 fn tokenize_module (mw: ModuleWalker&, module: Module&, code: u8[], endlos: EndlosAllocator&) {
@@ -126,7 +130,7 @@ fn tokenize_module (mw: ModuleWalker&, module: Module&, code: u8[], endlos: Endl
     return endlos_ripp_off~Token(endlos, tokenizer.tokens);
 }
 
-fn find_already_compiled(mw: ModuleWalker&, import_filename : u8[]) : Module&{
+fn find_existing_module(mw: ModuleWalker&, import_filename : u8[]) : Module&{
     for (let i = 0; i < mw.modules.arr.len; i++) {
         if (sv_equal(import_filename, mw.modules.arr[i].header.filename))
             return mw.modules.arr[i];
@@ -188,48 +192,76 @@ fn compile_module (mw: ModuleWalker&, module: Module&) : void {
 
     if (verbose) write(2, $"Compiling module {module.header.filename}...\n");
 
-    if (verbose) write(2, $"Tokenizing {endlos_rolls_in_use(mw.endlos)}...\n");
-    let tokens = tokenize_module(mw, module, module.code, module.endlos);
-    if (verbose) write(2, $"Tokenizing finished {endlos_rolls_in_use(mw.endlos)}\n");
+    if (module.state != ModuleState::NotCompiled) {
+        write(2, $"{__LOCATION__} Error: module {module.header.filename} is not in expected state\n");
+        return;
+    }
 
+    module.state = ModuleState::Compiling;
+    obj_zero~Import[](module.imports);
+    obj_zero~Symbol[](module.symbols);
+    obj_zero~Symbol&[](module.global_symbols);
+    module.ast_root => null;
+
+    let last_num_errors = mw.num_errors;
+
+    if (verbose) write(2, $"Tokenizing {endlos_rolls_in_use(mw.endlos_compile)}...\n");
+    let tokens = tokenize_module(mw, module, module.code, mw.endlos_compile);
+    if (verbose) write(2, $"Tokenizing finished {endlos_rolls_in_use(mw.endlos_compile)}\n");
+    
     let ast_allocator: AST_Node_Allocator;
-    AST_Node_Allocator_init(ast_allocator, module.endlos);
+    AST_Node_Allocator_init(ast_allocator, mw.endlos_compile);
 
-    if (verbose) write(2, $"Parsing {endlos_rolls_in_use(mw.endlos)} ...\n");
-    let root => parse_program(tokens, ast_allocator, module.endlos, mw.error_handler_location)
-    if (verbose) write(2, $"Parsing finished {endlos_rolls_in_use(mw.endlos)} \n");
+    if (verbose) write(2, $"Parsing {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
+    let root => parse_program(tokens, ast_allocator, mw.endlos_compile, mw.error_handler_location)
+    if (verbose) write(2, $"Parsing finished {endlos_rolls_in_use(mw.endlos_compile)} \n");
 
-    let imports = gather_imports(root, module.endlos);
-    module.imports = imports;
-    handle_imports(mw, module.header.filename, imports);
+    module.imports = gather_imports(root, mw.endlos_compile);
+    handle_imports(mw, module.header.filename, module.imports);
 
     // Restoring current module is needed because it will change during importing more stuffs from other imports
     mw.current_module => module;
 
+    if (mw.num_errors > last_num_errors) {
+        write (mw.log_fd, "Errors during parsing. Not going to run resolvers.\n")
+        module.state = ModuleState::CompilationFailed;
+        return;
+    }
+
     let symbol_cache: SymbolCache;
-    SymbolCache_init(symbol_cache, mw.type_cache, module.endlos, lookup_external_symbol, mw);
+    SymbolCache_init(symbol_cache, mw.type_cache, mw.endlos_compile, lookup_external_symbol, mw);
 
-    if (verbose) write(2, $"Type Resolver {endlos_rolls_in_use(mw.endlos)} ...\n");
-    type_resolver_run(root, symbol_cache, module.endlos, mw.error_handler_ast_node);
-    if (verbose) write(2, $"Type Resolver finished  {endlos_rolls_in_use(mw.endlos)} \n");
+    if (verbose) write(2, $"Type Resolver {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
+    type_resolver_run(root, symbol_cache, mw.endlos_compile, mw.error_handler_ast_node);
+    if (verbose) write(2, $"Type Resolver finished  {endlos_rolls_in_use(mw.endlos_compile)} \n");
 
-    if (verbose) write(2, $"Resolver  {endlos_rolls_in_use(mw.endlos)} ...\n");
-    resolver_run(root, symbol_cache, module.endlos, mw.error_handler_ast_node);
-    if (verbose) write(2, $"Resolver finished {endlos_rolls_in_use(mw.endlos)} \n");
+    if (verbose) write(2, $"Resolver  {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
+    resolver_run(root, symbol_cache, mw.endlos_compile, mw.error_handler_ast_node);
+    if (verbose) write(2, $"Resolver finished {endlos_rolls_in_use(mw.endlos_compile)} \n");
 
-    // ast_dump_tree(root);
+    if (mw.num_errors > last_num_errors) {
+        write (mw.log_fd, "Errors during resolvers. Not going to run type checker.\n")
+        module.state = ModuleState::CompilationFailed;
+        return;
+    }
 
-    if (verbose) write(2, $"Going to run type checker {endlos_rolls_in_use(mw.endlos)} ...\n");
-    type_checker_run(root, symbol_cache, ast_allocator, module.endlos, mw.error_handler_ast_node);
-    if (verbose) write(2, $"Finished type checking. {endlos_rolls_in_use(mw.endlos)}\n");
+    if (verbose) write(2, $"Going to run type checker {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
+    type_checker_run(root, symbol_cache, ast_allocator, mw.endlos_compile, mw.error_handler_ast_node);
+    if (verbose) write(2, $"Finished type checking. {endlos_rolls_in_use(mw.endlos_compile)}\n");
 
-    AST_Node_Allocator_finalize(ast_allocator, module.endlos);
+    AST_Node_Allocator_finalize(ast_allocator, mw.endlos_compile);
 
-    module.symbols = endlos_ripp_off~Symbol(module.endlos, symbol_cache.symbol_roll);
-    module.global_symbols = EndlosArr_finalize~Symbol&(symbol_cache.global_symbols, module.endlos);
+    module.symbols = endlos_ripp_off~Symbol(mw.endlos_compile, symbol_cache.symbol_roll);
+    module.global_symbols = EndlosArr_finalize~Symbol&(symbol_cache.global_symbols, mw.endlos_compile);
     module.ast_root => root;
 
-    if (verbose) write(2, $"Going to run IL gen {endlos_rolls_in_use(mw.endlos)} ...\n");
+    if (mw.num_errors > last_num_errors) {
+        write (mw.log_fd, "Errors during type checker. Not going to run il gen.\n")
+        module.state = ModuleState::CompilationFailed;
+        return;
+    }
+
+    if (verbose) write(2, $"Going to run IL gen {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
 
     // The IL gen is only run for the diagnostic messages here
     let gen: IL_gen;
@@ -238,18 +270,20 @@ fn compile_module (mw: ModuleWalker&, module: Module&) : void {
     gen.lookup_stdlib_symbol_arg => mw;
     gen.error_handler => mw.error_handler_ast_node;
 
-    EndlosArr_begin~Opcode(gen.opcodes, mw.endlos);
-    EndlosArr_begin~u8[](gen.generic_implementation_names, mw.endlos);
+    EndlosArr_begin~Opcode(gen.opcodes, mw.endlos_compile);
+    EndlosArr_begin~u8[](gen.generic_implementation_names, mw.endlos_compile);
 
     il_gen_run(gen, root);
 
-    EndlosArr_free~u8[](gen.generic_implementation_names, mw.endlos);
-    EndlosArr_free~Opcode(gen.opcodes, mw.endlos);
+    EndlosArr_free~u8[](gen.generic_implementation_names, mw.endlos_compile);
+    EndlosArr_free~Opcode(gen.opcodes, mw.endlos_compile);
 
-    if (verbose) write(2, $"Finished IL gen. {endlos_rolls_in_use(mw.endlos)}\n");  
+    if (verbose) write(2, $"Finished IL gen. {endlos_rolls_in_use(mw.endlos_compile)}\n");
+
+    module.state = ModuleState::Compiled;
 }
 
-fn endlos_read_file(endlos: EndlosAllocator&, filename: u8[]) : u8[] {
+fn read_file_to_buffer(filename: u8[], buffer: u8[]) : u8[] {
     let O_RDONLY = 0
     let fd = open (filename, O_RDONLY)
 
@@ -259,14 +293,16 @@ fn endlos_read_file(endlos: EndlosAllocator&, filename: u8[]) : u8[] {
         return a;
     }
 
-    let buffer = endlos_begin~u8(endlos);
     let size = fsize(fd)
     let read_size = read(fd, buffer);
     ASSERT(read_size == size, __LOCATION__);
 
     close(fd);
 
-    return endlos_ripp_off~u8(endlos, sv_skip(buffer, read_size));
+    let r = buffer;
+    r.len = size;
+
+    return r;
 }
 
 fn handle_imports(mw: ModuleWalker&, module_filename: u8[], imports: Import[]) : void {
@@ -281,14 +317,33 @@ fn handle_imports(mw: ModuleWalker&, module_filename: u8[], imports: Import[]) :
         
         if (res) {
             sb.str.len--; // make the terminating 0 for C invisible to FSM
-            let module => find_already_compiled(mw, sb.str);
-            if (!module) {
-                write (2, $"Module {sb.str} doesn't exist, creating\n")
+            let module => find_existing_module(mw, sb.str);
+            if (module) {
+                if (module.state == ModuleState::NotCompiled) {
+                    write (mw.log_fd, $"Module {sb.str} exists but needs to be recompiled. recompiling...\n")
+                    EndlosArr_begin~Diagnostic(module.diagnostics, mw.endlos_compile);
+                    compile_module(mw, module);
+                }
+                else if (module.state == ModuleState::Compiling) {
+                    error_handler_location("[FSM Modulizer]", imp.location, $"Detected circular import '{imp.name}'", mw);
+                }
+                else if (module.state == ModuleState::Compiled) {
+                    write (mw.log_fd, $"Module {sb.str} exists and is already compiled\n")
+                }
+                else if (module.state == ModuleState::CompilationFailed) {
+                    write (mw.log_fd, $"Module {sb.str} exists and is already compiled (with errors)\n")
+                }
+                else NOT_IMPLEMENTED_EC(23, __LOCATION__, $"Dealing with module state {module.state.name}");
+            }
+            else {
+                write (mw.log_fd, $"Module {sb.str} doesn't exist, creating\n")
                 module => EndlosArr_push~Module(mw.modules);
-                module.header.filename = endlos_copy~u8(sb.str, mw.endlos);
-                endlos_follower_init(module.endlos, mw.endlos, 128);
-                module.code = endlos_read_file(module.endlos, module.header.filename);
-                EndlosArr_begin~Diagnostic(module.diagnostics, module.endlos);
+                module.header.filename = endlos_copy~u8(sb.str, mw.endlos_main);
+                module.code_buffer = endlos_begin~u8(mw.endlos_main);
+                module.code = read_file_to_buffer(module.header.filename, module.code_buffer);
+
+                EndlosArr_begin~Diagnostic(module.diagnostics, mw.endlos_compile);
+
                 compile_module(mw, module);
             }
             imp.module => module;
@@ -299,36 +354,68 @@ fn handle_imports(mw: ModuleWalker&, module_filename: u8[], imports: Import[]) :
         }
     }
 }
- 
-fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[], changed: bool) {
-    let filename = uri_to_file_path(mw.project_root, uri);
-    let module => find_already_compiled(mw, filename);
-    if (module) {
-        if (!changed) { // (only opened, not edited)
-            return;
+
+fn recompile_all (mw: ModuleWalker&) {
+    let modules => mw.modules.arr;
+
+    for (let i = 0; i < modules.len; i++) {
+        let module => modules[i];
+        module.state = ModuleState::NotCompiled;
+    }
+
+    if (mw.endlos_compile.rolls.begin) {
+        endlos_free(mw.endlos_compile);
+    }
+
+    endlos_root_init(mw.endlos_compile, 256, 1024 * 1024 * 64);
+
+    TypeCache_init(mw.type_cache, mw.endlos_compile);
+    mw.builtin_symbols = make_builtin_symbols(mw.type_cache, mw.endlos_compile);
+
+    for (let i = 0; i < modules.len; i++) {
+        let module => modules[i];
+        EndlosArr_begin~Diagnostic(module.diagnostics, mw.endlos_compile);
+    }
+    
+    for (let i = 0; i < modules.len; i++) {
+        let module => modules[i];
+        if (module.state == ModuleState::NotCompiled) {
+            compile_module(mw, module);
         }
-
-        write (2, $"Module {uri} exists, freeing\n")
-        endlos_free (module.endlos);
+        else if (module.state == ModuleState::Compiled |== ModuleState::CompilationFailed) {
+        }
+        else {
+            write (mw.log_fd, $"{__LOCATION__} Error: Module '{module.header.filename}' is in unexpected state\n")
+        }
     }
-    else {
-        write (2, $"Module {uri} doesn't exist, creating\n")
-        module => EndlosArr_push~Module(mw.modules);
-        module.header.filename = endlos_copy~u8(filename, mw.endlos);
-    }
-    // endlos_follower_init(module.endlos, mw.endlos, 128);
-    endlos_root_init(module.endlos, 128, 1024 * 1024 * 64);
-    module.code = json_unescape_string(content, module.endlos);
-    EndlosArr_begin~Diagnostic(module.diagnostics, module.endlos);
-
-    compile_module(mw, module);
 
     publish_diagnostics(mw);
 }
 
+fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[], changed: bool) {
+    let filename = uri_to_file_path(mw.project_root, uri);
+    let module => find_existing_module(mw, filename);
+    if (module) {
+        if (!changed) { // (only opened, not edited)
+            return;
+        }
+    }
+    else {
+        write (mw.log_fd, $"Module {uri} doesn't exist, creating\n")
+        module => EndlosArr_push~Module(mw.modules);
+        module.header.filename = endlos_copy~u8(filename, mw.endlos_main);
+        module.code_buffer = endlos_begin~u8(mw.endlos_main);
+        module.state = ModuleState::NotCompiled;
+    }
+
+    module.code = json_unescape_string(content, module.code_buffer);
+
+    recompile_all(mw);
+}
+
 fn find_definition(mw: ModuleWalker&, range: LocationRange&, uri: u8[], line, col) : u8[] {
     let filename = uri_to_file_path(mw.project_root, uri);
-    let module => find_already_compiled(mw, filename);
+    let module => find_existing_module(mw, filename);
     let out_filename: u8[];
     if (!module) return out_filename;
 
@@ -342,23 +429,22 @@ fn main () {
 
     write (log_fd, "FSMD 3 started\n"); 
 
-    let endlos: EndlosAllocator;
-    endlos_root_init(endlos, 512, 1024 * 1024 * 64);
-    let buffer = endlos_begin~u8(endlos);
-
-    let type_cache: TypeCache;
-    TypeCache_init(type_cache, endlos)
-
     let mw: ModuleWalker;
-    mw.endlos => endlos;
-    mw.type_cache => type_cache;
-    mw.builtin_symbols = make_builtin_symbols(type_cache, endlos);
+    write(log_fd, $"1\n");
+    endlos_root_init(mw.endlos_main, 256, 1024 * 1024 * 64);
+    write(log_fd, $"2\n");
     mw.error_handler_location.handler => error_handler_location;
+    mw.error_handler_location.arg => mw;
     mw.error_handler_ast_node.handler => error_handler_ast_node;
+    mw.error_handler_ast_node.arg => mw;
     mw.project_root = "/home/tixiv/work/fsm";
     mw.log_fd = log_fd;
-    EndlosArr_begin~Module(mw.modules, endlos);
+    write(log_fd, $"3\n");
+    EndlosArr_begin~Module(mw.modules, mw.endlos_main);
 
+    write(log_fd, $"4\n");
+
+    let buffer = endlos_begin~u8(mw.endlos_main);
     let sr: StreamReader; 
     sr_init(sr, buffer, 0)
 
@@ -415,7 +501,7 @@ fn main () {
 
             handle_document_updated(mw, uri, text, false);
             
-            print_request = true;
+            print_request = false;
         }
         else if (sv_equal(method, "exit")) {
             exit(0);

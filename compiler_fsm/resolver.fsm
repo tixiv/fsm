@@ -178,6 +178,7 @@ fn resolver_visitor(n: AST_node&, res: Resolver&) : void {
                     |== AST_node::AST_import
                     |== AST_node::AST_generic_speciation
                     |== AST_node::AST_type_generic_speciation
+                    |== AST_node::AST_undefined
             )
     {
         ast_visit_children(n, resolver_visitor, res);

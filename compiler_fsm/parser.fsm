@@ -445,8 +445,9 @@ fn parse_primary(parser: Parser&) : AST_node&
     }
     else {
         parser_error(parser, $"Expected expression but got {parser.CT.kind.name}");
+        let ast_undefined => ast_alloc(parser.allocator, AST_node::AST_undefined, parser.CT.location);
         MOVE_NEXT(parser);
-        return null;
+        return ast_undefined;
     }
 
     n => parse_postfix_operators(parser, n);
@@ -870,6 +871,8 @@ fn parse_enum(parser: Parser&) : AST_node& {
 
             if (parser.CT.kind == TokenKind::TOK_semicolon || parser.CT.kind == TokenKind::TOK_komma) {
                 MOVE_NEXT(parser);
+            }
+            else if(parser.CT.kind == TokenKind::TOK_rbrace) {
             }
             else {
                 parser_error(parser, $"Expected ';' or ',' or '}' but got {parser.CT.kind.name}.");

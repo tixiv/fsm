@@ -325,7 +325,7 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
                    |== TokenKind::TOK_unequal) {
             auto_dereference(type_checker, n.AST_binary.left);
             auto_dereference(type_checker, n.AST_binary.right);
-            let okay = n.AST_binary.left.type <==>n.AST_binary.right.type || (is_integer_kind(n.AST_binary.left.type) && is_integer_kind(n.AST_binary.right.type));
+            let okay = n.AST_binary.left.type <==> n.AST_binary.right.type || (is_integer_kind(n.AST_binary.left.type) && is_integer_kind(n.AST_binary.right.type));
             if (!okay) {
                 type_checker_error(type_checker, n,
                     $"Operator {token_kind_printable(tk)} can't accept arguments with different types. Have '{get_type_name_r(buf_1, n.AST_binary.left.type)}' and '{get_type_name_r(buf_2, n.AST_binary.right.type)}'.");
@@ -907,25 +907,30 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
             if (is_structlike_kind(container) || is_union_kind(container)) {
                 let offset;
                 let t => get_member_type_and_offset_by_name(type_checker.type_cache, container, &n.AST_member_access.name, &offset);
-                if (!t) type_checker_error(type_checker, n, $"Member '{n.AST_member_access.name}' not found in '{get_type_name_r(buf_1, container)}'.");
+                if (!t) {
+                    type_checker_error(type_checker, n, $"Member '{n.AST_member_access.name}' not found in '{get_type_name_r(buf_1, container)}'.");
+                    n.type => type_checker.type_cache.builtin_undefined;
+                    n.addressable = false;
+                }
+                else {
+                    if (!is_reference_kind(n.AST_member_access.body.type))
+                        insert_take_reference(type_checker, n.AST_member_access.body);
 
-                if (!is_reference_kind(n.AST_member_access.body.type))
-                    insert_take_reference(type_checker, n.AST_member_access.body);
+                    n.type => get_ref_type_for(type_checker.type_cache, t);
+                    n.AST_member_access.offset = offset;
+                    n.addressable = true;
 
-                n.type => get_ref_type_for(type_checker.type_cache, t);
-                n.AST_member_access.offset = offset;
-                n.addressable = true;
+                    // We need to insert a dereference node now at this point in the tree.
+                    // copy the current node to a new one:
+                    let ast_member_access => ast_alloc(type_checker.ast_allocator, AST_node::AST_member_access, n.location);
+                    obj_copy~AST_node(ast_member_access, n);
+                    ast_member_access.next => null; // clear next pointer in case it was used
 
-                // We need to insert a dereference node now at this point in the tree.
-                // copy the current node to a new one:
-                let ast_member_access => ast_alloc(type_checker.ast_allocator, AST_node::AST_member_access, n.location);
-                obj_copy~AST_node(ast_member_access, n);
-                ast_member_access.next => null; // clear next pointer in case it was used
-
-                // Now we overwrite the current node, making it the dereference node with the member acces in it's body
-                n.kind = AST_node::AST_dereference;
-                n.AST_dereference.body => ast_member_access;
-                n.type => dereferenced_type(ast_member_access.type);
+                    // Now we overwrite the current node, making it the dereference node with the member acces in it's body
+                    n.kind = AST_node::AST_dereference;
+                    n.AST_dereference.body => ast_member_access;
+                    n.type => dereferenced_type(ast_member_access.type);
+                }
             }
             else if (is_array_kind(container)) {
                 if(sv_equal(n.AST_member_access.name, "len")) {
@@ -956,7 +961,6 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
 
         }
     }
-
     else if (n.kind == AST_node::AST_namespace_access) {
         let t => n.AST_namespace_access.body.type;
         if (t.kind == Type::T_enum) {
@@ -980,33 +984,29 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
             n.type => type_checker.type_cache.builtin_undefined;
         }
     }
-
     else if (n.kind == AST_node::AST_variadic_operator) {
         type_check_variadic_operator(type_checker, n);
     }
-
     else if (n.kind == AST_node::AST_builder_string) {
         type_check_builder_string(type_checker, n);
         n.type => get_slice_type(type_checker.type_cache, type_checker.type_cache.builtin_u8);
     }
-
     else if (n.kind == AST_node::AST_null) {
         n.type => type_checker.type_cache.builtin_null;
     }
-
     else if (n.kind == AST_node::AST_generic) {
         n.type => type_checker.type_cache.builtin_void;
     }
-
+    else if (n.kind == AST_node::AST_undefined) {
+        n.type => type_checker.type_cache.builtin_undefined;
+    }
     else if (n.kind == AST_node::AST_generic_speciation) {
         n.type => n.AST_generic_speciation.body.type;
         n.addressable = n.AST_generic_speciation.body.addressable;
     }
-            
     else if (n.kind == AST_node::AST_generic_implementation) {
         // already handled
     }
-
     else if (n.kind == AST_node::AST_typename
                     |== AST_node::AST_member_def
                     |== AST_node::AST_union_member_def
