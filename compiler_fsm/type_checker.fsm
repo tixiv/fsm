@@ -40,7 +40,7 @@ fn annotate_used_visitor(n: AST_node&, type_checker: TypeChecker&) {
     n.result_used = type_checker.used;
 
     if (n.kind == AST_node::AST_scope) {
-        if (type_checker.used) type_checker_error(type_checker, n, "Using the result of a scope is not implemented yet.\n");
+        if (type_checker.used) type_checker_error(type_checker, n, "Using the result of a scope is not implemented yet.");
         type_checker.used = false;
         ast_visit_children(n, annotate_used_visitor, type_checker);
     }
@@ -51,7 +51,7 @@ fn annotate_used_visitor(n: AST_node&, type_checker: TypeChecker&) {
         ast_visit_children(n, annotate_used_visitor, type_checker);
     }
     else if (n.kind == AST_node::AST_return) {
-        if (type_checker.used) type_checker_error(type_checker, n, "The 'return' statement has no value and therefore can't be used in an expression.\n");
+        if (type_checker.used) type_checker_error(type_checker, n, "The 'return' statement has no value and therefore can't be used in an expression.");
         ast_visit_children(n, annotate_used_visitor, type_checker);
     }
     else if (n.kind == AST_node::AST_if) {
@@ -62,7 +62,7 @@ fn annotate_used_visitor(n: AST_node&, type_checker: TypeChecker&) {
         annotate_used_visitor(n.AST_if.else_clause, type_checker);
     }
     else if (n.kind == AST_node::AST_while) {
-        if (type_checker.used) type_checker_error(type_checker, n, "The 'while' statement has no value and therefore can't be used in an expression.\n");
+        if (type_checker.used) type_checker_error(type_checker, n, "The 'while' statement has no value and therefore can't be used in an expression.");
         type_checker.used = true;
         annotate_used_visitor(n.AST_while.condition, type_checker);
         type_checker.used = false;
@@ -208,7 +208,7 @@ or to perform a null reference check.");
             return;
         }
         else {
-            type_checker_error(type_checker, n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}'.\n");
+            type_checker_error(type_checker, n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}'.");
         }
     }
 
@@ -224,14 +224,14 @@ or to perform a null reference check.");
 
     if (target_type <==> get_ref_type_for(type_checker.type_cache, type_checker.type_cache.builtin_any)) {
         if (!is_reference_kind(original_type)) {
-            if (n.addressable == false) type_checker_error(type_checker, n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}' because it is not addressable.\n");            
+            if (n.addressable == false) type_checker_error(type_checker, n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}' because it is not addressable.");            
             insert_take_reference(type_checker, n);
         }
         return; // any& can accept any reference type.
     }
 
     if (is_reference_kind(target_type) && !is_reference_kind(original_type)) {
-        if (n.addressable == false) type_checker_error(type_checker, n, $"Can't convert {desc} of type '{ get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}' because it is not addressable.\n");
+        if (n.addressable == false) type_checker_error(type_checker, n, $"Can't convert {desc} of type '{ get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}' because it is not addressable.");
         insert_take_reference(type_checker, n);
     }
 
@@ -791,7 +791,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
     
     else if (n.kind == AST_node::AST_if) {
         try_convert_to_type_if_necessary(type_checker, n.AST_if.condition, type_checker.type_cache.builtin_bool, "'if' condition");
-        let _if_type => n.AST_if.if_clause.type;
+        let _if_type => if (n.AST_if.if_clause) n.AST_if.if_clause.type else &type_checker.type_cache.builtin_void;
         let _else_type => if (n.AST_if.else_clause) n.AST_if.else_clause.type else &type_checker.type_cache.builtin_void;
         if (n.result_used && _if_type <!=> _else_type) {
             type_checker_error(type_checker, n,

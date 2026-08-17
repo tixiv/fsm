@@ -1,0 +1,37 @@
+
+import * from "std";
+import * from "compiler_fsm/ast";
+import * from "compiler_fsm/symbol";
+
+
+struct Finder {
+    line : i32;
+    col : i32;
+    best_col: i32;
+    best_symbol: Symbol&;
+}
+
+fn finder_visitor (n: AST_node&, finder: Finder&) : void {
+    if (n.kind == AST_node::AST_symbol) {
+        // We are looking for the AST node that is the first symbol after the indicated location,
+        // as our location is the end location of each token.
+        if (n.location.line == finder.line) {
+            write (3, $"Found Symbol '{n.AST_symbol.name}' col = {n.location.col} looking_for_col = {finder.col}\n");
+            if (finder.col <= n.location.col < finder.best_col) {
+                write (3, $"Best Symbol '{n.AST_symbol.name}' col = {n.location.col}\n");
+                finder.best_symbol => n.AST_symbol.symbol;
+                finder.best_col = n.location.col;
+            }
+        }
+    }
+    ast_visit_children(n, finder_visitor, finder);
+}
+
+fn find_symbol_at (root: AST_node&, line, col) : Symbol& {
+    let finder: Finder;
+    finder.line = line;
+    finder.col = col;
+    finder.best_col = 1000000;
+    finder_visitor(root, finder);
+    return finder.best_symbol;
+}

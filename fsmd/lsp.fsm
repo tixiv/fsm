@@ -25,24 +25,33 @@ write_wrapped (1, $"\{
 }");
 }
 
-fn send_definition_response (id: u8[]) {
+fn send_definition_response (id: u8[], filename: u8[], range: LocationRange) {
+    if (filename.begin) {
 write_wrapped (1, $"\{
     \"jsonrpc\": \"2.0\",
     \"id\": {id},
     \"result\": \{
-        \"uri\": \"file:///home/tixiv/work/fsm/foo.fsm\",
+        \"uri\": \"file:///home/tixiv/work/fsm/{filename}\",
         \"range\": \{
             \"start\": \{
-                \"line\": 3,
-                \"character\": 5
+                \"line\": {range.start_line},
+                \"character\": {range.start_col}
             },
             \"end\": \{
-                \"line\": 3,
-                \"character\": 8
+                \"line\": {range.end_line},
+                \"character\": {range.end_col}
             }
         }
     }
 }");
+    }
+    else {
+write_wrapped (1, $"\{
+    \"jsonrpc\": \"2.0\",
+    \"id\": {id},
+    \"result\": null
+}");
+    }
 }
 
 fn send_diagnostic_notifications (filename: u8[], diagnostics: Diagnostic[]) {

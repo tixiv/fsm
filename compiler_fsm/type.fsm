@@ -259,7 +259,7 @@ fn get_type_name_r_impl(print_buf: u8[1024]&, type: Type&, encoded: bool) : u8[]
         }
     }
     else {
-        NOT_IMPLEMENTED(__LOCATION__, $"Dumping type kind {type.kind.name} is not implemented yet.\n");
+        NOT_IMPLEMENTED(__LOCATION__, $"Dumping type kind {type.kind.name}");
     }
 
     if (type.speciation)

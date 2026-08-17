@@ -91,7 +91,7 @@ fn parse_typedecl_postifx(parser: Parser&, inner: AST_node&) : AST_node& {
                 latest => ast_slice;
             }
             else {
-                parser_error(parser, "Expected array size or ']'.\n");
+                parser_error(parser, "Expected array size or ']'.");
             }
         }
         
@@ -264,6 +264,8 @@ fn parse_call_arguments(parser: Parser&) : AST_node& {
     let last: AST_node& => null;
 
     while (parser.CT.kind != TokenKind::TOK_rparen) {
+        if (parser.CT.kind == TokenKind::TOK_eof)
+            return null;
         first => parse_expression(parser);
         last => first;
 
@@ -572,6 +574,9 @@ fn parse_statement(parser: Parser&) : AST_node&
         n => parse_scope_body(parser);
     }
     else if (parser.CT.kind == TokenKind::TOK_semicolon) {
+        n => null;
+    }
+    else if (parser.CT.kind == TokenKind::TOK_eof) {
         n => null;
     }
     else {

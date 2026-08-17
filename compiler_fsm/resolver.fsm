@@ -71,7 +71,7 @@ fn resolver_leave_function(res: Resolver&) {
 }
 
 fn resolver_enter_scope(res: Resolver&, n: AST_node&) {
-    if (res.locals_stack_pointer >= 99) resolver_error(res, n, "Scope stack overflow. More than 100 levels nested. What are you doing?.\n");
+    if (res.locals_stack_pointer >= 99) resolver_error(res, n, "Scope stack overflow. More than 100 levels nested. What are you doing?.");
     res.locals_stack[res.locals_stack_pointer++] = res.local_symbols.arr.len;
 }
 

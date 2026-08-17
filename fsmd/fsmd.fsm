@@ -20,6 +20,7 @@ import * from "compiler_fsm/type_checker";
 import * from "json";
 import * from "lsp";
 import * from "helpers";
+import * from "ast_node_finder";
 
 fn open_log_file() {
     let O_WRONLY = 1;
@@ -416,12 +417,20 @@ fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[], changed:
 fn find_definition(mw: ModuleWalker&, range: LocationRange&, uri: u8[], line, col) : u8[] {
     let filename = uri_to_file_path(mw.project_root, uri);
     let module => find_existing_module(mw, filename);
-    let out_filename: u8[];
-    if (!module) return out_filename;
+    if (!module) { let r: u8[]; return r; }
 
-    //for (let i = 0; i < )
+    let sym => find_symbol_at(module.ast_root, line + 1, col + 1);
 
-    return out_filename;
+    if (!sym) { let r: u8[]; return r; }
+
+    write (mw.log_fd, $"Found symbol {sym.name}\n")
+
+    range.start_line = sym.location.line - 1;
+    range.end_line = sym.location.line;
+    range.start_col = 0;
+    range.end_col = 0;
+    
+    return sym.location.module.filename;
 }
 
 fn main () {
@@ -476,9 +485,9 @@ fn main () {
             let col = parse_integer(json_get_number(position, "character"));
 
             let range: LocationRange;
-            let def_uri = find_definition(mw, range, uri, line, col);
+            let filename = find_definition(mw, range, uri, line, col);
             
-            send_definition_response(id);
+            send_definition_response(id, filename, range);
         }
         else if (sv_equal(method, "textDocument/didChange")) {
             let textDocument = json_get_element(params, "textDocument");

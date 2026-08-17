@@ -135,7 +135,7 @@ fn type_resolver_struct_visitor(n: AST_node&, srs: StructResolverState&) : void 
         member.type => n.type;
     }
     else {
-        NOT_IMPLEMENTED(__LOCATION__, $"type_resolver_struct_visitor() is not implemented for {n.kind.name}.\n");
+        NOT_IMPLEMENTED(__LOCATION__, $"type_resolver_struct_visitor() for {n.kind.name}.");
     }
 }
 
