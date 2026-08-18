@@ -74,6 +74,11 @@ fn find_file(sb: StringBuilder&, name: u8[], parent_module_filename: u8[]) : boo
     return false;
 }
 
+struct FsmOptions {
+    dump_ast;
+    continue_after_error: bool;
+    verbose: bool;
+}
 
 struct ModuleWalker {
     modules: EndlosArr<Module>;
@@ -84,6 +89,7 @@ struct ModuleWalker {
     current_imports: Import[];
     builtin_symbols: Symbol[];
     error_handler_args: ErrorHandlerArgs;
+    options: FsmOptions&;
 }
 
 fn tokenize_module (mw: ModuleWalker&, module: Module&, code: u8[], endlos: EndlosAllocator&) {
@@ -146,27 +152,27 @@ fn lookup_external_symbol(name: u8[], mw: ModuleWalker&) : Symbol& {
 }
 
 fn compile_module (mw: ModuleWalker&, filename: u8[]) : Module& {
-    let verbose = false;
-
     let module => EndlosArr_push~Module(mw.modules);
 
     module.header.filename = filename
 
-    if (verbose) $"Reading '{filename}'\n"
+    if (mw.options.verbose) $"Reading '{filename}'\n"
     let code = read_file (filename);
 
-    if (verbose) $"Tokenizing {endlos_rolls_in_use(mw.endlos)}...\n"
+    if (mw.options.verbose) $"Tokenizing {endlos_rolls_in_use(mw.endlos)}...\n"
     let tokens = tokenize_module(mw, module, code, mw.endlos);
-    if (verbose) $"Tokenizing finished {endlos_rolls_in_use(mw.endlos)}\n"
+    if (mw.options.verbose) $"Tokenizing finished {endlos_rolls_in_use(mw.endlos)}\n"
 
     // dump_tokens(module.tokens);
 
     let ast_allocator: AST_Node_Allocator;
     AST_Node_Allocator_init(ast_allocator, mw.endlos);
 
-    if (verbose) $"Parsing {endlos_rolls_in_use(mw.endlos)} ...\n"
+    if (mw.options.verbose) $"Parsing {endlos_rolls_in_use(mw.endlos)} ...\n"
     let root => parse_program(tokens, ast_allocator, mw.endlos, mw.error_handler_location)
-    if (verbose) $"Parsing finished {endlos_rolls_in_use(mw.endlos)} \n"
+    if (mw.options.verbose) $"Parsing finished {endlos_rolls_in_use(mw.endlos)} \n"
+
+    if (mw.options.dump_ast == 1) ast_dump_tree (root);
 
     let imports = gather_imports(root, mw.endlos);
 
@@ -196,23 +202,23 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : Module& {
     let symbol_cache: SymbolCache;
     SymbolCache_init(symbol_cache, mw.type_cache, mw.endlos, lookup_external_symbol, mw);
 
-    if (verbose) $"Type Resolver {endlos_rolls_in_use(mw.endlos)} ...\n"
+    if (mw.options.verbose) $"Type Resolver {endlos_rolls_in_use(mw.endlos)} ...\n"
     type_resolver_run(root, symbol_cache, mw.endlos, mw.error_handler_ast_node);
-    if (verbose) $"Type Resolver finished  {endlos_rolls_in_use(mw.endlos)} \n"
+    if (mw.options.verbose) $"Type Resolver finished  {endlos_rolls_in_use(mw.endlos)} \n"
 
-    if (verbose) $"Resolver  {endlos_rolls_in_use(mw.endlos)} ...\n"
+    if (mw.options.verbose) $"Resolver  {endlos_rolls_in_use(mw.endlos)} ...\n"
     resolver_run(root, symbol_cache, mw.endlos, mw.error_handler_ast_node);
-    if (verbose) $"Resolver finished {endlos_rolls_in_use(mw.endlos)} \n"
+    if (mw.options.verbose) $"Resolver finished {endlos_rolls_in_use(mw.endlos)} \n"
 
-    // ast_dump_tree(root);
-
-    if (verbose) $"Going to run type checker {endlos_rolls_in_use(mw.endlos)} ...\n"
+    if (mw.options.dump_ast == 2) ast_dump_tree (root);
+    
+    if (mw.options.verbose) $"Going to run type checker {endlos_rolls_in_use(mw.endlos)} ...\n"
     type_checker_run(root, symbol_cache, ast_allocator, mw.endlos, mw.error_handler_ast_node);
-    if (verbose) $"Finished type checking. {endlos_rolls_in_use(mw.endlos)}\n"
+    if (mw.options.verbose) $"Finished type checking. {endlos_rolls_in_use(mw.endlos)}\n"
 
     AST_Node_Allocator_finalize(ast_allocator, mw.endlos);
 
-    // ast_dump_tree(root);
+    if (mw.options.dump_ast == 3) ast_dump_tree (root);
 
     calculate_stacks(root, mw.endlos);
 
@@ -222,8 +228,7 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : Module& {
     return module;
 }
 
-fn compile_program(initial_filename: u8[], stop_on_error: bool) {
-    let verbose = true;
+fn compile_program(initial_filename: u8[], options: FsmOptions&) {
 
     let endlos: EndlosAllocator;
     endlos_root_init(endlos, 128, 1024 * 1024 * 64);
@@ -235,18 +240,19 @@ fn compile_program(initial_filename: u8[], stop_on_error: bool) {
     mw.endlos => endlos;
     mw.type_cache => type_cache;
     mw.builtin_symbols = make_builtin_symbols(type_cache, endlos);
-    mw.error_handler_args.stop_on_error = stop_on_error;
+    mw.error_handler_args.stop_on_error = !options.continue_after_error;
     mw.error_handler_location.handler => error_handler_location;
     mw.error_handler_location.arg => mw.error_handler_args;
     mw.error_handler_ast_node.handler => error_handler_ast_node;
     mw.error_handler_ast_node.arg => mw.error_handler_args;
+    mw.options => options;
     EndlosArr_begin~Module(mw.modules, endlos);
 
     compile_module(mw, initial_filename);
 
     let compiled_modules = EndlosArr_finalize~Module(mw.modules, endlos);
 
-    if (verbose) $"Going to run il gen...\n"
+    if (mw.options.verbose) $"Going to run il gen...\n"
 
     let gen: IL_gen;
     gen.type_cache => type_cache;
@@ -262,7 +268,7 @@ fn compile_program(initial_filename: u8[], stop_on_error: bool) {
     EndlosArr_free~u8[](gen.generic_implementation_names, endlos);
     let opcodes = EndlosArr_finalize~Opcode(gen.opcodes, endlos);
 
-    if (verbose) $"il gen finished\n"
+    if (mw.options.verbose) $"il gen finished\n"
 
     // dump_opcodes(opcodes);
 
@@ -270,10 +276,37 @@ fn compile_program(initial_filename: u8[], stop_on_error: bool) {
 }
 
 fn main (argv: u8&[]) {
-    if (argv.len < 2) {
+    let arg_input_file: u8[];
+    let continue_after_error = false;
+
+    let options: FsmOptions;
+
+    for (let i = 1; i < argv.len; i++)  {
+        let arg = sv_of_c_string(argv[i]);
+        if (arg.begin == '-') {
+            if (sv_equal(arg, "-c")) {
+                options.continue_after_error = true;
+            }
+            if (sv_equal(arg, "-v")) {
+                options.verbose = true;
+            }
+            else if (sv_starts_with(arg, "-a")) {
+                options.dump_ast = parse_integer(sv_skip(arg, 2));
+            }
+            else {
+                write (2, $"fsm: Unknown option '{arg}'\n")
+                exit (1);
+            }
+        }
+        else {
+            arg_input_file = arg;
+        }
+    }
+
+    if (!arg_input_file.len) {
         write(2, $"fsm: No input file.\n");
         exit(1);
     } 
     
-    compile_program(sv_of_c_string(argv[1]), argv.len == 2);
+    compile_program(arg_input_file, options);
 }

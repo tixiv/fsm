@@ -144,6 +144,7 @@ union AST_node enum kind {
     struct AST_struct {
         body: AST_node&;
         name: u8[];
+        symbol: Symbol&;
         is_record: bool;
     }
 
@@ -155,6 +156,7 @@ union AST_node enum kind {
     struct AST_union {
         body: AST_node&;
         name: u8[];
+        symbol: Symbol&;
         enumerator_name: u8[];
     }
 
@@ -179,6 +181,7 @@ union AST_node enum kind {
     struct AST_enum {
         body: AST_node&;
         name: u8[];
+        symbol: Symbol&;
     }
 
     struct AST_enum_member {
@@ -192,6 +195,7 @@ union AST_node enum kind {
 
     struct AST_typename {
         name: u8[];
+        symbol: Symbol&;
     }
 
     struct AST_function_type {
@@ -315,30 +319,6 @@ fn ast_insert_node(allocator: AST_Node_Allocator&, at: AST_node&, new_node: AST_
     // ones copy linked
     obj_copy~AST_node(at, new_node);
 }
-
-/*
-fn ast_remove_node(n: AST_node&) : void {
-    AST_node *child = nullptr;
-    switch (n.kind) {        
-        else if (n.kind == AST_node::AST_dereference:
-            child = n.deref.body;
-        }
-        default:
-            NOT_IMPLEMENTED(__LOCATION__, "Removing AST node of kind %s");
-    }
-
-    ASSERT(child.next == nullptr, "Can't remove node when child is linked in a chain.\n")
-    AST_node *saved_next = n.next;
-
-    // just overwrite this node with the contents of the child. This will effectively move
-    // The child to where the old node was.
-    memcpy(n, child, sizeof(AST_node));
-
-    // restore the next pointer in case it is used
-    n.next = saved_next;
-}
-
-*/
 
 fn ast_visit_chain(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&) {
     while (n) {

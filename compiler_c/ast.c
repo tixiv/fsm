@@ -89,27 +89,6 @@ void ast_insert_node(AST_node *at, AST_node *new_node) {
     memcpy(at, new_node, sizeof(AST_node));
 }
 
-void ast_remove_node(AST_node *n) {
-    AST_node *child = nullptr;
-    switch (n->kind) {        
-        case AST_dereference:
-            child = n->deref.body;
-            break;
-        default:
-            NOT_IMPLEMENTED("Removing AST node of kind %s is not implemented yet.\n", ast_kind_name(n->kind));
-    }
-
-    ASSERT(child->next == nullptr, "Can't remove node when child is linked in a chain.\n")
-    AST_node *saved_next = n->next;
-
-    // just overwrite this node with the contents of the child. This will effectively move
-    // The child to where the old node was.
-    memcpy(n, child, sizeof(AST_node));
-
-    // restore the next pointer in case it is used
-    n->next = saved_next;
-}
-
 void ast_visit_chain(AST_node *n, void (*visit)(AST_node *, void *arg), void *arg) {
     while (n) {
         visit(n, arg);

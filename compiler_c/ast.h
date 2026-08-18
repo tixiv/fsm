@@ -315,7 +315,6 @@ AST_node *ast_alloc(AST_kind kind, const Location *location);
 
 AST_node *get_last_in_chain(AST_node *n);
 void ast_insert_node(AST_node *at, AST_node *new_node);
-void ast_remove_node(AST_node *n);
 void ast_link_to_chain(AST_node **chain_p, AST_node *n);
 
 typedef void (*AstVisitor)(AST_node *, void *);

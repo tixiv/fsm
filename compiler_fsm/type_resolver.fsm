@@ -55,13 +55,14 @@ fn get_type_by_name(symbol_cache: SymbolCache&, name: u8[], trs: TypeResolverSta
     return null;
 }
 
-fn push_named_type(trs: TypeResolverState&, name: u8[], type: Type&, n: AST_node&) : void {
+fn push_type_symbol(trs: TypeResolverState&, name: u8[], type: Type&, n: AST_node&) : Symbol& {
     type.name = name;
 
     let sym => alloc_symbol(trs.symbol_cache.symbol_roll, SymbolKind::SYM_type, name, n.location);
     sym.type => type;
 
     push_global_symbol(trs.symbol_cache, sym, n, trs.error_handler);
+    return sym;
 }
 
 fn type_lookup_visitor(n: AST_node&, trs: TypeResolverState&) : void {
@@ -70,15 +71,15 @@ fn type_lookup_visitor(n: AST_node&, trs: TypeResolverState&) : void {
         t.T_struct.kind = StructlikeKind::SL_struct;
         if (n.AST_struct.is_record)
             t.T_struct.kind = StructlikeKind::SL_record;
-        push_named_type(trs, n.AST_struct.name, t, n);
+        n.AST_struct.symbol => push_type_symbol(trs, n.AST_struct.name, t, n);
     }
     else if (n.kind == AST_node::AST_enum) {
         let t => type_alloc(trs.symbol_cache.type_cache, Type::T_enum);
         t.storage_size = 8;
-        push_named_type(trs, n.AST_enum.name, t, n);
+        n.AST_enum.symbol => push_type_symbol(trs, n.AST_enum.name, t, n);
     }
     else if (n.kind == AST_node::AST_union) {
-        push_named_type(trs, n.AST_union.name, type_alloc(trs.symbol_cache.type_cache, Type::T_union), n);
+        n.AST_union.symbol => push_type_symbol(trs, n.AST_union.name, type_alloc(trs.symbol_cache.type_cache, Type::T_union), n);
     }
     else {
         ast_visit_children(n, type_lookup_visitor, trs);
