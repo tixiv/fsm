@@ -39,7 +39,7 @@ struct UnionResolverState {
     union_members: EndlosArr<UnionMember>;
 }
 
-fn get_type_by_name(symbol_cache: SymbolCache&, name: u8[], trs: TypeResolverState&, n: AST_node&) : Type& {
+fn lookup_type_symbol (symbol_cache: SymbolCache&, name: u8[], trs: TypeResolverState&, n: AST_node&) : Symbol& {
     let sym => get_global_symbol_by_name(symbol_cache, name);
 
     if (sym) {
@@ -49,7 +49,7 @@ fn get_type_by_name(symbol_cache: SymbolCache&, name: u8[], trs: TypeResolverSta
             else
                 type_resolver_error(trs, n, $"Builtin '{name}' is not a type symbol");
         }
-        return sym.type;
+        return sym;
     }
 
     return null;
@@ -91,7 +91,7 @@ fn type_resolve_struct(n: AST_node&, trs: TypeResolverState&, global: bool) {
     srs.trs => trs;
     EndlosArr_begin~StructMember(srs.struct_members, trs.endlos);
     if (global) {
-        n.type => get_type_by_name(trs.symbol_cache, n.AST_struct.name, trs, n);
+        n.type => n.AST_struct.symbol.type;
         ASSERT(n.type, $"{__LOCATION__} The type name '{n.AST_struct.name}' should exist because it should have been found in the lookup pass.\n");
     }
     else {
@@ -175,7 +175,7 @@ fn type_resolver_visitor(n: AST_node&, trs: TypeResolverState&) : void {
         ers.trs => trs;
         EndlosArr_begin~EnumMember(ers.enum_members, trs.endlos);
 
-        n.type => get_type_by_name(trs.symbol_cache, n.AST_enum.name, trs, n);
+        n.type => n.AST_enum.symbol.type;
         ASSERT(n.type, "The type name should exist because it should have been found in the lookup pass.\n");
         
         ers.current_enum => n.type;
@@ -189,7 +189,7 @@ fn type_resolver_visitor(n: AST_node&, trs: TypeResolverState&) : void {
         urs.trs => trs;
         EndlosArr_begin~UnionMember(urs.union_members, trs.endlos);
 
-        n.type => get_type_by_name(trs.symbol_cache, n.AST_union.name, trs, n);
+        n.type => n.AST_union.symbol.type;
         ASSERT(n.type, "The type name should exist because it should have been found in the lookup pass.\n");
 
         n.type.T_union.enumarator_name = n.AST_union.enumerator_name;
@@ -208,8 +208,12 @@ fn type_resolver_visitor(n: AST_node&, trs: TypeResolverState&) : void {
             else
                 n.type => trs.symbol_cache.type_cache.builtin_generic
         }
-        else
-            n.type => get_type_by_name(trs.symbol_cache, n.AST_typename.name, trs, n);
+        else {
+            n.AST_typename.symbol => lookup_type_symbol(trs.symbol_cache, n.AST_typename.name, trs, n);
+            if (n.AST_typename.symbol) 
+                n.type => n.AST_typename.symbol.type;
+        }
+        
         if (!n.type) {
             type_resolver_error(trs, n, $"The typename '{n.AST_typename.name}' could not be resolved.");
             n.type => trs.symbol_cache.type_cache.builtin_void;

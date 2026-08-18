@@ -195,7 +195,7 @@ union AST_node enum kind {
 
     struct AST_typename {
         name: u8[];
-        symbol: Symbol&;
+        symbol: Symbol&;        
     }
 
     struct AST_function_type {

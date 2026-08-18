@@ -1,5 +1,6 @@
 
 import * from "std";
+import * from "compiler_fsm/common";
 import * from "compiler_fsm/ast";
 import * from "compiler_fsm/symbol";
 
@@ -11,19 +12,29 @@ struct Finder {
     best_symbol: Symbol&;
 }
 
-fn finder_visitor (n: AST_node&, finder: Finder&) : void {
-    if (n.kind == AST_node::AST_symbol) {
-        // We are looking for the AST node that is the first symbol after the indicated location,
-        // as our location is the end location of each token.
-        if (n.location.line == finder.line) {
-            write (3, $"Found Symbol '{n.AST_symbol.name}' col = {n.location.col} looking_for_col = {finder.col}\n");
-            if (finder.col <= n.location.col < finder.best_col) {
-                write (3, $"Best Symbol '{n.AST_symbol.name}' col = {n.location.col}\n");
-                finder.best_symbol => n.AST_symbol.symbol;
-                finder.best_col = n.location.col;
-            }
+
+fn update_finder(finder: Finder&, location: Location&, symbol: Symbol&) {
+    // We are looking for the AST node that is the first symbol after the indicated location,
+    // as our location is the end location of each token.
+    if (location.line == finder.line) {
+        // write (3, $"Found Symbol '{n.AST_symbol.name}' col = {n.location.col} looking_for_col = {finder.col}\n");
+        if (finder.col <= location.col < finder.best_col) {
+            // write (3, $"Best Symbol '{n.AST_symbol.name}' col = {n.location.col}\n");
+            finder.best_symbol => symbol;
+            finder.best_col = location.col;
         }
     }
+
+}
+
+fn finder_visitor (n: AST_node&, finder: Finder&) : void {
+    if (n.kind == AST_node::AST_symbol) {
+        update_finder(finder, n.location, n.AST_symbol.symbol);
+    }
+    else if (n.kind == AST_node::AST_typename) {
+        update_finder(finder, n.location, n.AST_typename.symbol);
+    }
+
     ast_visit_children(n, finder_visitor, finder);
 }
 
