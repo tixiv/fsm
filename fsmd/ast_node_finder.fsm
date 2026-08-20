@@ -5,44 +5,59 @@ import * from "compiler_fsm/ast";
 import * from "compiler_fsm/symbol";
 
 
-struct Finder {
+struct SymbolFinder {
     line : i32;
     col : i32;
-    best_col: i32;
     best_symbol: Symbol&;
 }
 
-
-fn update_finder(finder: Finder&, location: Location&, symbol: Symbol&) {
-    // We are looking for the AST node that is the first symbol after the indicated location,
-    // as our location is the end location of each token.
-    if (location.line == finder.line) {
-        // write (3, $"Found Symbol '{n.AST_symbol.name}' col = {n.location.col} looking_for_col = {finder.col}\n");
-        if (finder.col <= location.col < finder.best_col) {
-            // write (3, $"Best Symbol '{n.AST_symbol.name}' col = {n.location.col}\n");
-            finder.best_symbol => symbol;
-            finder.best_col = location.col;
+fn find_symbol_visitor (n: AST_node&, finder: SymbolFinder&) : void {
+    if (n.location.line == finder.line) {
+        if (n.kind == AST_node::AST_symbol) {
+            if (n.location.col - n.AST_symbol.name.len <= finder.col <= n.location.col) {
+                finder.best_symbol => n.AST_symbol.symbol;
+            }
+        }
+        else if (n.kind == AST_node::AST_typename) {
+            if (n.location.col - n.AST_typename.name.len <= finder.col <= n.location.col) {
+                finder.best_symbol => n.AST_typename.symbol;
+            }
         }
     }
 
-}
-
-fn finder_visitor (n: AST_node&, finder: Finder&) : void {
-    if (n.kind == AST_node::AST_symbol) {
-        update_finder(finder, n.location, n.AST_symbol.symbol);
-    }
-    else if (n.kind == AST_node::AST_typename) {
-        update_finder(finder, n.location, n.AST_typename.symbol);
-    }
-
-    ast_visit_children(n, finder_visitor, finder);
+    ast_visit_children(n, find_symbol_visitor, finder);
 }
 
 fn find_symbol_at (root: AST_node&, line, col) : Symbol& {
-    let finder: Finder;
+    let finder: SymbolFinder;
     finder.line = line;
     finder.col = col;
-    finder.best_col = 1000000;
-    finder_visitor(root, finder);
+    find_symbol_visitor(root, finder);
     return finder.best_symbol;
+}
+
+struct MemeberAccessFinder {
+    line : i32;
+    col : i32;
+    member_access: AST_node&;
+}
+
+fn find_member_visitor (n: AST_node&, finder: MemeberAccessFinder&) : void {
+    if (n.location.line == finder.line) {
+        if (n.kind == AST_node::AST_member_access) {
+            if (n.location.col - n.AST_member_access.name.len <= finder.col <= n.location.col) {
+                finder.member_access => n;
+            }
+        }
+    }
+
+    ast_visit_children(n, find_member_visitor, finder);
+}
+
+fn find_member_access_at (root: AST_node&, line, col) : AST_node& {
+    let finder: MemeberAccessFinder;
+    finder.line = line;
+    finder.col = col;
+    find_member_visitor(root, finder);
+    return finder.member_access;
 }

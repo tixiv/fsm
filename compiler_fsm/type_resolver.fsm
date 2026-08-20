@@ -111,6 +111,7 @@ fn type_resolver_enum_visitor(n: AST_node&, ers: EnumResolverState&) {
         ASSERT(ers.current_enum, $"{__LOCATION__} Encountered {n.kind.name} outside of enum.\n");
         let member => EndlosArr_push~EnumMember(&ers.enum_members);
         member.name = n.AST_enum_member.name;
+        member.location => n.location;
         ast_visit_children(n, type_resolver_visitor, ers.trs);
         member.value = n.AST_enum_member.value;
         n.type => ers.trs.symbol_cache.type_cache.builtin_i64;
@@ -125,6 +126,7 @@ fn type_resolver_struct_visitor(n: AST_node&, srs: StructResolverState&) : void 
         ASSERT(srs.current_struct, $"{__LOCATION__} Encountered {n.kind.name} outside of struct.\n");
         let member => EndlosArr_push~StructMember(srs.struct_members);
         member.name = n.AST_member_def.name;
+        member.location => n.location;
         ast_visit_children(n, type_resolver_visitor, srs.trs);
         if (n.AST_member_def._typedef) {
             if (!n.AST_member_def._typedef.type) type_resolver_error(srs.trs, n, $"The type for struct member '{member.name}' could not be resolved.");
@@ -144,6 +146,7 @@ fn type_resolver_union_visitor(n: AST_node&, urs: UnionResolverState&) : void {
     if (n.kind == AST_node::AST_union_member_def) {
         let member => EndlosArr_push~UnionMember(urs.union_members);
         member.name = n.AST_union_member_def.name;
+        member.location => n.location;
         ast_visit_children(n, type_resolver_union_visitor, urs);
         if (n.AST_union_member_def._typedef) {
             if (!n.AST_union_member_def._typedef.type) type_resolver_error(urs.trs, n, $"The type for union member '{member.name}' could not be resolved.");

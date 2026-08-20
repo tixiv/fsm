@@ -56,7 +56,8 @@ write_wrapped (1, $"\{
 
 fn send_diagnostic_notifications (filename: u8[], diagnostics: Diagnostic[]) {
     let sb: StringBuilder;
-    let buf: u8[131072];
+    let buf: u8[0x100000];
+    let escape_buf: u8[1024];
     sb_init(sb, buf);
     sb_puts(sb, $"\{
     \"jsonrpc\": \"2.0\",
@@ -80,7 +81,7 @@ fn send_diagnostic_notifications (filename: u8[], diagnostics: Diagnostic[]) {
                     }
                 },
                 \"severity\": 1,
-                \"message\": \"{d.message}\",
+                \"message\": \"{json_escape_string(d.message, escape_buf)}\",
                 \"source\": \"fsmd\"
             }");
         if (i + 1 < diagnostics.len) sb_puts(sb, ",");

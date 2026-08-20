@@ -400,8 +400,8 @@ fn parse_primary(parser: Parser&) : AST_node&
                 take_expected(parser, TokenKind::TOK_rbracket);
             } 
             if (parser.CT.kind == TokenKind::TOK_dot) {
-                let ast_member_access => ast_alloc(parser.allocator, AST_node::AST_member_access, parser.CT.location);
                 MOVE_NEXT(parser);
+                let ast_member_access => ast_alloc(parser.allocator, AST_node::AST_member_access, parser.CT.location);
                 expect_token(parser, TokenKind::TOK_identifier);
                 ast_member_access.AST_member_access.body => n;
                 ast_member_access.AST_member_access.name = parser.CT.value;

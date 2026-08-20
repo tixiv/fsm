@@ -104,8 +104,6 @@ fn json_get_string (json: u8[], id: u8[]) {
 
 
 fn json_unescape_string (escaped: u8[], buffer: u8[]) : u8[] {
-    let sb: StringBuilder;
-
     let unescaped = buffer;
     for ( ; escaped.len; escaped++) {
         let c = escaped.begin;
@@ -123,6 +121,21 @@ fn json_unescape_string (escaped: u8[], buffer: u8[]) : u8[] {
     }
     let ret = buffer;
     ret.len = buffer.len - unescaped.len;
+
+    return ret;
+}
+
+fn json_escape_string (str: u8[], buffer: u8[]) : u8[] {
+    let escaped = buffer;
+
+    while (str.len && escaped.len) {
+        let c = str++;
+             if (c == '\n') { escaped++ = '\\'; escaped++ = 'n' }
+        else if (c == '"')  { escaped++ = '\\'; escaped++ = '"' }
+        else escaped++ = c;
+    }
+    let ret = buffer;
+    ret.len = buffer.len - escaped.len;
 
     return ret;
 }

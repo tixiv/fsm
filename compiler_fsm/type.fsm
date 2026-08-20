@@ -1,21 +1,25 @@
 
 import * from "std";
 import * from "endlos";
+import * from "common";
 
 struct StructMember {
     name: u8[];
     type: Type&;
+    location: Location&;
 }
 
 struct UnionMember {
     name: u8[];
     type: Type&;
     value;
+    location: Location&;
 }
 
 struct EnumMember {
     name: u8[];
     value;
+    location: Location&;
 }
 
 enum StructlikeKind {
@@ -450,6 +454,36 @@ fn get_member_type_and_offset_by_name(cache: TypeCache&, t: Type&, member_name: 
     return null;
 }
 
+fn get_member_location_by_name(cache: TypeCache&, t: Type&, member_name: u8[]) : Location& {
+    if (is_reference_kind(t)) t => t.T_reference.target_type;
+    
+    if (t.kind == Type::T_struct) {
+        for (let i = 0; i < t.T_struct.members.len; i++) {
+            let member => &t.T_struct.members[i];
+            if (sv_equal(&member.name, member_name)) {
+                return member.location;
+            }
+        }
+    }
+    else if (t.kind == Type::T_union) {
+        for (let i = 0; i < t.T_union.members.len; i++) {
+            let member => t.T_union.members[i];
+
+            if (!member.name.begin) {
+                if (is_struct_kind(member.type)) {
+                    let location => get_member_location_by_name(cache, member.type, member_name);
+                    if (location) return location;
+                }
+                else NOT_IMPLEMENTED(__LOCATION__, "Unnanmed things in unions except structs\n")
+            }
+
+            if (sv_equal(member.name, member_name)) {
+                return member.location;
+            }
+        }
+    }
+    return null;
+}
 
 fn get_enum_member_value (t: Type&, member_name: u8[], enum_value: i64&) : bool {
     for (let i = 0; i < t.T_enum.members.len; i++) {
@@ -680,9 +714,9 @@ fn speciate_tree(tc: TypeCache&, t: Type&, speciation: Type&) : Type& {
             let alloc = endlos_begin~StructMember(tc.endlos);
             let members = alloc;
             for (let i = 0; i < t.T_struct.members.len; i++) {
+                obj_copy~StructMember(members.begin, t.T_struct.members[i]);
                 members.begin.type => speciate_tree(tc, t.T_struct.members[i].type, speciation);
                 if (members.begin.type <!=> t.T_struct.members[i].type) need_to_copy = true;
-                members.begin.name = t.T_struct.members[i].name;
                 members++;
             }
 

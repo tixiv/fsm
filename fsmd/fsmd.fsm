@@ -419,18 +419,39 @@ fn find_definition(mw: ModuleWalker&, range: LocationRange&, uri: u8[], line, co
     let module => find_existing_module(mw, filename);
     if (!module) { let r: u8[]; return r; }
 
-    let sym => find_symbol_at(module.ast_root, line + 1, col + 1);
+    // convert to one based
+    line++; col++;
 
-    if (!sym) { let r: u8[]; return r; }
+    let sym => find_symbol_at(module.ast_root, line, col);
 
-    write (mw.log_fd, $"Found symbol {sym.name}\n")
+    if (sym) {
+        write (mw.log_fd, $"Found symbol {sym.name}\n")
+        range.start_line = sym.location.line - 1;
+        range.end_line = sym.location.line;
+        range.start_col = 0;
+        range.end_col = 0;
+        return sym.location.module.filename;
+    }
 
-    range.start_line = sym.location.line - 1;
-    range.end_line = sym.location.line;
-    range.start_col = 0;
-    range.end_col = 0;
-    
-    return sym.location.module.filename;
+    let n => find_member_access_at(module.ast_root, line, col);
+    if (n) {
+        let buf: u8[1024];
+        write (mw.log_fd, $"Found member access {n.AST_member_access.name}\n")
+        let container => n.AST_member_access.body;
+        if (!container) { let r: u8[]; return r; }
+        let type => container.type;
+        if (!type) { let r: u8[]; return r; }
+        write (mw.log_fd, $"Found member access {get_type_name_r(buf, type)}\n")
+        let location => get_member_location_by_name(mw.type_cache, type, n.AST_member_access.name);
+        if (!location) { let r: u8[]; return r; }
+        range.start_line = location.line - 1;
+        range.end_line = location.line;
+        range.start_col = 0;
+        range.end_col = 0;
+        return location.module.filename;
+    }
+
+    let r: u8[]; return r;
 }
 
 fn main () {
