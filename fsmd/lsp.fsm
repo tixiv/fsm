@@ -17,9 +17,11 @@ write_wrapped (1, $"\{
     \"result\": \{
         \"capabilities\": \{
             \"textDocumentSync\": 1,
-            \"documentSymbolProvider\": true,
+            \"documentSymbolProvider\": false,
             \"definitionProvider\": true,
-            \"renameProvider\": true
+            \"inlayHintProvider\": false,
+            \"renameProvider\": false,
+            \"referencesProvider\": true
         }
     }
 }");
@@ -90,6 +92,47 @@ fn send_diagnostic_notifications (filename: u8[], diagnostics: Diagnostic[]) {
         ]
     }
 }");
+
+    write_wrapped(1, sb.str);
+}
+
+struct LSP_Location {
+    filename: u8[];
+    range: LocationRange;
+}
+
+fn lsp_put_location(sb: StringBuilder&, location: LSP_Location&) {
+    sb_puts(sb, $"    \{
+        \"uri\": \"file:///home/tixiv/work/fsm/{location.filename}\",
+        \"range\": \{
+            \"start\": \{
+                \"line\": {location.range.start_line},
+                \"character\": {location.range.start_col}
+            },
+            \"end\": \{
+                \"line\": {location.range.start_line},
+                \"character\": {location.range.end_col}
+            }
+        }
+    }");
+}
+
+fn lsp_send_references_response (id :u8[], locations: LSP_Location[], buffer: u8[]) {
+    let sb: StringBuilder;
+    sb_init(sb, buffer);
+
+    sb_puts(sb, $"\{
+    \"jsonrpc\": \"2.0\",
+    \"id\": {id},
+    \"result\": [\n");
+
+    for (let i = 0; i < locations.len; i++) {
+        lsp_put_location(sb, locations[i]);
+        if (i < locations.len-1)
+            sb_puts(sb, ",\n");
+    }
+
+    sb_puts(sb, "]\n}\n");
 
     write_wrapped(1, sb.str);
 }

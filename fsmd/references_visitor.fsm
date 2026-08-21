@@ -1,0 +1,40 @@
+
+import * from "std";
+import * from "endlos";
+import * from "compiler_fsm/common";
+import * from "compiler_fsm/ast";
+import * from "compiler_fsm/symbol";
+import * from "compiler_fsm/type";
+import * from "lsp";
+
+
+struct SymbolReferencesVisitor {
+    locations: EndlosArr<LSP_Location>&;
+    symbol_to_find: Symbol&;
+}
+
+
+fn symbol_references_visitor(n: AST_node&, v: SymbolReferencesVisitor&) : void {
+    if (n.kind == AST_node::AST_symbol) {
+        if (n.AST_symbol.symbol <==> v.symbol_to_find) {
+            let loc => EndlosArr_push~LSP_Location(v.locations);
+            loc.filename         = n.location.module.filename;
+            loc.range.start_line = n.location.line-1;
+            loc.range.end_line   = n.location.line-1;
+            loc.range.start_col  = n.location.col - n.AST_symbol.name.len - 1;
+            loc.range.end_col    = n.location.col - 1;
+        }
+    }
+    ast_visit_children(n, symbol_references_visitor, v);
+}
+
+fn find_symbol_references_in_ast(root: AST_node&, locations: EndlosArr<LSP_Location>&, symbol_to_find: Symbol&) {
+    let v: SymbolReferencesVisitor;
+    v.locations => locations;
+    v.symbol_to_find => symbol_to_find;
+    symbol_references_visitor(root, v);
+}
+
+fn find_member_references_in_ast(root: AST_node&, locations: EndlosArr<LSP_Location>&, type_to_find: Type&, member_to_find: u8[]) {
+
+}

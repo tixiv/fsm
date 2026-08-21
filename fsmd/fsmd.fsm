@@ -21,6 +21,7 @@ import * from "json";
 import * from "lsp";
 import * from "helpers";
 import * from "ast_node_finder";
+import * from "references_visitor";
 
 fn open_log_file() {
     let O_WRONLY = 1;
@@ -454,6 +455,49 @@ fn find_definition(mw: ModuleWalker&, range: LocationRange&, uri: u8[], line, co
     let r: u8[]; return r;
 }
 
+fn find_all_references(mw: ModuleWalker&, id: u8[], uri: u8[], line, col) {
+    let filename = uri_to_file_path(mw.project_root, uri);
+    let module => find_existing_module(mw, filename);
+    if (!module) return;
+
+    let modules => mw.modules.arr;
+
+    // convert to one based
+    line++; col++;
+
+    let reference_locations: EndlosArr<LSP_Location>;
+
+    let sym => find_symbol_at(module.ast_root, line, col);
+    if (sym) {
+        EndlosArr_begin~LSP_Location(reference_locations, mw.endlos_main);
+        for (let i = 0; i < modules.len; i++) {
+            let other_module => modules[i];
+            if (other_module.state == ModuleState::Compiled) {
+                find_symbol_references_in_ast(other_module.ast_root, reference_locations, sym);
+            }
+        }
+    }
+    else {
+        let n => find_member_access_at(module.ast_root, line, col);
+        if (n && n.AST_member_access.body && n.AST_member_access.body.type) {
+            let type => n.AST_member_access.body.type;
+            let name = n.AST_member_access.name;
+            for (let i = 0; i < modules.len; i++) {
+                let other_module => modules[i];
+                if (other_module.state == ModuleState::Compiled) {
+                    //find_member_references_in_ast(other_module.ast_root, reference_locations, sym);
+                }
+            }
+        } 
+    }
+
+    let buffer = endlos_begin~u8(mw.endlos_main);
+    lsp_send_references_response(id, reference_locations.arr, buffer);
+    endlos_ripp_off~u8(mw.endlos_main, buffer); // free
+
+    EndlosArr_free~LSP_Location(reference_locations, mw.endlos_main);
+}
+
 fn main () {
     let log_fd = open_log_file();
 
@@ -509,6 +553,15 @@ fn main () {
             let filename = find_definition(mw, range, uri, line, col);
             
             send_definition_response(id, filename, range);
+        }
+        else if (sv_equal(method, "textDocument/references")) {
+            let textDocument = json_get_element(params, "textDocument");
+            let uri = json_get_string(textDocument, "uri");
+            let position = json_get_element(params, "position");
+            let line = parse_integer(json_get_number(position, "line"));
+            let col = parse_integer(json_get_number(position, "character"));
+
+            find_all_references(mw, id, uri, line, col);
         }
         else if (sv_equal(method, "textDocument/didChange")) {
             let textDocument = json_get_element(params, "textDocument");

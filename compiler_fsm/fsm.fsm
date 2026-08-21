@@ -275,6 +275,16 @@ fn compile_program(initial_filename: u8[], options: FsmOptions&) {
     output_asm("out1.asm", opcodes, endlos);
 }
 
+fn print_help () {
+    write (2,
+"Usage: fsm [options] <input_file.fsm>
+  -c     Continue after errors occurred
+  -v     Verbose information about compile steps
+  -a<n>  Dump the AST tree at different points during the compilation
+");
+}
+
+
 fn main (argv: u8&[]) {
     let arg_input_file: u8[];
     let continue_after_error = false;
@@ -287,14 +297,18 @@ fn main (argv: u8&[]) {
             if (sv_equal(arg, "-c")) {
                 options.continue_after_error = true;
             }
-            if (sv_equal(arg, "-v")) {
+            else if (sv_equal(arg, "-v")) {
                 options.verbose = true;
             }
             else if (sv_starts_with(arg, "-a")) {
                 options.dump_ast = parse_integer(sv_skip(arg, 2));
             }
+            else if (sv_starts_with(arg, "--help")) {
+                print_help();
+                exit(0);
+            }
             else {
-                write (2, $"fsm: Unknown option '{arg}'\n")
+                write (2, $"fsm: Unknown option '{arg}'. Use --help for options.\n")
                 exit (1);
             }
         }

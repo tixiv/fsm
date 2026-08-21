@@ -130,8 +130,9 @@ fn json_escape_string (str: u8[], buffer: u8[]) : u8[] {
 
     while (str.len && escaped.len) {
         let c = str++;
-             if (c == '\n') { escaped++ = '\\'; escaped++ = 'n' }
-        else if (c == '"')  { escaped++ = '\\'; escaped++ = '"' }
+             if (c == '\n')  { escaped++ = '\\'; escaped++ = 'n'  }
+        else if (c == '"')   { escaped++ = '\\'; escaped++ = '"'  }
+        else if (c == '\\')  { escaped++ = '\\'; escaped++ = '\\' }
         else escaped++ = c;
     }
     let ret = buffer;

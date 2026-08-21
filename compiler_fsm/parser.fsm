@@ -32,15 +32,20 @@ fn MOVE_NEXT(parser: Parser&) {
     }
 }
 
-fn expect_token(parser: Parser&, tok: TokenKind) {
+fn expect_token(parser: Parser&, tok: TokenKind) : bool {
     if (parser.CT.kind != tok) {
         parser_error(parser, $"Expected {tok.name} but got {parser.CT.kind.name}");
+        return false;
     }
+    return true;
 }
 
-fn take_expected(parser: Parser&, tok: TokenKind) {
-    expect_token(parser, tok);
-    MOVE_NEXT(parser);
+fn take_expected(parser: Parser&, tok: TokenKind) : bool {
+    if (expect_token(parser, tok)) {
+        MOVE_NEXT(parser);
+        return true;
+    }
+    return false;
 }
 
 fn link_arr(parent: AST_node&, child: AST_node&) {
@@ -932,13 +937,12 @@ fn parse_program(tokens: Token[], allocator: AST_Node_Allocator&, endlos: Endlos
             MOVE_NEXT(parser);
             take_expected(parser, TokenKind::TOK_asterisk);
             take_expected(parser, TokenKind::TOK_identifier); // from
-            expect_token(parser, TokenKind::TOK_string);
-
-            let ast_import => ast_alloc(parser.allocator, AST_node::AST_import, parser.CT.location);
-            ast_import.AST_import.name = parser.CT.value;
-            ast_link_to_chain(&root.AST_program.body, ast_import);
-
-            MOVE_NEXT(parser);
+            if (expect_token(parser, TokenKind::TOK_string)) {
+                let ast_import => ast_alloc(parser.allocator, AST_node::AST_import, parser.CT.location);
+                ast_import.AST_import.name = parser.CT.value;
+                ast_link_to_chain(&root.AST_program.body, ast_import);
+                MOVE_NEXT(parser);
+            }
             take_expected(parser, TokenKind::TOK_semicolon);
         }
         else if (parser.CT.kind == TokenKind::TOK_keyword_fn) {
