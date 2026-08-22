@@ -26,6 +26,7 @@ enum StructlikeKind {
     SL_struct,
     SL_record,
     SL_slice,
+    SL_dyn_arr,
 }
 
 union Type enum kind {
@@ -115,6 +116,7 @@ struct TypeCache {
     enumerator_types :TypeRefArr;
     array_types      :TypeRefArr;
     slice_types      :TypeRefArr;
+    dyn_arr_types    :TypeRefArr;
     speciated_types  :EndlosArr<SpeciatedType>;
 
     builtin_void: Type;
@@ -143,6 +145,7 @@ fn TypeCache_init(cache: TypeCache&, endlos: EndlosAllocator&) {
     TypeRefArr_init(cache.enumerator_types, endlos);
     TypeRefArr_init(cache.array_types,      endlos);
     TypeRefArr_init(cache.slice_types,      endlos);
+    TypeRefArr_init(cache.dyn_arr_types,    endlos);
     EndlosArr_begin~SpeciatedType(cache.speciated_types, endlos);
 
     let t: Type&;
@@ -232,7 +235,11 @@ fn get_type_name_r_impl(print_buf: u8[1024]&, type: Type&, encoded: bool) : u8[]
     else if (type.kind == Type::T_struct) {
         if (is_slice_kind(type)) {
             sb_puts(sb, get_type_name_r_impl(child_print_buf, dereferenced_type(type.T_struct.members[0].type), encoded));
-            sb_puts(sb, if (encoded) "slice" else "[]");
+            sb_puts(sb, if (encoded) "_slice" else "[]");
+        }
+        else if (is_dyn_arr_kind(type)) {
+            sb_puts(sb, get_type_name_r_impl(child_print_buf, dereferenced_type(type.T_struct.members[0].type), encoded));
+            sb_puts(sb, if (encoded) "_dyn_arr" else "[*]");
         }
         else {
             let kind_name = "unknown ";
@@ -323,6 +330,10 @@ fn is_record_kind(t: Type&) : bool {
 
 fn is_slice_kind(t: Type&) : bool {
     return t && t.kind == Type::T_struct && t.T_struct.kind == StructlikeKind::SL_slice;
+}
+
+fn is_dyn_arr_kind(t: Type&) : bool {
+    return t && t.kind == Type::T_struct && t.T_struct.kind == StructlikeKind::SL_dyn_arr;
 }
 
 fn is_union_kind(t: Type&) : bool {
@@ -514,7 +525,7 @@ fn get_union_member_value (t: Type&, member_name: u8[], enum_value: i64&) : bool
 }
 
 fn calculate_storage_size(container: Type&) : void {
-    if (is_struct_kind(container) || is_slice_kind(container)) {
+    if (is_struct_kind(container) || is_slice_kind(container) || is_dyn_arr_kind(container)) {
         let offset = 0;
         for (let i = 0; i < container.T_struct.members.len; i++) {
             let member => container.T_struct.members[i];
@@ -667,8 +678,50 @@ fn get_slice_type(cache: TypeCache&, element_type: Type&) : Type& {
     return slice;
 }
 
+fn make_dyn_arr_type(cache: TypeCache&, element_type: Type&) : Type& {
+    let dyn_arr_t => type_alloc(cache, Type::T_struct);
+    dyn_arr_t.T_struct.members.len = 3;
+    dyn_arr_t.T_struct.kind = StructlikeKind::SL_dyn_arr;
+
+    let members = endlos_begin~StructMember(cache.endlos);
+    let m1 => members++;
+    let m2 => members++;
+    let m3 => members++;
+
+    m1.type => get_ref_type_for(cache, element_type);
+    m1.name = "buffer";
+    m2.type => cache.builtin_i32;
+    m2.name = "len";
+    m3.type => cache.builtin_i32;
+    m3.name = "capacity";
+
+    dyn_arr_t.T_struct.members = endlos_ripp_off~StructMember(cache.endlos, members);
+
+    calculate_storage_size(dyn_arr_t);
+
+    return dyn_arr_t;
+}
+
+fn check_is_dyn_arr_of_type(dyn_arr: Type&, ref_type: Type&, _: any&) {
+    return dyn_arr.T_struct.members[0].type <==> ref_type;
+}
+
+fn get_dyn_arr_type(cache: TypeCache&, element_type: Type&) : Type& {
+    let dyn_arr => find_type_in_array(cache.dyn_arr_types, check_is_dyn_arr_of_type, get_ref_type_for(cache, element_type), null);
+    if (dyn_arr) return dyn_arr;
+
+    dyn_arr => make_dyn_arr_type(cache, element_type);
+    TypeRefArr_push(cache.dyn_arr_types, dyn_arr);
+    return dyn_arr;
+}
+
 fn get_slice_element_type(t: Type&) : Type& {
     ASSERT(is_slice_kind(t), "Tried to get slice element type for non slice type.\n");
+    return dereferenced_type(t.T_struct.members[0].type);
+}
+
+fn get_dyn_arr_element_type(t: Type&) : Type& {
+    ASSERT(is_dyn_arr_kind(t), "Tried to get dyn arr element type for non dyn arr type.\n");
     return dereferenced_type(t.T_struct.members[0].type);
 }
 
@@ -710,6 +763,11 @@ fn speciate_tree(tc: TypeCache&, t: Type&, speciation: Type&) : Type& {
     else if (t.kind == Type::T_struct) {
         if (is_slice_kind(t)) {
             return get_slice_type(tc, 
+                dereferenced_type(
+                    speciate_tree(tc, t.T_struct.members[0].type, speciation)));
+        }
+        if (is_dyn_arr_kind(t)) {
+            return get_dyn_arr_type(tc, 
                 dereferenced_type(
                     speciate_tree(tc, t.T_struct.members[0].type, speciation)));
         }

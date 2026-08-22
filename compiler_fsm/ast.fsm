@@ -39,13 +39,14 @@ union AST_node enum kind {
         name: u8[];
     }
 
-    struct AST_arg_list       { body: AST_node&; }
-    struct AST_scope          { body: AST_node&; }
-    struct AST_program        { body: AST_node&; }
-    struct AST_array_to_slice { body: AST_node&; }
-    struct AST_dereference    { body: AST_node&; }
-    struct AST_reference      { body: AST_node&; }
-    struct AST_type_ref       { body: AST_node&; }
+    struct AST_arg_list         { body: AST_node&; }
+    struct AST_scope            { body: AST_node&; }
+    struct AST_program          { body: AST_node&; }
+    struct AST_array_to_slice   { body: AST_node&; }
+    struct AST_dyn_arr_to_slice { body: AST_node&; }
+    struct AST_dereference      { body: AST_node&; }
+    struct AST_reference        { body: AST_node&; }
+    struct AST_type_ref         { body: AST_node&; }
 
     struct AST_call {
         target: AST_node&;
@@ -212,6 +213,10 @@ union AST_node enum kind {
         body: AST_node&;
     }
 
+    struct AST_type_dyn_arr {
+        body: AST_node&;
+    }
+
     struct AST_builder_string {
         var_decl_sb: AST_node&;
         var_decl_arr: AST_node&;
@@ -308,11 +313,12 @@ fn ast_insert_node(allocator: AST_Node_Allocator&, at: AST_node&, new_node: AST_
     new_node.next => at.next;
     new_node.result_used = at.result_used;
 
-         if (new_node.kind == AST_node::AST_cast) {          new_node.AST_cast.body => at_copy; }
-    else if (new_node.kind == AST_node::AST_dereference) {   new_node.AST_dereference.body => at_copy; }
-    else if (new_node.kind == AST_node::AST_reference) {     new_node.AST_reference.body => at_copy; }
-    else if (new_node.kind == AST_node::AST_array_to_slice) {new_node.AST_array_to_slice.body => at_copy; }
-    else if (new_node.kind == AST_node::AST_call) {          new_node.AST_call.args => at_copy; }
+         if (new_node.kind == AST_node::AST_cast)             { new_node.AST_cast.body => at_copy; }
+    else if (new_node.kind == AST_node::AST_dereference)      { new_node.AST_dereference.body => at_copy; }
+    else if (new_node.kind == AST_node::AST_reference)        { new_node.AST_reference.body => at_copy; }
+    else if (new_node.kind == AST_node::AST_array_to_slice)   { new_node.AST_array_to_slice.body => at_copy; }
+    else if (new_node.kind == AST_node::AST_dyn_arr_to_slice) { new_node.AST_dyn_arr_to_slice.body => at_copy; }
+    else if (new_node.kind == AST_node::AST_call)             { new_node.AST_call.args => at_copy; }
     else NOT_IMPLEMENTED(__LOCATION__, $"Inserting AST node of kind {new_node.kind.name}");
 
     // overwrite the old node with the new one that has the old
@@ -394,6 +400,9 @@ fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
     else if (n.kind == AST_node::AST_array_to_slice) {
         visit_non_null(n.AST_array_to_slice.body, visit, arg);
     }
+    else if (n.kind == AST_node::AST_dyn_arr_to_slice) {
+        visit_non_null(n.AST_dyn_arr_to_slice.body, visit, arg);
+    }
     else if (n.kind == AST_node::AST_array_access) {
         visit_non_null(n.AST_array_access.array, visit, arg);
         visit_non_null(n.AST_array_access.index, visit, arg);
@@ -439,6 +448,9 @@ fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
     }
     else if (n.kind == AST_node::AST_type_slice) {
         visit_non_null(n.AST_type_slice.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_type_dyn_arr) {
+        visit_non_null(n.AST_type_dyn_arr.body, visit, arg);
     }
     else if (n.kind == AST_node::AST_variadic_operator) {
         visit_non_null(n.AST_variadic_operator.left, visit, arg);
@@ -566,6 +578,9 @@ fn ast_copy_tree(alloc: AllocatorsForTreeCopy&, n: AST_node&) : AST_node& {
     else if (n.kind == AST_node::AST_array_to_slice) {
         nn.AST_array_to_slice.body => ast_copy_tree(alloc, n.AST_array_to_slice.body);
     }
+    else if (n.kind == AST_node::AST_dyn_arr_to_slice) {
+        nn.AST_dyn_arr_to_slice.body => ast_copy_tree(alloc, n.AST_dyn_arr_to_slice.body);
+    }
     else if (n.kind == AST_node::AST_array_access) {
         nn.AST_array_access.array => ast_copy_tree(alloc, n.AST_array_access.array);
         nn.AST_array_access.index => ast_copy_tree(alloc, n.AST_array_access.index);
@@ -598,6 +613,9 @@ fn ast_copy_tree(alloc: AllocatorsForTreeCopy&, n: AST_node&) : AST_node& {
     }
     else if (n.kind == AST_node::AST_type_slice) {
         nn.AST_type_slice.body => ast_copy_tree(alloc, n.AST_type_slice.body);
+    }
+    else if (n.kind == AST_node::AST_type_dyn_arr) {
+        nn.AST_type_dyn_arr.body => ast_copy_tree(alloc, n.AST_type_dyn_arr.body);
     }
     else if (n.kind == AST_node::AST_variadic_operator) {
         nn.AST_variadic_operator.left => ast_copy_tree(alloc, n.AST_variadic_operator.left);
@@ -678,6 +696,7 @@ fn ast_dump_visitor (n: AST_node&, spaces: i64&) : void {
                    |== AST_node::AST_type_ref
                    |== AST_node::AST_type_array
                    |== AST_node::AST_type_slice
+                   |== AST_node::AST_type_dyn_arr
                    |== AST_node::AST_dereference
                    |== AST_node::AST_reference
                    |== AST_node::AST_plus_plus

@@ -1,0 +1,22 @@
+
+generic T fn make_arr (buffer: T[]) : T[*] {
+    let arr: u8[*];
+    arr.buffer => buffer.begin;
+    arr.capacity = buffer.len;
+    return arr;
+}
+
+fn main () {
+    let buffer: u8[26];
+    let arr = make_arr~u8(buffer);
+
+    for (let i = 0; i < arr.capacity; i++) {
+        arr++ = i + 'A';
+    }
+
+    for (let i = 0; i < arr.len; i++) {
+        print(arr[i]);
+    }
+
+    puts(arr) puts("\n")
+}

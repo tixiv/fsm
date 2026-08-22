@@ -170,6 +170,7 @@ fn resolver_visitor(n: AST_node&, res: Resolver&) : void {
                     |== AST_node::AST_type_ref
                     |== AST_node::AST_type_array
                     |== AST_node::AST_type_slice
+                    |== AST_node::AST_type_dyn_arr
                     |== AST_node::AST_function_type
                     |== AST_node::AST_builder_string
                     |== AST_node::AST_user_cast

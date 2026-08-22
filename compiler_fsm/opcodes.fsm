@@ -48,6 +48,7 @@ enum OpKind {
     OP_integer_plus_plus,
     OP_integer_minus_minus,
     OP_slice_plus_plus,
+    OP_dyn_arr_plus_plus,
     OP_bittest,
     OP_bitshift,
     OP_bitand,
@@ -57,6 +58,7 @@ enum OpKind {
     OP_setbit,
     OP_pop,
     OP_get_enum_member_name,
+    OP_dyn_arr_to_slice,
 }
 
 

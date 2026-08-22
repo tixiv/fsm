@@ -52,6 +52,7 @@ fn link_arr(parent: AST_node&, child: AST_node&) {
     
          if (parent.kind == AST_node::AST_type_array) parent.AST_type_array.body => child
     else if (parent.kind == AST_node::AST_type_slice) parent.AST_type_slice.body => child
+    else if (parent.kind == AST_node::AST_type_dyn_arr) parent.AST_type_dyn_arr.body => child
     else NOT_IMPLEMENTED(__LOCATION__, $"Linking to {parent.kind.name}");
 }
 
@@ -83,9 +84,22 @@ fn parse_typedecl_postifx(parser: Parser&, inner: AST_node&) : AST_node& {
                 }
                 latest => ast_array;
             }
+            else if (parser.CT.kind == TokenKind::TOK_asterisk) {
+                let ast_arr => ast_alloc(parser.allocator, AST_node::AST_type_dyn_arr, location);
+                MOVE_NEXT(parser);
+                take_expected(parser, TokenKind::TOK_rbracket);
+
+                if (!first) {
+                    first => ast_arr;
+                }
+                if (latest) {
+                    link_arr(latest, ast_arr);
+                }
+                latest => ast_arr;                
+            }
             else if (parser.CT.kind == TokenKind::TOK_rbracket) {
                 let ast_slice => ast_alloc(parser.allocator, AST_node::AST_type_slice, location);
-                take_expected(parser, TokenKind::TOK_rbracket);
+                MOVE_NEXT(parser);
 
                 if (!first) {
                     first => ast_slice;
@@ -417,11 +431,12 @@ fn parse_primary(parser: Parser&) : AST_node&
             if (parser.CT.kind == TokenKind::TOK_dot) {
                 MOVE_NEXT(parser);
                 let ast_member_access => ast_alloc(parser.allocator, AST_node::AST_member_access, parser.CT.location);
-                expect_token(parser, TokenKind::TOK_identifier);
+                if (expect_token(parser, TokenKind::TOK_identifier)) {
+                    ast_member_access.AST_member_access.name = parser.CT.value;
+                    MOVE_NEXT(parser);
+                }
                 ast_member_access.AST_member_access.body => n;
-                ast_member_access.AST_member_access.name = parser.CT.value;
                 n => ast_member_access;
-                MOVE_NEXT(parser);
             }
             if (parser.CT.kind == TokenKind::TOK_colon_colon) {
                 let ast_namespace_access => ast_alloc(parser.allocator, AST_node::AST_namespace_access, parser.CT.location);

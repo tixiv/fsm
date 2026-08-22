@@ -455,7 +455,6 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) 
                 write(file, "    push rax\n");
             }
             write(file, "    cmp QWORD [rbx+8], 0\n");
-            write(file, "    \n");
             write(file, "    jle @f\n");
             write(file, $"    add QWORD [rbx], {size}\n");
             write(file, "    dec QWORD [rbx+8]\n");
@@ -464,6 +463,37 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) 
                 write(file, "    mov rax, [rbx]\n");
                 write(file, "    push rax\n");
             }
+        }
+        else if (op.kind == OpKind::OP_dyn_arr_plus_plus) {
+            write(file, "    pop rbx\n");
+            write(file, "    mov ecx, [rbx+8]\n") // len (automatically zero extended into rcx)
+            if (op.i64_value[0] == 2) { // post increment: push value first
+                write(file,  "    mov rax, rcx\n");
+                write(file, $"    mov rdi, {size}\n");
+                write(file,  "    mul QWORD rdi\n");
+                write(file,  "    add rax, QWORD [rbx]\n");
+                write(file,  "    push rax\n");
+            }
+            write(file, "    mov edx, [rbx+12]\n") // capacity (automatically zero extended into rdx)
+            write(file, "    cmp rcx, rdx\n");
+            write(file, "    jnb @f\n");
+            write(file, "    inc DWORD [rbx+8]\n");
+            write(file,"@@:\n");
+            if (op.i64_value[0] == 1) { // pre increment: push value after
+                write(file,  "    mov rax, rcx\n");
+                write(file,  "    inc rax\n");
+                write(file, $"    mov rdi, {size}\n");
+                write(file,  "    mul QWORD rdi\n");
+                write(file,  "    add rax, QWORD [rbx]\n");
+                write(file,  "    push rax\n");
+            }
+        }
+        else if (op.kind == OpKind::OP_dyn_arr_to_slice) {
+            write(file, "    pop rbx\n"); // Address of the dyn_arr struct
+            write(file, "    mov rax, [rbx]\n"); // buffer
+            write(file, "    mov edx, [rbx+8]\n") // len (automatically zero extended into rdx)
+            write(file, "    push rdx\n");
+            write(file, "    push rax\n");
         }
         else if (op.kind == OpKind::OP_sign_extend) {
             write(file, "    pop  rax\n");

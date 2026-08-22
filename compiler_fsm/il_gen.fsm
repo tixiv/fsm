@@ -384,8 +384,13 @@ fn gen_plus_plus(n: AST_node&, gen: IL_gen&, result_used: bool) {
         push_opcode(gen, OpKind::OP_slice_plus_plus, null,
             if (result_used) n.AST_plus_plus.postfix + 1 else 0, element_type, n.location);
     }
+    else if (is_dyn_arr_kind(n.AST_plus_plus.body.type)) {
+        let element_type => get_dyn_arr_element_type(n.AST_plus_plus.body.type);
+        push_opcode(gen, OpKind::OP_dyn_arr_plus_plus, null,
+            if (result_used) n.AST_plus_plus.postfix + 1 else 0, element_type, n.location);
+    }
     else {
-        il_gen_error(gen, n, "Operator '++' is not supported for anything but integers or slices.")
+        il_gen_error(gen, n, "Operator '++' is not supported for anything but integers, slices or dyn arrays.")
     }
 }
 
@@ -596,7 +601,12 @@ fn gen_value_visitor(n: AST_node&, gen: IL_gen&) : void {
         push_opcode(gen, OpKind::OP_push_literal, null, n.AST_array_to_slice.body.type.T_array.n_elements, null, n.location);
         gen_address_visitor(n.AST_array_to_slice.body, gen);
     }
-    
+
+    else if (n.kind == AST_node::AST_dyn_arr_to_slice) {
+        gen_address_visitor(n.AST_dyn_arr_to_slice.body, gen);
+        push_opcode(gen, OpKind::OP_dyn_arr_to_slice, null, 0, null, n.location);
+    }
+
     else if (n.kind == AST_node::AST_string) {
         push_opcode(gen, OpKind::OP_push_string_literal, &n.AST_string.value, gen.num_strings++, null, n.location);
     }
@@ -627,6 +637,12 @@ fn gen_value_visitor(n: AST_node&, gen: IL_gen&) : void {
             push_opcode(gen, OpKind::OP_load, null, 0, get_ref_type_for(gen.type_cache, gen.type_cache.builtin_any), n.location); // load the 'begin' member
             gen_value_visitor(n.AST_array_access.index, gen);
             push_opcode(gen, OpKind::OP_array_access, null, 0, get_slice_element_type(n.AST_array_access.array.type), n.location);
+        }
+        else if (is_dyn_arr_kind(n.AST_array_access.array.type)) {
+            gen_address_visitor(n.AST_array_access.array, gen);
+            push_opcode(gen, OpKind::OP_load, null, 0, get_ref_type_for(gen.type_cache, gen.type_cache.builtin_any), n.location); // load the 'begin' member
+            gen_value_visitor(n.AST_array_access.index, gen);
+            push_opcode(gen, OpKind::OP_array_access, null, 0, get_dyn_arr_element_type(n.AST_array_access.array.type), n.location);
         }
         else {
             il_gen_error (gen, n, "Can't generate AST_array_access for anything that is not an array or a slice.")
@@ -797,6 +813,7 @@ fn il_gen_visitor(n: AST_node&, gen: IL_gen&) : void {
                     |== AST_node::AST_type_ref
                     |== AST_node::AST_type_array
                     |== AST_node::AST_type_slice
+                    |== AST_node::AST_type_dyn_arr
                     |== AST_node::AST_function_type
                     |== AST_node::AST_enum
                     |== AST_node::AST_enum_member

@@ -180,8 +180,9 @@ fn try_convert_to_type_if_necessary(type_checker: TypeChecker&, n: AST_node&, ta
     let original_type => n.type;
     // $"try_convert_to_type_if_necessary begin {get_type_name_r(buf_1, original_type)} {get_type_name_r(buf_2, target_type)}\n"
 
-
     if (target_type <==> original_type) return;
+    if (target_type   <==> type_checker.type_cache.builtin_undefined) return;
+    if (original_type <==> type_checker.type_cache.builtin_undefined) return;
 
     if (target_type <==> type_checker.type_cache.builtin_bool && is_reference_kind(original_type)) {
         if (dereferenced_type(original_type) <==> type_checker.type_cache.builtin_bool) {
@@ -209,6 +210,20 @@ or to perform a null reference check.");
         }
         else {
             type_checker_error(type_checker, n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}'.");
+            return;
+        }
+    }
+
+    if (is_slice_kind(target_type) && is_dyn_arr_kind(n.type)) {
+        if (get_slice_element_type(target_type) <==> get_dyn_arr_element_type(n.type)) {
+            let conv => ast_alloc(type_checker.ast_allocator, AST_node::AST_dyn_arr_to_slice, n.location);
+            conv.type => get_slice_type(type_checker.type_cache, get_dyn_arr_element_type(n.type));
+            ast_insert_node(type_checker.ast_allocator, n, conv);
+            return;
+        }
+        else {
+            type_checker_error(type_checker, n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to '{get_type_name_r(buf_2, target_type)}'.");
+            return;
         }
     }
 
@@ -829,6 +844,9 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
         else if (is_slice_kind(n.AST_array_access.array.type)) {
             n.type => get_ref_type_for(type_checker.type_cache, get_slice_element_type(n.AST_array_access.array.type));
         }
+        else if (is_dyn_arr_kind(n.AST_array_access.array.type)) {
+            n.type => get_ref_type_for(type_checker.type_cache, get_dyn_arr_element_type(n.AST_array_access.array.type));
+        }
         else {
             type_checker_error(type_checker, n,
                 $"Invalid use of [] operator on something that is not an array or a slice. Have '{get_type_name_r(buf_1, n.AST_array_access.array.type)}'.");
@@ -883,11 +901,14 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
         if (is_slice_kind(n.AST_plus_plus.body.type)) {
             n.type => n.AST_plus_plus.body.type.T_struct.members[0].type;
         }
+        else if (is_dyn_arr_kind(n.AST_plus_plus.body.type)) {
+            n.type => n.AST_plus_plus.body.type.T_struct.members[0].type;
+        }
         else if (is_integer_kind(n.AST_plus_plus.body.type)) {
             n.type => n.AST_plus_plus.body.type;
         }
-        else{
-            type_checker_error(type_checker, n, $"Operator '++' needs integer or slice type argument. Have '{get_type_name_r(buf_1, original_type)}'");
+        else {
+            type_checker_error(type_checker, n, $"Operator '++' needs integer, slice or dyn_arr type argument. Have '{get_type_name_r(buf_1, original_type)}'");
             n.type => type_checker.type_cache.builtin_undefined;
         }
         
@@ -1028,6 +1049,7 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
                     |== AST_node::AST_type_ref
                     |== AST_node::AST_type_array
                     |== AST_node::AST_type_slice
+                    |== AST_node::AST_type_dyn_arr
                     |== AST_node::AST_function_type
                     |== AST_node::AST_type_generic_speciation)
     {
