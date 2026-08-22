@@ -115,9 +115,13 @@ fn parse_typedecl(parser: Parser&) : AST_node& {
 
         while (parser.CT.kind != TokenKind::TOK_rparen) {
             let arg => parse_typedecl(parser);
-            if (!arg) parser_error(parser, $"Expected function argument type or ')' but have {parser.CT.kind.name}");
-
-            ast_link_to_chain(&ast_fn_type.AST_function_type.function_args, arg);
+            if (arg) {
+                ast_link_to_chain(&ast_fn_type.AST_function_type.function_args, arg);
+            }
+            else {
+                parser_error(parser, $"Expected function argument type or ')' but have {parser.CT.kind.name}");
+            }
+            
             if (parser.CT.kind == TokenKind::TOK_komma){
                 MOVE_NEXT(parser);
             }
@@ -125,6 +129,7 @@ fn parse_typedecl(parser: Parser&) : AST_node& {
             }
             else {
                 parser_error(parser, $"Expected ',' or ')' but have {parser.CT.kind.name}");
+                return null;
             }
         }
         MOVE_NEXT(parser);
@@ -606,14 +611,8 @@ fn parse_scope_body(parser: Parser&) : AST_node& {
         }
         else {
             let n => parse_statement(parser);
-            if (!n) {
-                parser_error(parser, "Couldn't parse statement")
-            }
-
-            ast_link_to_chain(&ast_scope.AST_scope.body, n);
-
-            if (parser.CT.kind != TokenKind::TOK_semicolon) {
-                if (false) parser_error(parser, "missing ';'");
+            if (n) {
+                ast_link_to_chain(&ast_scope.AST_scope.body, n);
             }
         }
     }
