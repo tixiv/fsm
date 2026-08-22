@@ -188,7 +188,7 @@ fn lookup_external_symbol(name: u8[], mw: ModuleWalker&) : Symbol& {
 }
 
 fn compile_module (mw: ModuleWalker&, module: Module&) : void {
-    let verbose = true;
+    let verbose = false;
 
     mw.current_module => module;
 
@@ -466,10 +466,10 @@ fn find_all_references(mw: ModuleWalker&, id: u8[], uri: u8[], line, col) {
     line++; col++;
 
     let reference_locations: EndlosArr<LSP_Location>;
+    EndlosArr_begin~LSP_Location(reference_locations, mw.endlos_main);
 
     let sym => find_symbol_at(module.ast_root, line, col);
     if (sym) {
-        EndlosArr_begin~LSP_Location(reference_locations, mw.endlos_main);
         for (let i = 0; i < modules.len; i++) {
             let other_module => modules[i];
             if (other_module.state == ModuleState::Compiled) {
@@ -485,7 +485,7 @@ fn find_all_references(mw: ModuleWalker&, id: u8[], uri: u8[], line, col) {
             for (let i = 0; i < modules.len; i++) {
                 let other_module => modules[i];
                 if (other_module.state == ModuleState::Compiled) {
-                    //find_member_references_in_ast(other_module.ast_root, reference_locations, sym);
+                    find_member_references_in_ast(other_module.ast_root, reference_locations, type, name);
                 }
             }
         } 

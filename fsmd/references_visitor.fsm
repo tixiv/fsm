@@ -35,6 +35,34 @@ fn find_symbol_references_in_ast(root: AST_node&, locations: EndlosArr<LSP_Locat
     symbol_references_visitor(root, v);
 }
 
-fn find_member_references_in_ast(root: AST_node&, locations: EndlosArr<LSP_Location>&, type_to_find: Type&, member_to_find: u8[]) {
 
+struct MemberReferencesVisitor {
+    locations: EndlosArr<LSP_Location>&;
+    type_to_find: Type&;
+    member_to_find: u8[];
+}
+
+
+fn member_references_visitor(n: AST_node&, v: MemberReferencesVisitor&) : void {
+     if (n.kind == AST_node::AST_member_access) {
+        if (n.AST_member_access.body.type <==> v.type_to_find
+            && sv_equal(n.AST_member_access.name, v.member_to_find))
+        {
+            let loc => EndlosArr_push~LSP_Location(v.locations);
+            loc.filename         = n.location.module.filename;
+            loc.range.start_line = n.location.line-1;
+            loc.range.end_line   = n.location.line-1;
+            loc.range.start_col  = n.location.col - n.AST_member_access.name.len - 1;
+            loc.range.end_col    = n.location.col - 1;
+        }
+    }
+    ast_visit_children(n, member_references_visitor, v);
+}
+
+fn find_member_references_in_ast(root: AST_node&, locations: EndlosArr<LSP_Location>&, type_to_find: Type&, member_to_find: u8[]) {
+    let v: MemberReferencesVisitor;
+    v.locations => locations;
+    v.type_to_find => type_to_find;
+    v.member_to_find = member_to_find;
+    member_references_visitor(root, v);
 }
