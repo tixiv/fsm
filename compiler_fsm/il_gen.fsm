@@ -715,7 +715,7 @@ fn il_gen_visitor(n: AST_node&, gen: IL_gen&) : void {
     if (n.kind == AST_node::AST_function) {
         let s_fun => n.AST_function.symbol;
         ASSERT(s_fun, __LOCATION__);
-        push_opcode(gen, OpKind::OP_begin_fn, &n.AST_function.name, s_fun.size, s_fun.type, n.location);
+        push_opcode_2(gen, OpKind::OP_begin_fn, &n.AST_function.name, s_fun.size, n.AST_function.is_signal_handler, s_fun.type, n.location);
         ast_visit_children(n, il_gen_visitor, gen);
     }
 

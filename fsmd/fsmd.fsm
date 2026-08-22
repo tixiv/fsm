@@ -22,6 +22,7 @@ import * from "lsp";
 import * from "helpers";
 import * from "ast_node_finder";
 import * from "references_visitor";
+import * from "signal_handler";
 
 fn open_log_file() {
     let O_WRONLY = 1;
@@ -501,7 +502,9 @@ fn find_all_references(mw: ModuleWalker&, id: u8[], uri: u8[], line, col) {
 fn main () {
     let log_fd = open_log_file();
 
-    write (log_fd, "FSMD 3 started\n"); 
+    write (log_fd, "FSMD 3 started\n");
+
+    install_segv_handler();
 
     let mw: ModuleWalker;
     write(log_fd, $"1\n");

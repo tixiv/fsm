@@ -37,6 +37,7 @@ union AST_node enum kind {
         ret_typedecl: AST_node&;
         symbol: Symbol&;
         name: u8[];
+        is_signal_handler;
     }
 
     struct AST_arg_list         { body: AST_node&; }

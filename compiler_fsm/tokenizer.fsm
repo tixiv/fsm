@@ -21,6 +21,7 @@ enum TokenKind {
     TOK_keyword_false,
     TOK_keyword_null,
     TOK_keyword_fsm_debug,
+    TOK_keyword_attribute,
     TOK_magic_location,
     TOK_lparen,
     TOK_rparen,
@@ -86,6 +87,7 @@ fn token_kind_printable(kind: TokenKind) : u8[] {
     if (kind == TokenKind::TOK_keyword_false) return("'false'");
     if (kind == TokenKind::TOK_keyword_null) return("'null'");
     if (kind == TokenKind::TOK_keyword_fsm_debug) return("'fsm_debug'");
+    if (kind == TokenKind::TOK_keyword_attribute) return("'__attribute'");
     if (kind == TokenKind::TOK_magic_location) return("'__LOCATION__'");
     if (kind == TokenKind::TOK_lparen) return("'('");
     if (kind == TokenKind::TOK_rparen) return("')'");
@@ -206,8 +208,12 @@ fn push_token (tokenizer: Tokenizer&, kind: TokenKind, value: u8[]&) {
     let token => alloc_token (tokenizer);
 
     token.kind = kind;
-    if (value)
+    if (value) {
         token.value = value;
+    } else {
+        token.value.begin => null;
+        token.value.len = 0;
+    }
     
     token.location = tokenizer.location;
 }
@@ -263,6 +269,9 @@ fn handle_word(tokenizer: Tokenizer&, word: u8[]) {
     }
     else if (sv_equal(word, "fsm_debug")) {
         push_token(tokenizer, TokenKind::TOK_keyword_fsm_debug, null);
+    }
+    else if (sv_equal(word, "__attribute")) {
+        push_token(tokenizer, TokenKind::TOK_keyword_attribute, null);
     }
     else if (sv_equal(word, "__LOCATION__")) {
         push_token(tokenizer, TokenKind::TOK_magic_location, null);

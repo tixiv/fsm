@@ -219,7 +219,7 @@ fn type_resolver_visitor(n: AST_node&, trs: TypeResolverState&) : void {
         
         if (!n.type) {
             type_resolver_error(trs, n, $"The typename '{n.AST_typename.name}' could not be resolved.");
-            n.type => trs.symbol_cache.type_cache.builtin_void;
+            n.type => trs.symbol_cache.type_cache.builtin_undefined;
         }
     }
     else if (n.kind == AST_node::AST_function_type) {

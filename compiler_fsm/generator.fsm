@@ -106,7 +106,19 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) 
 
         if (op.kind == OpKind::OP_begin_fn) {
             let local_vars_size = op.i64_value[0];
+            let is_signal_handler = op.i64_value[1];
             write(file, $"fn_{op.string_value}:\n");
+            if (is_signal_handler) {
+                // push the normal function arguments to the handler on the stack for compatibility
+                // with the current FSM calling conventions
+                write(file,  "    push rdi\n");
+                write(file,  "    push rsi\n");
+                write(file,  "    push rdx\n");
+                write(file,  "    call @f\n");
+                write(file,  "    add rsp, 24\n");
+                write(file,  "    ret\n");
+                write(file,  "@@:\n");
+            }
             write(file,  "    push rbp\n");
             write(file,  "    mov rbp, rsp\n");
             if (local_vars_size) {
