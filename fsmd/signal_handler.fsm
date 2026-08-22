@@ -1,0 +1,96 @@
+
+import * from "std";
+
+record Sigaction {
+	handler: fn (i64, any&, UContext&) : void;
+	flags: u64;
+	restorer: fn () : void;
+	mask: u64;
+}
+
+enum MContextRegs {
+  REG_R8 = 0,
+  REG_R9,
+  REG_R10,
+  REG_R11,
+  REG_R12,
+  REG_R13,
+  REG_R14,
+  REG_R15,
+  REG_RDI,
+  REG_RSI,
+  REG_RBP,
+  REG_RBX,
+  REG_RDX,
+  REG_RAX,
+  REG_RCX,
+  REG_RSP,
+  REG_RIP,
+  REG_EFL,
+  REG_CSGSFS,		/* Actually short cs, gs, fs, __pad0.  */
+  REG_ERR,
+  REG_TRAPNO,
+  REG_OLDMASK,
+  REG_CR2
+}
+
+/* Context to describe whole processor state.  */
+record MContext
+{
+    gregs: u64[23];
+    /* Note that fpregs is a pointer.  */
+    fpregs: any&;
+}
+
+record UContext
+{
+    _: u64[5]; // some stuff I don't care about for now
+    mcontext: MContext;
+}
+
+fn rt_sigaction (signum, act: Sigaction&, oldact: Sigaction&) : i64 {
+    let SYS_RT_SIGACTION = 13;
+    return syscall_4(SYS_RT_SIGACTION, signum, <i64>act, <i64>oldact, Sigaction.mask.sizeof);
+}
+
+fn __attribute(SIGNAL_HANDLER) sigsegv_handler (sig: i64, arg: any&, ctx: UContext&) {
+    let buf: u8[1024];
+    let sb: StringBuilder;
+    sb_init(sb, buf);
+    sb_puts(sb, "SIGSEGV at rip = 0x"); sb_put_hex(sb, ctx.mcontext.gregs[<i64>MContextRegs::REG_RIP]);
+    sb_puts(sb, "\nTried to acces address 0x"); sb_put_hex(sb, ctx.mcontext.gregs[<i64>MContextRegs::REG_CR2]); sb_puts(sb, "\n");
+
+    write (3, sb.str);
+    /*
+    for (let i = 0; i < 23; i++) {
+        let mr: MContextRegs = i;
+        $"{mr.name}: "
+        print_hex (ctx.mcontext.gregs[i]);
+        puts("\n");
+    }
+    */
+}
+
+fn restorer () {
+    exit(77);
+}
+
+fn install_segv_handler () {
+    let SA_SIGINFO = 4;
+    let SA_RESTORER = 0x04000000;
+    let SIGSEGV = 11;
+    let sa: Sigaction;
+    sa.handler => sigsegv_handler;
+    sa.flags = SA_SIGINFO + SA_RESTORER;
+    sa.restorer => restorer;
+    sa.restorer => restorer;
+    let result = rt_sigaction(SIGSEGV, sa, null);
+
+    if (result < 0) {
+        write (3, $"Handler failed to install: {strerror(result)}\n");
+        exit(77);
+    }
+
+    // let a: u8& => <u8&> 0x1337;
+    // a = 42;
+}

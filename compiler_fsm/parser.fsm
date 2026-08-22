@@ -664,9 +664,26 @@ fn parse_function(parser: Parser&) : AST_node& {
     let ast_fn => ast_alloc(parser.allocator, AST_node::AST_function, parser.CT.location);
     MOVE_NEXT(parser);
 
-    expect_token(parser, TokenKind::TOK_identifier);
-    ast_fn.AST_function.name = parser.CT.value;
-    MOVE_NEXT(parser);
+    if (parser.CT.kind == TokenKind::TOK_keyword_attribute) {
+        MOVE_NEXT(parser);
+        take_expected(parser, TokenKind::TOK_lparen);
+        if (expect_token(parser, TokenKind::TOK_identifier)) {
+            if (sv_equal(parser.CT.value, "SIGNAL_HANDLER")) {
+                ast_fn.AST_function.is_signal_handler = true;
+            }
+            else {
+                parser_error(parser, $"Unknown attribute '{parser.CT.value}'.");
+            }
+            MOVE_NEXT(parser);
+        }
+        take_expected(parser, TokenKind::TOK_rparen);
+    }
+
+    if (expect_token(parser, TokenKind::TOK_identifier)) {
+        ast_fn.AST_function.name = parser.CT.value;
+        ast_fn.location = parser.CT.location;
+        MOVE_NEXT(parser);
+    }
 
     take_expected(parser, TokenKind::TOK_lparen);
 
