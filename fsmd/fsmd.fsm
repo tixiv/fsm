@@ -224,7 +224,7 @@ fn compile_module (mw: ModuleWalker&, module: Module&) : void {
     // Restoring current module is needed because it will change during importing more stuffs from other imports
     mw.current_module => module;
 
-    if (mw.num_errors > last_num_errors) {
+    if (false && mw.num_errors > last_num_errors) {
         write (mw.log_fd, "Errors during parsing. Not going to run resolvers.\n")
         module.state = ModuleState::CompilationFailed;
         return;
@@ -241,7 +241,7 @@ fn compile_module (mw: ModuleWalker&, module: Module&) : void {
     resolver_run(root, symbol_cache, mw.endlos_compile, mw.error_handler_ast_node);
     if (verbose) write(2, $"Resolver finished {endlos_rolls_in_use(mw.endlos_compile)} \n");
 
-    if (mw.num_errors > last_num_errors) {
+    if (false && mw.num_errors > last_num_errors) {
         write (mw.log_fd, "Errors during resolvers. Not going to run type checker.\n")
         module.state = ModuleState::CompilationFailed;
         return;
@@ -258,7 +258,7 @@ fn compile_module (mw: ModuleWalker&, module: Module&) : void {
     module.ast_root => root;
 
     if (mw.num_errors > last_num_errors) {
-        write (mw.log_fd, "Errors during type checker. Not going to run il gen.\n")
+        write (mw.log_fd, "Errors during compilation. Not going to run il gen.\n")
         module.state = ModuleState::CompilationFailed;
         return;
     }

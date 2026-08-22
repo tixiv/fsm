@@ -345,6 +345,10 @@ fn is_function_kind(t: Type&) : bool {
     return t && t.kind == Type::T_function;
 }
 
+fn is_undefined_kind(t: Type&) : bool {
+    return t && t.kind == Type::T_undefined;
+}
+
 fn is_function_reference(t: Type&) : bool {
     return is_reference_kind(t) &&
         is_function_kind(dereferenced_type(t));

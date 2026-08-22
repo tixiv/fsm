@@ -15,6 +15,7 @@ struct SymbolReferencesVisitor {
 
 
 fn symbol_references_visitor(n: AST_node&, v: SymbolReferencesVisitor&) : void {
+    if (!n) return;
     if (n.kind == AST_node::AST_symbol) {
         if (n.AST_symbol.symbol <==> v.symbol_to_find) {
             let loc => EndlosArr_push~LSP_Location(v.locations);
@@ -44,7 +45,8 @@ struct MemberReferencesVisitor {
 
 
 fn member_references_visitor(n: AST_node&, v: MemberReferencesVisitor&) : void {
-     if (n.kind == AST_node::AST_member_access) {
+    if (!n) return;
+    if (n.kind == AST_node::AST_member_access) {
         if (n.AST_member_access.body.type <==> v.type_to_find
             && sv_equal(n.AST_member_access.name, v.member_to_find))
         {

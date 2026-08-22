@@ -12,6 +12,7 @@ struct SymbolFinder {
 }
 
 fn find_symbol_visitor (n: AST_node&, finder: SymbolFinder&) : void {
+    if (!n) return;
     if (n.location.line == finder.line) {
         if (n.kind == AST_node::AST_symbol) {
             if (n.location.col - n.AST_symbol.name.len <= finder.col <= n.location.col) {
@@ -43,6 +44,7 @@ struct MemeberAccessFinder {
 }
 
 fn find_member_visitor (n: AST_node&, finder: MemeberAccessFinder&) : void {
+    if (!n) return;
     if (n.location.line == finder.line) {
         if (n.kind == AST_node::AST_member_access) {
             if (n.location.col - n.AST_member_access.name.len <= finder.col <= n.location.col) {

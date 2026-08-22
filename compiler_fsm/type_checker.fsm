@@ -258,11 +258,15 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
 
 
     if (tk == TokenKind::TOK_bind_ref) {
-        if (!is_reference_kind(n.AST_binary.left.type)) {
+        if (n.AST_binary.left.type <==> type_checker.type_cache.builtin_undefined) {
+        }
+        else if (!is_reference_kind(n.AST_binary.left.type)) {
             type_checker_error(type_checker, n, $"Operator {token_kind_printable(tk)} requires a reference type on the left side. Have '{get_type_name_r(buf_1, n.AST_binary.left.type)}' and '{get_type_name_r(buf_2, n.AST_binary.right.type)}'.");
         }
 
         if (n.AST_binary.right.type <==> type_checker.type_cache.builtin_null) {
+        }
+        else if (n.AST_binary.right.type <==> type_checker.type_cache.builtin_undefined) {
         }
         else
         {
@@ -273,7 +277,6 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
             }
 
             let any_ref => get_ref_type_for(type_checker.type_cache, type_checker.type_cache.builtin_any);
-            
             
             if (!check_function_refs_compatible(type_checker, n.AST_binary.left.type, n.AST_binary.right.type)
                   && n.AST_binary.left.type <!=> n.AST_binary.right.type
@@ -421,10 +424,15 @@ fn type_check_function_call(type_checker: TypeChecker&, n_call: AST_node&) {
     let fn_type => n_call.AST_call.target.type;
     if (is_reference_kind(fn_type)) fn_type => dereferenced_type(fn_type);
 
+    if (is_undefined_kind(fn_type)) {
+        n_call.type => type_checker.type_cache.builtin_undefined;
+        return;
+    }
+    
     if (!is_function_kind(fn_type)) {
         type_checker_error(type_checker, n_call,
             $"Trying to call something that is not a function. have '{get_type_name_r(buf, n_call.AST_call.target.type)}'");
-        n_call.type => type_checker.type_cache.builtin_void;
+        n_call.type => type_checker.type_cache.builtin_undefined;
         return;
     }
     
@@ -837,14 +845,17 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
     }
 
     else if (n.kind == AST_node::AST_dereference) {
-        if (!is_reference_kind(n.AST_dereference.body.type)) {
+        if (is_undefined_kind(n.AST_dereference.body.type)) {
+            n.type => type_checker.type_cache.builtin_undefined;
+        }
+        else if (!is_reference_kind(n.AST_dereference.body.type)) {
                 type_checker_error(type_checker, n,
                     $"Dereferencing something that is not a reference. Have '{get_type_name_r(buf_1, n.AST_dereference.body.type)}'.");
             n.type => type_checker.type_cache.builtin_undefined;
         } else {
             n.type => dereferenced_type(n.AST_dereference.body.type);
-            n.addressable = true;
         }
+        n.addressable = true;
     }
 
     else if (n.kind == AST_node::AST_reference) {

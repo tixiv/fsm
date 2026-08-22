@@ -100,8 +100,13 @@ fn parse_typedecl_postifx(parser: Parser&, inner: AST_node&) : AST_node& {
             }
         }
         
-        link_arr(latest, inner);
-        return parse_typedecl_postifx(parser, first);
+        if (latest) {
+            link_arr(latest, inner);
+            return parse_typedecl_postifx(parser, first);
+        }
+        else {
+            return parse_typedecl_postifx(parser, inner);
+        }        
     }
     return inner;
 }

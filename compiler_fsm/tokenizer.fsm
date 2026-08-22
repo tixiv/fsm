@@ -431,6 +431,20 @@ fn tokenize_fsm (tokenizer: Tokenizer&) : void {
             tokenizer_pop_n(tokenizer, 2)
             push_token(tokenizer, TokenKind::TOK_minus_minus, null);
         }
+        else if (sv_starts_with(code, "//")) {
+            while(code.len && code.begin != '\n')
+                tokenizer_pop(tokenizer)
+        }
+        else if (sv_starts_with(code, "/*")) {
+            while(code.len && !sv_starts_with(code, "*/")) {
+                tokenizer_pop(tokenizer)
+            }
+            tokenizer_pop_n(tokenizer, 2)
+        }
+        else if (sv_starts_with(code, "*/")) {
+            tokenizer_error(tokenizer, "Encountered '*/' outside of comment.");
+            tokenizer_pop_n(tokenizer, 2)
+        }
         else if ('+' == c) {
             tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_plus, null);
@@ -450,19 +464,6 @@ fn tokenize_fsm (tokenizer: Tokenizer&) : void {
         else if ('~' == c) {
             tokenizer_pop(tokenizer)
             push_token(tokenizer, TokenKind::TOK_tilde, null);
-        }
-        else if (sv_starts_with(code, "//")) {
-            while(code.len && code.begin != '\n')
-                tokenizer_pop(tokenizer)
-        }
-        else if (sv_starts_with(code, "/*")) {
-            while(code.len && !sv_starts_with(code, "*/")) {
-                tokenizer_pop(tokenizer)
-            }
-            tokenizer_pop_n(tokenizer, 2)
-        }
-        else if (sv_starts_with(code, "*/")) {
-            tokenizer_error(tokenizer, "Encountered '*/' outside of comment.");
         }
         else if ('/' == c) {
             tokenizer_pop(tokenizer)
