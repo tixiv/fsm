@@ -76,6 +76,7 @@ fn type_lookup_visitor(n: AST_node&, trs: TypeResolverState&) : void {
     else if (n.kind == AST_node::AST_enum) {
         let t => type_alloc(trs.symbol_cache.type_cache, Type::T_enum);
         t.storage_size = 8;
+        t.allignof = 8;
         n.AST_enum.symbol => push_type_symbol(trs, n.AST_enum.name, t, n);
     }
     else if (n.kind == AST_node::AST_union) {

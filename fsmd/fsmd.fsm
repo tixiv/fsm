@@ -557,6 +557,7 @@ fn main () {
     let log_fd = open_log_file();
 
     write (log_fd, "FSMD 3 started\n");
+    write (log_fd, $"sizeof AST_node = {AST_node.sizeof}, sizeof Type = {Type.sizeof}\n");
 
     install_segv_handler();
 

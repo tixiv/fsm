@@ -7,6 +7,7 @@ struct StructMember {
     name: u8[];
     type: Type&;
     location: Location&;
+    offset: i64;
 }
 
 struct UnionMember {
@@ -14,6 +15,7 @@ struct UnionMember {
     type: Type&;
     value;
     location: Location&;
+    offset: i64;
 }
 
 struct EnumMember {
@@ -33,6 +35,7 @@ union Type enum kind {
     struct {
         name: u8[];
         storage_size;
+        allignof;
         speciation: Type&;
         // slice_type_for: Type&;
         ref_type_for: Type&;
@@ -155,15 +158,15 @@ fn TypeCache_init(cache: TypeCache&, endlos: EndlosAllocator&) {
     t => cache.builtin_any;          t.kind = Type::T_any;
     t => cache.builtin_generic;      t.kind = Type::T_generic;
     t => cache.builtin_undefined;    t.kind = Type::T_undefined;
-    t => cache.builtin_bool;         t.kind = Type::T_boolean;   t.storage_size = 1;
-    t => cache.builtin_u64;          t.kind = Type::T_integer;   t.storage_size = 8; t.T_integer.signed = false;  t.T_integer.num_bits = 64;
-    t => cache.builtin_i64;          t.kind = Type::T_integer;   t.storage_size = 8; t.T_integer.signed = true;   t.T_integer.num_bits = 64;
-    t => cache.builtin_u32;          t.kind = Type::T_integer;   t.storage_size = 4; t.T_integer.signed = false;  t.T_integer.num_bits = 32;
-    t => cache.builtin_i32;          t.kind = Type::T_integer;   t.storage_size = 4; t.T_integer.signed = true;   t.T_integer.num_bits = 32;
-    t => cache.builtin_u16;          t.kind = Type::T_integer;   t.storage_size = 2; t.T_integer.signed = false;  t.T_integer.num_bits = 16;
-    t => cache.builtin_i16;          t.kind = Type::T_integer;   t.storage_size = 2; t.T_integer.signed = true;   t.T_integer.num_bits = 16;
-    t => cache.builtin_u8;           t.kind = Type::T_integer;   t.storage_size = 1; t.T_integer.signed = false;  t.T_integer.num_bits =  8;
-    t => cache.builtin_i8;           t.kind = Type::T_integer;   t.storage_size = 1; t.T_integer.signed = true;   t.T_integer.num_bits =  8;
+    t => cache.builtin_bool;         t.kind = Type::T_boolean;   t.storage_size = 1; t.allignof = 1; 
+    t => cache.builtin_u64;          t.kind = Type::T_integer;   t.storage_size = 8; t.allignof = 8; t.T_integer.signed = false;  t.T_integer.num_bits = 64;
+    t => cache.builtin_i64;          t.kind = Type::T_integer;   t.storage_size = 8; t.allignof = 8; t.T_integer.signed = true;   t.T_integer.num_bits = 64;
+    t => cache.builtin_u32;          t.kind = Type::T_integer;   t.storage_size = 4; t.allignof = 4; t.T_integer.signed = false;  t.T_integer.num_bits = 32;
+    t => cache.builtin_i32;          t.kind = Type::T_integer;   t.storage_size = 4; t.allignof = 4; t.T_integer.signed = true;   t.T_integer.num_bits = 32;
+    t => cache.builtin_u16;          t.kind = Type::T_integer;   t.storage_size = 2; t.allignof = 2; t.T_integer.signed = false;  t.T_integer.num_bits = 16;
+    t => cache.builtin_i16;          t.kind = Type::T_integer;   t.storage_size = 2; t.allignof = 2; t.T_integer.signed = true;   t.T_integer.num_bits = 16;
+    t => cache.builtin_u8;           t.kind = Type::T_integer;   t.storage_size = 1; t.allignof = 1; t.T_integer.signed = false;  t.T_integer.num_bits =  8;
+    t => cache.builtin_i8;           t.kind = Type::T_integer;   t.storage_size = 1; t.allignof = 1; t.T_integer.signed = true;   t.T_integer.num_bits =  8;
 }
 
 fn type_ref_roll_take (cache: TypeCache&, len) : Type&[] {
@@ -400,20 +403,19 @@ fn is_castable_to(cache: TypeCache&, to: Type&, from: Type&, ) {
             to <==> get_slice_type(cache, cache.builtin_u8) && (is_record_kind(from))
 }
 
+fn allign (offset, allignment) {
+    if (allignment <= 1) return offset;
+    let fuzz = offset % allignment;
+    if (!fuzz) return offset;
+    return offset + allignment - fuzz;
+}
 
 fn get_member_offset(_struct: Type&, index) {
     ASSERT(_struct.kind == Type::T_struct,
         "get_member_offset() called on something that is not a struct or record.\n")
     ASSERT(index < _struct.T_struct.members.len, "Index out of range.\n");
 
-    let offset = 0;
-    for (let i = 0; i < index; i++) {
-        let member => &_struct.T_struct.members[i];
-
-        offset = offset + member.type.storage_size;
-    }
-
-    return offset;
+    return _struct.T_struct.members[index].offset;
 }
 
 fn get_member_type_and_offset_by_name(cache: TypeCache&, t: Type&, member_name: u8[], out_offset: i64&) : Type& {
@@ -424,25 +426,20 @@ fn get_member_type_and_offset_by_name(cache: TypeCache&, t: Type&, member_name: 
         "get_member_type_and_offset() called on something that is not a struct or a struct reference.\n")
 
     if (t.kind == Type::T_struct) {
-        let offset = 0;
         for (let i = 0; i < t.T_struct.members.len; i++) {
             let member => &t.T_struct.members[i];
-
-            if (sv_equal(&member.name, member_name)) {
-                if (out_offset) out_offset = offset;
+            if (sv_equal(member.name, member_name)) {
+                if (out_offset) out_offset = member.offset;
                 return member.type;
             }
-            offset = offset + member.type.storage_size;
         }
     }
     else if (t.kind == Type::T_union) {
-        let offset = 0;
         if (t.T_union.enumarator_name.begin) {
             if (sv_equal(&t.T_union.enumarator_name, member_name)) {
                 if (out_offset) *out_offset = 0;
                 return get_enumerator_type_for(cache, t);
             }
-            offset = offset + 8;
         }
         for (let i = 0; i < t.T_union.members.len; i++) {
             let member => t.T_union.members[i];
@@ -451,17 +448,15 @@ fn get_member_type_and_offset_by_name(cache: TypeCache&, t: Type&, member_name: 
                 if (is_struct_kind(member.type)) {
                     let mt => get_member_type_and_offset_by_name(cache, member.type, member_name, out_offset);
                     if (mt) {
-                        if (out_offset) *out_offset = *out_offset + offset;
+                        if (out_offset) *out_offset = *out_offset + member.offset;
                         return mt;
                     }
                 }
                 else NOT_IMPLEMENTED(__LOCATION__, "Unnanmed things in unions except structs\n")
-
-                offset = offset + member.type.storage_size;
             }
 
             if (sv_equal(&member.name, member_name)) {
-                if (out_offset) *out_offset = offset;
+                if (out_offset) *out_offset = member.offset;
                 return member.type;
             }
         }
@@ -528,37 +523,56 @@ fn get_union_member_value (t: Type&, member_name: u8[], enum_value: i64&) : bool
 fn calculate_storage_size(container: Type&) : void {
     if (is_struct_kind(container) || is_slice_kind(container) || is_dyn_arr_kind(container)) {
         let offset = 0;
+        let max_allign = 1;
         for (let i = 0; i < container.T_struct.members.len; i++) {
             let member => container.T_struct.members[i];
+            if (member.type.allignof > max_allign) max_allign = member.type.allignof;
+            offset = allign(offset, member.type.allignof)
+            member.offset = offset;
             offset = offset + member.type.storage_size;
         }
-        container.storage_size = offset;
+        container.allignof = max_allign; 
+        container.storage_size = allign(offset, max_allign);
     }
     else if (is_record_kind(container)) {
         let offset = 0;
         for (let i = 0; i < container.T_struct.members.len; i++) {
             let member => container.T_struct.members[i];
+            member.offset = offset;
             offset = offset + member.type.storage_size;
         }
+        container.allignof = 1;
         container.storage_size = offset;
     }
     else if (is_union_kind(container)) {
-        let offset = 0;
-        if (container.T_union.enumarator_name.begin) offset = offset + 8;
-        let max_member_size = 0;
+        let initial_offset = 0;
+        let max_allignof = 1;
+        if (container.T_union.enumarator_name.begin) {
+            initial_offset = initial_offset + 8;
+            max_allignof = 8;
+        }
         for (let i = 0; i < container.T_union.members.len; i++) {
             let member => container.T_union.members[i];
-            let sz = member.type.storage_size;
+            if (member.type.allignof > max_allignof) max_allignof = member.type.allignof;
+            
             if (!member.name.begin) {
-                offset = offset + sz;
+                initial_offset = allign(initial_offset, member.type.allignof);
+                member.offset = initial_offset;
+                initial_offset = initial_offset + member.type.storage_size;
             }
-            else {
-                if (sz > max_member_size) max_member_size = sz;
-            }
-
         }
-        container.storage_size = offset + max_member_size;
 
+        let max_final_size = 0;
+        for (let i = 0; i < container.T_union.members.len; i++) {
+            let member => container.T_union.members[i];
+            if (member.name.begin) {
+                member.offset = allign(initial_offset, member.type.allignof);
+                let final_size = allign(member.offset + member.type.storage_size, max_allignof);
+                if (final_size > max_final_size) max_final_size = final_size;
+            }
+        }
+        container.allignof = max_allignof;
+        container.storage_size = max_final_size;
     }
     else NOT_IMPLEMENTED(__LOCATION__, $"calculate_storage_size() for {container.kind.name}");
 }
@@ -570,7 +584,7 @@ fn get_function_arguments_size(t: Type&) {
     for (let i = 0; i < t.T_function.argument_types.len; i++) {
         let arg => t.T_function.argument_types[i];
         size = size + arg.storage_size;
-        if (size % 8) size = size + 8 - (size % 8);
+        size = allign(size, 8);
     }
     return size;
 }
@@ -586,6 +600,7 @@ fn make_ref_type_for(cache: TypeCache&, t: Type&) : Type& {
     let ref => type_alloc(cache, Type::T_reference);
     ref.T_reference.target_type => t;
     ref.storage_size = 8;
+    ref.allignof = 8;
     return ref;
 }
 
@@ -605,6 +620,7 @@ fn make_enumerator_type_for(cache: TypeCache&, t: Type&) {
     let enumerator => type_alloc(cache, Type::T_enumerator);
     enumerator.T_enumerator.target_type => t;
     enumerator.storage_size = 8;
+    enumerator.allignof = 8;
     return enumerator;
 }
 
@@ -626,6 +642,7 @@ fn make_array_type(cache: TypeCache&, element_type: Type&, n_elements) {
     array_t.T_array.element_type => element_type;
     array_t.T_array.n_elements = n_elements;
     array_t.storage_size = element_type.storage_size * n_elements;
+    array_t.allignof = element_type.allignof;
     return array_t;
 }
 
@@ -859,7 +876,7 @@ fn get_stack_offset_for(t: Type&) {
     ASSERT(t, "get_stack_offset_for() called with nullptr.\n");
     let size = t.storage_size;
 
-    return ((size + 7) / 8) * 8;
+    return allign(size, 8);
 }
 
 fn get_max_enum_value (t: Type&) {
