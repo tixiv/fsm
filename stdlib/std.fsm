@@ -246,6 +246,19 @@ fn sb_put_hex(sb: StringBuilder&, num: u64) {
     }
 }
 
+fn sb_puts_rightpad(sb: StringBuilder&, s: u8[], pad_to_len) {
+    let s_len = s.len;
+    while (sb.buffer.len && s.len) {
+        sb.buffer++ = s++
+        sb.str.len++
+    }
+    while (sb.buffer.len && s_len < pad_to_len) {
+        sb.buffer++ = ' ';
+        sb.str.len++;
+        s_len++;
+    }
+}
+
 fn NOT_IMPLEMENTED(location: u8[], what:u8[]) {
     $"{location}: {what} is not implemented yet.\n"
     exit(1);

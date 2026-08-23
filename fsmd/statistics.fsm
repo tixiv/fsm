@@ -1,0 +1,23 @@
+
+import * from "std";
+import * from "fsmd_module";
+
+fn dump_statistics(modules: FsmdModule[]) {
+    let cummulative_times: i64[8];
+
+    while (modules.len) {
+        let module => modules++;
+        for (let i = 0; i < 7; i++) {
+            cummulative_times[i] = cummulative_times[i] + module.statistics.finish_times[i] - module.statistics.start_times[i];
+        }
+    }
+
+    for (let i = 0; i < 7; i++) {
+        let si: StatiticsIndex = i;
+        let sb: StringBuilder; let buf: u8[1024];
+        sb_init(sb, buf);
+        sb_puts_rightpad(sb, si.name, 16);
+        sb_puts(sb, $": {cummulative_times[i] / 1000000} ms\n")
+        write (3, sb.str);
+    }
+}

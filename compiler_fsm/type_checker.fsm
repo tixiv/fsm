@@ -754,8 +754,14 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
     }
 
     else if (n.kind == AST_node::AST_user_cast) {
-        n.type => n.AST_user_cast.typedecl.type;
-        n.addressable = n.AST_user_cast.body.addressable;
+        if (n.AST_user_cast.typedecl) {
+            n.type => n.AST_user_cast.typedecl.type;
+            n.addressable = n.AST_user_cast.body.addressable;
+        }
+        else {
+            n.type => type_checker.type_cache.builtin_undefined;
+            n.addressable = true;
+        }
     }
 
     else if (n.kind == AST_node::AST_return) {

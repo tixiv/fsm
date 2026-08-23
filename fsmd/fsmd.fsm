@@ -25,6 +25,7 @@ import * from "helpers";
 import * from "ast_node_finder";
 import * from "references_visitor";
 import * from "signal_handler";
+import * from "statistics";
 
 fn open_log_file() {
     let O_WRONLY = 1;
@@ -75,6 +76,21 @@ fn find_file(sb: StringBuilder&, name: u8[], parent_module_filename: u8[]) : boo
     return false;
 }
 
+struct FsmdOptions {
+    show_steps: bool;
+    show_modules: bool;
+}
+
+enum MWStatiticsIndex {
+    CompileAll,
+    PublishDiagnostics,
+}
+
+struct MWStatistics {
+    start_times:  i64[8];
+    finish_times: i64[8];
+}
+
 struct ModuleWalker {
     modules: EndlosArr<FsmdModule>;
     ast_allocator: AST_Node_Allocator&;
@@ -87,7 +103,19 @@ struct ModuleWalker {
     project_root: u8[];
     log_fd;
     current_module: FsmdModule&;
-    num_errors;
+    options: FsmdOptions;
+    statistics: MWStatistics;
+}
+
+fn dump_mw_statistics(fd, statistics: MWStatistics&) {
+    for (let i = 0; i < 2; i++) {
+        let si: MWStatiticsIndex = i;
+        let sb: StringBuilder; let buf: u8[1024];
+        sb_init(sb, buf);
+        sb_puts_rightpad(sb, si.name, 16);
+        sb_puts(sb, $": {(statistics.finish_times[i] - statistics.start_times[i]) / 1000000} ms\n")
+        write (fd, sb.str);
+    }
 }
 
 fn push_diagnostic(mw: ModuleWalker&, location: Location&, message: u8[], severity: Severity) {
@@ -112,13 +140,14 @@ fn publish_diagnostics(mw: ModuleWalker&) {
 fn error_handler_location(facility: u8[], location: Location&, message: u8[], severity: Severity, mw: ModuleWalker&) {
     write(mw.log_fd, $"{facility} {location.module.filename}:{location.line}:{location.col} Error: {message}\n");
     push_diagnostic(mw, location, message, severity);
-    mw.num_errors++;
+    mw.current_module.num_errors++;
 }
 
 fn error_handler_ast_node(facility: u8[], n: AST_node&, message: u8[], severity: Severity, mw: ModuleWalker&) {
     write(mw.log_fd, $"{facility} {n.location.module.filename}:{n.location.line}:{n.location.col} Error: {message}\n");
     push_diagnostic(mw, n.location, message, severity);
-    mw.num_errors++;
+
+    mw.current_module.num_errors++;
 }
 
 fn tokenize_module (mw: ModuleWalker&, module: Module&, code: u8[], endlos: EndlosAllocator&) {
@@ -176,30 +205,26 @@ fn lookup_external_symbol(name: u8[], mw: ModuleWalker&) : Symbol& {
 
     let imports = mw.current_module.module.imports;
 
-    // write(2, $"Looking up external symbol {name} {imports.len}\n");
+    // write (mw.log_fd, $"Looking up external symbol {name} {imports.len}\n");
 
     for (let i = 0; i < imports.len; i++) {
         if (imports[i].module) {
-            // write(2, $"    Looking in {imports[i].module.module.header.filename}\n");
+            // write (mw.log_fd, $"    Looking in {imports[i].module.module.header.filename}\n");
             sym => lookup_symbol_from_module(name, imports[i].module);
             if (sym) return sym;
         }
     }
 
-    // write(2, $"    Not found\n");
+    // write (mw.log_fd, $"    Not found\n");
 
     return null;
 }
 
 fn compile_module (mw: ModuleWalker&, module: FsmdModule&) : void {
-    let verbose = false;
-
     mw.current_module => module;
 
-    if (verbose) write(2, $"Compiling module {module.module.header.filename}...\n");
-
     if (module.state != ModuleState::NotCompiled) {
-        write(2, $"{__LOCATION__} Error: module {module.module.header.filename} is not in expected state\n");
+        write(mw.log_fd, $"{__LOCATION__} Error: module {module.module.header.filename} is not in expected state\n");
         return;
     }
 
@@ -209,22 +234,25 @@ fn compile_module (mw: ModuleWalker&, module: FsmdModule&) : void {
     obj_zero~Symbol&[](module.module.global_symbols);
     module.module.ast_root => null;
 
-    let last_num_errors = mw.num_errors;
+    let last_num_errors = module.num_errors;
 
     let start_times:  i64[] = module.statistics.start_times;
     let finish_times: i64[] = module.statistics.finish_times;
 
-    if (verbose) write(2, $"Tokenizing {endlos_rolls_in_use(mw.endlos_compile)}...\n");
-    // start_times[0]
+    if (mw.options.show_steps) write (mw.log_fd, $"Tokenizing {endlos_rolls_in_use(mw.endlos_compile)}...\n");
+    start_times[<i64>StatiticsIndex::Tokenizer] = monotonic_clock_gettime_ns();
     let tokens = tokenize_module(mw, module.module, module.module.code, mw.endlos_compile);
-    if (verbose) write(2, $"Tokenizing finished {endlos_rolls_in_use(mw.endlos_compile)}\n");
+    finish_times[<i64>StatiticsIndex::Tokenizer] = monotonic_clock_gettime_ns();
+    if (mw.options.show_steps) write (mw.log_fd, $"Tokenizing finished {endlos_rolls_in_use(mw.endlos_compile)}\n");
     
     let ast_allocator: AST_Node_Allocator;
     AST_Node_Allocator_init(ast_allocator, mw.endlos_compile);
 
-    if (verbose) write(2, $"Parsing {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
+    if (mw.options.show_steps) write (mw.log_fd, $"Parsing {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
+    start_times[<i64>StatiticsIndex::Parser] = monotonic_clock_gettime_ns();
     let root => parse_program(tokens, ast_allocator, mw.endlos_compile, mw.error_handler_location)
-    if (verbose) write(2, $"Parsing finished {endlos_rolls_in_use(mw.endlos_compile)} \n");
+    finish_times[<i64>StatiticsIndex::Parser] = monotonic_clock_gettime_ns();
+    if (mw.options.show_steps) write (mw.log_fd, $"Parsing finished {endlos_rolls_in_use(mw.endlos_compile)} \n");
 
     module.module.imports = gather_imports(root, mw.endlos_compile);
     handle_imports(mw, module.module.header.filename, module.module.imports);
@@ -232,32 +260,40 @@ fn compile_module (mw: ModuleWalker&, module: FsmdModule&) : void {
     // Restoring current module is needed because it will change during importing more stuffs from other imports
     mw.current_module => module;
 
-    if (false && mw.num_errors > last_num_errors) {
+    if (false && module.num_errors > last_num_errors) {
         write (mw.log_fd, "Errors during parsing. Not going to run resolvers.\n")
         module.state = ModuleState::CompilationFailed;
         return;
     }
 
+    start_times[<i64>StatiticsIndex::InitSymbols] = monotonic_clock_gettime_ns();
     let symbol_cache: SymbolCache;
     SymbolCache_init(symbol_cache, mw.type_cache, mw.endlos_compile, lookup_external_symbol, mw);
-
-    if (verbose) write(2, $"Type Resolver {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
+    finish_times[<i64>StatiticsIndex::InitSymbols] = monotonic_clock_gettime_ns();
+    
+    if (mw.options.show_steps) write (mw.log_fd, $"Type Resolver {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
+    start_times[<i64>StatiticsIndex::Type_Resolver] = monotonic_clock_gettime_ns();
     type_resolver_run(root, symbol_cache, mw.endlos_compile, mw.error_handler_ast_node);
-    if (verbose) write(2, $"Type Resolver finished  {endlos_rolls_in_use(mw.endlos_compile)} \n");
+    finish_times[<i64>StatiticsIndex::Type_Resolver] = monotonic_clock_gettime_ns();
+    if (mw.options.show_steps) write (mw.log_fd, $"Type Resolver finished  {endlos_rolls_in_use(mw.endlos_compile)} \n");
 
-    if (verbose) write(2, $"Resolver  {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
+    if (mw.options.show_steps) write (mw.log_fd, $"Resolver  {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
+    start_times[<i64>StatiticsIndex::Resolver] = monotonic_clock_gettime_ns();
     resolver_run(root, symbol_cache, mw.endlos_compile, mw.error_handler_ast_node);
-    if (verbose) write(2, $"Resolver finished {endlos_rolls_in_use(mw.endlos_compile)} \n");
+    finish_times[<i64>StatiticsIndex::Resolver] = monotonic_clock_gettime_ns();
+    if (mw.options.show_steps) write (mw.log_fd, $"Resolver finished {endlos_rolls_in_use(mw.endlos_compile)} \n");
 
-    if (false && mw.num_errors > last_num_errors) {
+    if (false && module.num_errors > last_num_errors) {
         write (mw.log_fd, "Errors during resolvers. Not going to run type checker.\n")
         module.state = ModuleState::CompilationFailed;
         return;
     }
 
-    if (verbose) write(2, $"Going to run type checker {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
+    if (mw.options.show_steps) write (mw.log_fd, $"Going to run type checker {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
+    start_times[<i64>StatiticsIndex::Type_Checker] = monotonic_clock_gettime_ns();
     type_checker_run(root, symbol_cache, ast_allocator, mw.endlos_compile, mw.error_handler_ast_node);
-    if (verbose) write(2, $"Finished type checking. {endlos_rolls_in_use(mw.endlos_compile)}\n");
+    finish_times[<i64>StatiticsIndex::Type_Checker] = monotonic_clock_gettime_ns();
+    if (mw.options.show_steps) write (mw.log_fd, $"Finished type checking. {endlos_rolls_in_use(mw.endlos_compile)}\n");
 
     AST_Node_Allocator_finalize(ast_allocator, mw.endlos_compile);
 
@@ -265,13 +301,13 @@ fn compile_module (mw: ModuleWalker&, module: FsmdModule&) : void {
     module.module.global_symbols = EndlosArr_finalize~Symbol&(symbol_cache.global_symbols, mw.endlos_compile);
     module.module.ast_root => root;
 
-    if (mw.num_errors > last_num_errors) {
+    if (module.num_errors > last_num_errors) {
         write (mw.log_fd, "Errors during compilation. Not going to run il gen.\n")
         module.state = ModuleState::CompilationFailed;
         return;
     }
 
-    if (verbose) write(2, $"Going to run IL gen {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
+    if (mw.options.show_steps) write (mw.log_fd, $"Going to run IL gen {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
 
     // The IL gen is only run for the diagnostic messages here
     let gen: IL_gen;
@@ -283,12 +319,14 @@ fn compile_module (mw: ModuleWalker&, module: FsmdModule&) : void {
     EndlosArr_begin~Opcode(gen.opcodes, mw.endlos_compile);
     EndlosArr_begin~u8[](gen.generic_implementation_names, mw.endlos_compile);
 
+    start_times[<i64>StatiticsIndex::IL_Gen] = monotonic_clock_gettime_ns();
     il_gen_run(gen, root);
-
+    finish_times[<i64>StatiticsIndex::IL_Gen] = monotonic_clock_gettime_ns();
+    
     EndlosArr_free~u8[](gen.generic_implementation_names, mw.endlos_compile);
     EndlosArr_free~Opcode(gen.opcodes, mw.endlos_compile);
 
-    if (verbose) write(2, $"Finished IL gen. {endlos_rolls_in_use(mw.endlos_compile)}\n");
+    if (mw.options.show_steps) write (mw.log_fd, $"Finished IL gen. {endlos_rolls_in_use(mw.endlos_compile)}\n");
 
     module.state = ModuleState::Compiled;
 }
@@ -298,7 +336,7 @@ fn read_file_to_buffer(filename: u8[], buffer: u8[]) : u8[] {
     let fd = open (filename, O_RDONLY)
 
     if (fd < 0) {
-        write(2, $"Error: failed to read file '{filename}': {strerror(fd)}\n");
+        write (2, $"Error: failed to read file '{filename}': {strerror(fd)}\n");
         let a: u8[];
         return a;
     }
@@ -330,7 +368,7 @@ fn handle_imports(mw: ModuleWalker&, module_filename: u8[], imports: Import[]) :
             let module => find_existing_module(mw, sb.str);
             if (module) {
                 if (module.state == ModuleState::NotCompiled) {
-                    write (mw.log_fd, $"Module {sb.str} exists but needs to be recompiled. recompiling...\n")
+                    if (mw.options.show_modules) write (mw.log_fd, $"Module {sb.str} exists but needs to be recompiled. recompiling...\n")
                     EndlosArr_begin~Diagnostic(module.diagnostics, mw.endlos_compile);
                     compile_module(mw, module);
                 }
@@ -338,15 +376,15 @@ fn handle_imports(mw: ModuleWalker&, module_filename: u8[], imports: Import[]) :
                     error_handler_location("[FSM Modulizer]", imp.location, $"Detected circular import '{imp.name}'", Severity::Error, mw);
                 }
                 else if (module.state == ModuleState::Compiled) {
-                    write (mw.log_fd, $"Module {sb.str} exists and is already compiled\n")
+                    if (mw.options.show_modules) write (mw.log_fd, $"Module {sb.str} exists and is already compiled\n")
                 }
                 else if (module.state == ModuleState::CompilationFailed) {
-                    write (mw.log_fd, $"Module {sb.str} exists and is already compiled (with errors)\n")
+                    if (mw.options.show_modules) write (mw.log_fd, $"Module {sb.str} exists and is already compiled (with errors)\n")
                 }
                 else NOT_IMPLEMENTED_EC(23, __LOCATION__, $"Dealing with module state {module.state.name}");
             }
             else {
-                write (mw.log_fd, $"Module {sb.str} doesn't exist, creating\n")
+                if (mw.options.show_modules) write (mw.log_fd, $"Module {sb.str} doesn't exist, creating\n")
                 module => EndlosArr_push~FsmdModule(mw.modules);
                 module.module.header.filename = endlos_copy~u8(sb.str, mw.endlos_main);
                 module.code_buffer = endlos_begin~u8(mw.endlos_main);
@@ -366,6 +404,8 @@ fn handle_imports(mw: ModuleWalker&, module_filename: u8[], imports: Import[]) :
 }
 
 fn recompile_all (mw: ModuleWalker&) {
+    mw.statistics.start_times[<i64>MWStatiticsIndex::CompileAll] = monotonic_clock_gettime_ns();
+
     let modules => mw.modules.arr;
 
     for (let i = 0; i < modules.len; i++) {
@@ -399,7 +439,11 @@ fn recompile_all (mw: ModuleWalker&) {
         }
     }
 
+    mw.statistics.finish_times[<i64>MWStatiticsIndex::CompileAll] = monotonic_clock_gettime_ns();
+
+    mw.statistics.start_times[<i64>MWStatiticsIndex::PublishDiagnostics] = monotonic_clock_gettime_ns();
     publish_diagnostics(mw);
+    mw.statistics.finish_times[<i64>MWStatiticsIndex::PublishDiagnostics] = monotonic_clock_gettime_ns();
 }
 
 fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[], changed: bool) {
@@ -411,7 +455,7 @@ fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[], changed:
         }
     }
     else {
-        write (mw.log_fd, $"Module {uri} doesn't exist, creating\n")
+        if (mw.options.show_modules) write (mw.log_fd, $"Module {uri} doesn't exist, creating\n")
         module => EndlosArr_push~FsmdModule(mw.modules);
         module.module.header.filename = endlos_copy~u8(filename, mw.endlos_main);
         module.code_buffer = endlos_begin~u8(mw.endlos_main);
@@ -421,6 +465,8 @@ fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[], changed:
     module.module.code = json_unescape_string(content, module.code_buffer);
 
     recompile_all(mw);
+    dump_statistics(mw.modules.arr);
+    dump_mw_statistics(mw.log_fd, mw.statistics);
 }
 
 fn find_definition(mw: ModuleWalker&, range: LocationRange&, uri: u8[], line, col) : u8[] {

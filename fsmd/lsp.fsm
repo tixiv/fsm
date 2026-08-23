@@ -7,7 +7,7 @@ import * from "fsmd_module";
 fn write_wrapped(fd, json: u8[]) {
     write (fd, $"Content-Length: {json.len}\r\n\r\n");
     write (fd, json);
-    write (3, json);
+    // write (3, json);
 }
 
 fn send_initialize_response (id: u8[]) {
@@ -29,7 +29,8 @@ write_wrapped (1, $"\{
 
 fn send_definition_response (id: u8[], filename: u8[], range: LocationRange) {
     if (filename.begin) {
-write_wrapped (1, $"\{
+write_wrapped (1,
+$"\{
     \"jsonrpc\": \"2.0\",
     \"id\": {id},
     \"result\": \{

@@ -17,6 +17,16 @@ struct Diagnostic {
     range: LocationRange;
 }
 
+enum StatiticsIndex {
+    Tokenizer,
+    Parser,
+    InitSymbols,
+    Type_Resolver,
+    Resolver,
+    Type_Checker,
+    IL_Gen,
+}
+
 struct Statistics {
     start_times:  i64[8];
     finish_times: i64[8];
@@ -35,4 +45,5 @@ struct FsmdModule {
     code_buffer: u8[];
     diagnostics: EndlosArr<Diagnostic>;
     statistics: Statistics;
+    num_errors;
 }
