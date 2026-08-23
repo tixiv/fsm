@@ -260,18 +260,18 @@ fn sb_puts_rightpad(sb: StringBuilder&, s: u8[], pad_to_len) {
 }
 
 fn NOT_IMPLEMENTED(location: u8[], what:u8[]) {
-    $"{location}: {what} is not implemented yet.\n"
+    write (2, $"{location}: {what} is not implemented yet.\n");
     exit(1);
 }
 
 fn NOT_IMPLEMENTED_EC(exit_code, location: u8[], what:u8[]) {
-    $"{location}: {what} is not implemented yet.\n"
+    write (2, $"{location}: {what} is not implemented yet.\n");
     exit(exit_code);
 }
 
 fn ASSERT(condition: bool, s: u8[]) {
     if (!condition) {
-        $"Assertion failed: {s}";
+        write (2, $"Assertion failed: {s}");
         exit(1);
     }
 }

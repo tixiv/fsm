@@ -34,6 +34,8 @@ union Type enum kind {
         name: u8[];
         storage_size;
         speciation: Type&;
+        // slice_type_for: Type&;
+        ref_type_for: Type&;
     }
 
     struct T_void {}
@@ -112,7 +114,6 @@ struct TypeCache {
     endlos: EndlosAllocator&;
 
     function_types   :TypeRefArr;
-    ref_types        :TypeRefArr;
     enumerator_types :TypeRefArr;
     array_types      :TypeRefArr;
     slice_types      :TypeRefArr;
@@ -136,12 +137,12 @@ struct TypeCache {
 }
 
 fn TypeCache_init(cache: TypeCache&, endlos: EndlosAllocator&) {
+    obj_zero~TypeCache(cache);
     cache.endlos => endlos;
     cache.type_roll = endlos_begin~Type(endlos);
     cache.type_ref_roll = endlos_begin~Type&(endlos);
 
     TypeRefArr_init(cache.function_types,   endlos);
-    TypeRefArr_init(cache.ref_types,        endlos);
     TypeRefArr_init(cache.enumerator_types, endlos);
     TypeRefArr_init(cache.array_types,      endlos);
     TypeRefArr_init(cache.slice_types,      endlos);
@@ -588,16 +589,15 @@ fn make_ref_type_for(cache: TypeCache&, t: Type&) : Type& {
     return ref;
 }
 
-fn check_ref_type_matches(ref: Type&, target_type: Type&, _: any&) {
-    return ref.T_reference.target_type <==> target_type;
-}
-
-fn get_ref_type_for(cache: TypeCache&, t: Type&) {
-    let ref => find_type_in_array(cache.ref_types, check_ref_type_matches, t, null)
-    if (ref) return ref;
+fn get_ref_type_for(cache: TypeCache&, t: Type&) : Type&{
+    let ref => t.ref_type_for;
+    if (ref && t.speciation <==> ref.T_reference.target_type.speciation) {
+        return ref;
+    }
 
     ref => make_ref_type_for(cache, t);
-    TypeRefArr_push(cache.ref_types, ref);
+    t.ref_type_for => ref;
+
     return ref;
 }
 

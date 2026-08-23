@@ -222,6 +222,7 @@ fn lookup_external_symbol(name: u8[], mw: ModuleWalker&) : Symbol& {
 
 fn compile_module (mw: ModuleWalker&, module: FsmdModule&) : void {
     mw.current_module => module;
+    if (mw.options.show_steps) write (mw.log_fd, $"Compiling {module.module.header.filename}\n");
 
     if (module.state != ModuleState::NotCompiled) {
         write(mw.log_fd, $"{__LOCATION__} Error: module {module.module.header.filename} is not in expected state\n");
@@ -420,7 +421,7 @@ fn recompile_all (mw: ModuleWalker&) {
     endlos_root_init(mw.endlos_compile, 256, 1024 * 1024 * 64);
 
     TypeCache_init(mw.type_cache, mw.endlos_compile);
-    mw.builtin_symbols = make_builtin_symbols(mw.type_cache, mw.endlos_compile);
+    mw.builtin_symbols = make_builtin_symbols(mw.type_cache, mw.endlos_compile); 
 
     for (let i = 0; i < modules.len; i++) {
         let module => modules[i];
@@ -450,7 +451,7 @@ fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[], changed:
     let filename = uri_to_file_path(mw.project_root, uri);
     let module => find_existing_module(mw, filename);
     if (module) {
-        if (!changed) { // (only opened, not edited)
+        if (!changed) { // (only opened, not edited) 
             return;
         }
     }
@@ -569,6 +570,7 @@ fn main () {
     mw.error_handler_ast_node.arg => mw;
     mw.project_root = "/home/tixiv/work/fsm";
     mw.log_fd = log_fd;
+    mw.options.show_steps = false;
     write(log_fd, $"3\n");
     EndlosArr_begin~FsmdModule(mw.modules, mw.endlos_main);
 
