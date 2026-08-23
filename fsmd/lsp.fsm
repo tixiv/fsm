@@ -2,7 +2,7 @@
 import * from "std";
 import * from "json";
 import * from "compiler_fsm/common";
-import * from "compiler_fsm/module";
+import * from "fsmd_module";
 
 fn write_wrapped(fd, json: u8[]) {
     write (fd, $"Content-Length: {json.len}\r\n\r\n");

@@ -157,10 +157,10 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : Module& {
     module.header.filename = filename
 
     if (mw.options.verbose) $"Reading '{filename}'\n"
-    let code = read_file (filename);
+    module.code = read_file (filename);
 
     if (mw.options.verbose) $"Tokenizing {endlos_rolls_in_use(mw.endlos)}...\n"
-    let tokens = tokenize_module(mw, module, code, mw.endlos);
+    let tokens = tokenize_module(mw, module, module.code, mw.endlos);
     if (mw.options.verbose) $"Tokenizing finished {endlos_rolls_in_use(mw.endlos)}\n"
 
     // dump_tokens(module.tokens);
@@ -177,11 +177,11 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : Module& {
     let imports = gather_imports(root, mw.endlos);
 
     for (let i = 0; i < imports.len; i++) {
-        let imp => imports[i];
+        let _import => imports[i];
 
         let sb: StringBuilder;
         sb_init(sb, endlos_begin~u8(mw.endlos));
-        let res = find_file(sb, imp.name, filename);
+        let res = find_file(sb, _import.name, filename);
         let import_filename = endlos_ripp_off~u8(mw.endlos, sb.buffer);
         
         if (res) {
@@ -189,10 +189,10 @@ fn compile_module (mw: ModuleWalker&, filename: u8[]) : Module& {
             let compiled_module => find_already_compiled(mw, import_filename);
             if (!compiled_module)
                 compiled_module => compile_module(mw, import_filename);
-            imp.module => compiled_module;
+            _import.module => compiled_module;
         }
         else {
-            write(2, $"[FSM Modulizer] {filename}:{imp.location.line} Error: couldn't find import '{imp.name}'.\n")
+            write(2, $"[FSM Modulizer] {filename}:{_import.location.line} Error: couldn't find import '{_import.name}'.\n")
             exit(1);
         }
     }

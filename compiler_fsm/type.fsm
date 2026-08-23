@@ -822,7 +822,8 @@ fn speciate_tree(tc: TypeCache&, t: Type&, speciation: Type&) : Type& {
                    |== Type::T_enum
                    |== Type::T_enumerator
                    |== Type::T_void
-                   |== Type::T_any) {
+                   |== Type::T_any
+                   |== Type::T_undefined) {
         return t;
     }
     else NOT_IMPLEMENTED(__LOCATION__, $"Speciating {get_type_name_r(buf, t)}");

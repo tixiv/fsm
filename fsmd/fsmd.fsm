@@ -17,6 +17,7 @@ import * from "compiler_fsm/opcodes";
 import * from "compiler_fsm/il_gen";
 import * from "compiler_fsm/type_checker";
 
+import * from "fsmd_module";
 import * from "json";
 import * from "lsp";
 import * from "helpers";
@@ -74,7 +75,7 @@ fn find_file(sb: StringBuilder&, name: u8[], parent_module_filename: u8[]) : boo
 }
 
 struct ModuleWalker {
-    modules: EndlosArr<Module>;
+    modules: EndlosArr<FsmdModule>;
     ast_allocator: AST_Node_Allocator&;
     endlos_main: EndlosAllocator;      // lives forever
     endlos_compile: EndlosAllocator;   // gets reset when we recompile
@@ -84,12 +85,12 @@ struct ModuleWalker {
     builtin_symbols: Symbol[];
     project_root: u8[];
     log_fd;
-    current_module: Module&;
+    current_module: FsmdModule&;
     num_errors;
 }
 
 fn push_diagnostic(mw: ModuleWalker&, location: Location&, message: u8[]) {
-    let module => <Module&> location.module;
+    let module => <FsmdModule&> location.module;
     let diag => EndlosArr_push~Diagnostic(module.diagnostics);
     diag.message = endlos_copy~u8(message, mw.endlos_compile);
     diag.range.start_line = location.line-1;
@@ -102,7 +103,7 @@ fn push_diagnostic(mw: ModuleWalker&, location: Location&, message: u8[]) {
 fn publish_diagnostics(mw: ModuleWalker&) {
     for (let i = 0; i < mw.modules.arr.len; i++) {
         let module => mw.modules.arr[i];
-        send_diagnostic_notifications(module.header.filename, module.diagnostics.arr);
+        send_diagnostic_notifications(module.module.header.filename, module.diagnostics.arr);
     }
 }
 
@@ -133,9 +134,9 @@ fn tokenize_module (mw: ModuleWalker&, module: Module&, code: u8[], endlos: Endl
     return endlos_ripp_off~Token(endlos, tokenizer.tokens);
 }
 
-fn find_existing_module(mw: ModuleWalker&, import_filename : u8[]) : Module&{
+fn find_existing_module(mw: ModuleWalker&, import_filename : u8[]) : FsmdModule&{
     for (let i = 0; i < mw.modules.arr.len; i++) {
-        if (sv_equal(import_filename, mw.modules.arr[i].header.filename))
+        if (sv_equal(import_filename, mw.modules.arr[i].module.header.filename))
             return mw.modules.arr[i];
     }
     return null;
@@ -159,9 +160,9 @@ fn lookup_symbol_from_module(name: u8[], module: Module&) : Symbol& {
 
 fn lookup_stdlib_symbol(name: u8[], mw: ModuleWalker&) : Symbol& {
     for (let i = 0; i < mw.modules.arr.len; i++) {
-        let filename = mw.modules.arr[i].header.filename;
+        let filename = mw.modules.arr[i].module.header.filename;
         if (sv_ends_with(filename, "stdlib/std.fsm")) {
-            return lookup_symbol_from_module(name, mw.modules.arr[i]);
+            return lookup_symbol_from_module(name, mw.modules.arr[i].module);
         }
     }
     return null;
@@ -171,13 +172,13 @@ fn lookup_external_symbol(name: u8[], mw: ModuleWalker&) : Symbol& {
     let sym => lookup_builtin_symbol(name, mw);
     if (sym) return sym;
 
-    let imports = mw.current_module.imports;
+    let imports = mw.current_module.module.imports;
 
     // write(2, $"Looking up external symbol {name} {imports.len}\n");
 
     for (let i = 0; i < imports.len; i++) {
         if (imports[i].module) {
-            // write(2, $"    Looking in {imports[i].module.header.filename}\n");
+            // write(2, $"    Looking in {imports[i].module.module.header.filename}\n");
             sym => lookup_symbol_from_module(name, imports[i].module);
             if (sym) return sym;
         }
@@ -188,28 +189,28 @@ fn lookup_external_symbol(name: u8[], mw: ModuleWalker&) : Symbol& {
     return null;
 }
 
-fn compile_module (mw: ModuleWalker&, module: Module&) : void {
+fn compile_module (mw: ModuleWalker&, module: FsmdModule&) : void {
     let verbose = false;
 
     mw.current_module => module;
 
-    if (verbose) write(2, $"Compiling module {module.header.filename}...\n");
+    if (verbose) write(2, $"Compiling module {module.module.header.filename}...\n");
 
     if (module.state != ModuleState::NotCompiled) {
-        write(2, $"{__LOCATION__} Error: module {module.header.filename} is not in expected state\n");
+        write(2, $"{__LOCATION__} Error: module {module.module.header.filename} is not in expected state\n");
         return;
     }
 
     module.state = ModuleState::Compiling;
-    obj_zero~Import[](module.imports);
-    obj_zero~Symbol[](module.symbols);
-    obj_zero~Symbol&[](module.global_symbols);
-    module.ast_root => null;
+    obj_zero~Import[](module.module.imports);
+    obj_zero~Symbol[](module.module.symbols);
+    obj_zero~Symbol&[](module.module.global_symbols);
+    module.module.ast_root => null;
 
     let last_num_errors = mw.num_errors;
 
     if (verbose) write(2, $"Tokenizing {endlos_rolls_in_use(mw.endlos_compile)}...\n");
-    let tokens = tokenize_module(mw, module, module.code, mw.endlos_compile);
+    let tokens = tokenize_module(mw, module.module, module.module.code, mw.endlos_compile);
     if (verbose) write(2, $"Tokenizing finished {endlos_rolls_in_use(mw.endlos_compile)}\n");
     
     let ast_allocator: AST_Node_Allocator;
@@ -219,8 +220,8 @@ fn compile_module (mw: ModuleWalker&, module: Module&) : void {
     let root => parse_program(tokens, ast_allocator, mw.endlos_compile, mw.error_handler_location)
     if (verbose) write(2, $"Parsing finished {endlos_rolls_in_use(mw.endlos_compile)} \n");
 
-    module.imports = gather_imports(root, mw.endlos_compile);
-    handle_imports(mw, module.header.filename, module.imports);
+    module.module.imports = gather_imports(root, mw.endlos_compile);
+    handle_imports(mw, module.module.header.filename, module.module.imports);
 
     // Restoring current module is needed because it will change during importing more stuffs from other imports
     mw.current_module => module;
@@ -254,9 +255,9 @@ fn compile_module (mw: ModuleWalker&, module: Module&) : void {
 
     AST_Node_Allocator_finalize(ast_allocator, mw.endlos_compile);
 
-    module.symbols = endlos_ripp_off~Symbol(mw.endlos_compile, symbol_cache.symbol_roll);
-    module.global_symbols = EndlosArr_finalize~Symbol&(symbol_cache.global_symbols, mw.endlos_compile);
-    module.ast_root => root;
+    module.module.symbols = endlos_ripp_off~Symbol(mw.endlos_compile, symbol_cache.symbol_roll);
+    module.module.global_symbols = EndlosArr_finalize~Symbol&(symbol_cache.global_symbols, mw.endlos_compile);
+    module.module.ast_root => root;
 
     if (mw.num_errors > last_num_errors) {
         write (mw.log_fd, "Errors during compilation. Not going to run il gen.\n")
@@ -340,16 +341,16 @@ fn handle_imports(mw: ModuleWalker&, module_filename: u8[], imports: Import[]) :
             }
             else {
                 write (mw.log_fd, $"Module {sb.str} doesn't exist, creating\n")
-                module => EndlosArr_push~Module(mw.modules);
-                module.header.filename = endlos_copy~u8(sb.str, mw.endlos_main);
+                module => EndlosArr_push~FsmdModule(mw.modules);
+                module.module.header.filename = endlos_copy~u8(sb.str, mw.endlos_main);
                 module.code_buffer = endlos_begin~u8(mw.endlos_main);
-                module.code = read_file_to_buffer(module.header.filename, module.code_buffer);
+                module.module.code = read_file_to_buffer(module.module.header.filename, module.code_buffer);
 
                 EndlosArr_begin~Diagnostic(module.diagnostics, mw.endlos_compile);
 
                 compile_module(mw, module);
             }
-            imp.module => module;
+            imp.module => module.module;
         }
         else {
             error_handler_location("[FSM Modulizer]", imp.location, $"Couldn't find import '{imp.name}'", mw);
@@ -388,7 +389,7 @@ fn recompile_all (mw: ModuleWalker&) {
         else if (module.state == ModuleState::Compiled |== ModuleState::CompilationFailed) {
         }
         else {
-            write (mw.log_fd, $"{__LOCATION__} Error: Module '{module.header.filename}' is in unexpected state\n")
+            write (mw.log_fd, $"{__LOCATION__} Error: Module '{module.module.header.filename}' is in unexpected state\n")
         }
     }
 
@@ -405,13 +406,13 @@ fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[], changed:
     }
     else {
         write (mw.log_fd, $"Module {uri} doesn't exist, creating\n")
-        module => EndlosArr_push~Module(mw.modules);
-        module.header.filename = endlos_copy~u8(filename, mw.endlos_main);
+        module => EndlosArr_push~FsmdModule(mw.modules);
+        module.module.header.filename = endlos_copy~u8(filename, mw.endlos_main);
         module.code_buffer = endlos_begin~u8(mw.endlos_main);
         module.state = ModuleState::NotCompiled;
     }
 
-    module.code = json_unescape_string(content, module.code_buffer);
+    module.module.code = json_unescape_string(content, module.code_buffer);
 
     recompile_all(mw);
 }
@@ -424,7 +425,7 @@ fn find_definition(mw: ModuleWalker&, range: LocationRange&, uri: u8[], line, co
     // convert to one based
     line++; col++;
 
-    let sym => find_symbol_at(module.ast_root, line, col);
+    let sym => find_symbol_at(module.module.ast_root, line, col);
 
     if (sym) {
         write (mw.log_fd, $"Found symbol {sym.name}\n")
@@ -435,7 +436,7 @@ fn find_definition(mw: ModuleWalker&, range: LocationRange&, uri: u8[], line, co
         return sym.location.module.filename;
     }
 
-    let n => find_member_access_at(module.ast_root, line, col);
+    let n => find_member_access_at(module.module.ast_root, line, col);
     if (n) {
         let buf: u8[1024];
         write (mw.log_fd, $"Found member access {n.AST_member_access.name}\n")
@@ -469,24 +470,24 @@ fn find_all_references(mw: ModuleWalker&, id: u8[], uri: u8[], line, col) {
     let reference_locations: EndlosArr<LSP_Location>;
     EndlosArr_begin~LSP_Location(reference_locations, mw.endlos_main);
 
-    let sym => find_symbol_at(module.ast_root, line, col);
+    let sym => find_symbol_at(module.module.ast_root, line, col);
     if (sym) {
         for (let i = 0; i < modules.len; i++) {
             let other_module => modules[i];
             if (other_module.state == ModuleState::Compiled) {
-                find_symbol_references_in_ast(other_module.ast_root, reference_locations, sym);
+                find_symbol_references_in_ast(other_module.module.ast_root, reference_locations, sym);
             }
         }
     }
     else {
-        let n => find_member_access_at(module.ast_root, line, col);
+        let n => find_member_access_at(module.module.ast_root, line, col);
         if (n && n.AST_member_access.body && n.AST_member_access.body.type) {
             let type => n.AST_member_access.body.type;
             let name = n.AST_member_access.name;
             for (let i = 0; i < modules.len; i++) {
                 let other_module => modules[i];
                 if (other_module.state == ModuleState::Compiled) {
-                    find_member_references_in_ast(other_module.ast_root, reference_locations, type, name);
+                    find_member_references_in_ast(other_module.module.ast_root, reference_locations, type, name);
                 }
             }
         } 
@@ -517,7 +518,7 @@ fn main () {
     mw.project_root = "/home/tixiv/work/fsm";
     mw.log_fd = log_fd;
     write(log_fd, $"3\n");
-    EndlosArr_begin~Module(mw.modules, mw.endlos_main);
+    EndlosArr_begin~FsmdModule(mw.modules, mw.endlos_main);
 
     write(log_fd, $"4\n");
 

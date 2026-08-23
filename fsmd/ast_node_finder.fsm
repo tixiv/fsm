@@ -15,6 +15,7 @@ fn find_symbol_visitor (n: AST_node&, finder: SymbolFinder&) : void {
     if (!n) return;
     if (n.location.line == finder.line) {
         if (n.kind == AST_node::AST_symbol) {
+            write (3, $"Line {n.location.line} found symbol {n.AST_symbol.name}\n");
             if (n.location.col - n.AST_symbol.name.len <= finder.col <= n.location.col) {
                 finder.best_symbol => n.AST_symbol.symbol;
             }
@@ -26,7 +27,9 @@ fn find_symbol_visitor (n: AST_node&, finder: SymbolFinder&) : void {
         }
     }
 
-    ast_visit_children(n, find_symbol_visitor, finder);
+    if (n.kind != AST_node::AST_generic_implementation) {
+        ast_visit_children(n, find_symbol_visitor, finder);
+    }
 }
 
 fn find_symbol_at (root: AST_node&, line, col) : Symbol& {
@@ -53,7 +56,9 @@ fn find_member_visitor (n: AST_node&, finder: MemeberAccessFinder&) : void {
         }
     }
 
-    ast_visit_children(n, find_member_visitor, finder);
+    if (n.kind != AST_node::AST_generic_implementation) {
+        ast_visit_children(n, find_member_visitor, finder);
+    }
 }
 
 fn find_member_access_at (root: AST_node&, line, col) : AST_node& {
