@@ -2,7 +2,7 @@
 import * from "std";
 import * from "fsmd_module";
 
-fn dump_statistics(modules: FsmdModule[]) {
+fn dump_statistics(fd, modules: FsmdModule[]) {
     let cummulative_times: i64[8];
 
     while (modules.len) {
@@ -18,6 +18,6 @@ fn dump_statistics(modules: FsmdModule[]) {
         sb_init(sb, buf);
         sb_puts_rightpad(sb, si.name, 16);
         sb_puts(sb, $": {cummulative_times[i] / 1000000} ms\n")
-        write (3, sb.str);
+        write (fd, sb.str);
     }
 }

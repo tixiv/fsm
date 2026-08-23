@@ -26,6 +26,7 @@ import * from "ast_node_finder";
 import * from "references_visitor";
 import * from "signal_handler";
 import * from "statistics";
+import * from "ast_freq_finder";
 
 fn open_log_file() {
     let O_WRONLY = 1;
@@ -466,8 +467,9 @@ fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[], changed:
     module.module.code = json_unescape_string(content, module.code_buffer);
 
     recompile_all(mw);
-    dump_statistics(mw.modules.arr);
+    dump_statistics(mw.log_fd, mw.modules.arr);
     dump_mw_statistics(mw.log_fd, mw.statistics);
+    dump_ast_freqs(mw.log_fd, mw.modules.arr);
 }
 
 fn find_definition(mw: ModuleWalker&, range: LocationRange&, uri: u8[], line, col) : u8[] {

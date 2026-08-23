@@ -340,7 +340,39 @@ fn visit_non_null(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&) {
 
 fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
 {
-    if (n.kind == AST_node::AST_program) {
+    if (n.kind       == AST_node::AST_symbol) {
+        // no child nodes to visit, most frequent node kind
+    }
+    else if (n.kind == AST_node::AST_member_access) {
+        visit_non_null(n.AST_member_access.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_dereference) {
+        visit_non_null(n.AST_dereference.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_reference) {
+        visit_non_null(n.AST_reference.body, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_call) {
+        visit_non_null(n.AST_call.target, visit, arg);
+        ast_visit_chain(n.AST_call.args, visit, arg);
+    }
+    else if (n.kind == AST_node::AST_namespace_access) {
+        visit_non_null(n.AST_namespace_access.body, visit, arg);
+    }
+    else if (n.kind  == AST_node::AST_typename
+                    |== AST_node::AST_string
+                    |== AST_node::AST_number
+                    |== AST_node::AST_null
+                    |== AST_node::AST_enum_member
+                    |== AST_node::AST_bool
+                    |== AST_node::AST_char_constant
+                    |== AST_node::AST_array_len
+                    |== AST_node::AST_import
+                    |== AST_node::AST_undefined
+    ) {
+        // no child nodes to visit
+    }
+    else if (n.kind == AST_node::AST_program) {
         ast_visit_chain(n.AST_program.body, visit, arg);
     }
     else if (n.kind == AST_node::AST_scope) {
@@ -387,10 +419,6 @@ fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
     else if (n.kind == AST_node::AST_unary) {
         visit_non_null(n.AST_unary.body, visit, arg);
     }
-    else if (n.kind == AST_node::AST_call) {
-        visit_non_null(n.AST_call.target, visit, arg);
-        ast_visit_chain(n.AST_call.args, visit, arg);
-    }
     else if (n.kind == AST_node::AST_cast) {
         visit_non_null(n.AST_cast.body, visit, arg);
     }
@@ -407,12 +435,6 @@ fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
     else if (n.kind == AST_node::AST_array_access) {
         visit_non_null(n.AST_array_access.array, visit, arg);
         visit_non_null(n.AST_array_access.index, visit, arg);
-    }
-    else if (n.kind == AST_node::AST_dereference) {
-        visit_non_null(n.AST_dereference.body, visit, arg);
-    }
-    else if (n.kind == AST_node::AST_reference) {
-        visit_non_null(n.AST_reference.body, visit, arg);
     }
     else if (n.kind == AST_node::AST_plus_plus) {
         visit_non_null(n.AST_plus_plus.body, visit, arg);
@@ -434,12 +456,6 @@ fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
     }
     else if (n.kind == AST_node::AST_union_member_def) {
         visit_non_null(n.AST_union_member_def._typedef, visit, arg);
-    }
-    else if (n.kind == AST_node::AST_member_access) {
-        visit_non_null(n.AST_member_access.body, visit, arg);
-    }
-    else if (n.kind == AST_node::AST_namespace_access) {
-        visit_non_null(n.AST_namespace_access.body, visit, arg);
     }
     else if (n.kind == AST_node::AST_type_ref) {
         visit_non_null(n.AST_type_ref.body, visit, arg);
@@ -481,20 +497,6 @@ fn ast_visit_children(n: AST_node&, visit: fn(AST_node&, any&):void, arg: any&)
     }
     else if (n.kind == AST_node::AST_generic_implementation) {
         visit_non_null(n.AST_generic_implementation.body, visit, arg);
-    }
-    else if (n.kind  == AST_node::AST_enum_member
-                    |== AST_node::AST_symbol
-                    |== AST_node::AST_number
-                    |== AST_node::AST_bool
-                    |== AST_node::AST_null
-                    |== AST_node::AST_string
-                    |== AST_node::AST_char_constant
-                    |== AST_node::AST_array_len
-                    |== AST_node::AST_typename
-                    |== AST_node::AST_import
-                    |== AST_node::AST_undefined
-    ) {
-        // no child nodes to visit
     }
     else {
         NOT_IMPLEMENTED(__LOCATION__, $"Visiting {n.kind.name}");

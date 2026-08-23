@@ -1,0 +1,34 @@
+
+import * from "std";
+import * from "compiler_fsm/ast";
+import * from "fsmd_module";
+
+struct AstFreqFinder {
+    freqs: i64[256];
+}
+
+fn ast_freq_visitor(n: AST_node&, v: AstFreqFinder&) : void {
+    if (!n) return;
+    v.freqs[<i64>n.kind] ++;
+    ast_visit_children(n, ast_freq_visitor, v);
+}
+
+fn dump_ast_freqs(fd, modules: FsmdModule[]) {
+    let v: AstFreqFinder;
+    while (modules.len) {
+        let module => modules++;
+        ast_freq_visitor(module.module.ast_root, v);
+    }
+
+    let name_helper :AST_node;
+
+    for (let i = 0; i <= AST_node::AST_undefined; i++) {
+        name_helper.kind = i;
+
+        let sb: StringBuilder; let buf: u8[1024];
+        sb_init(sb, buf);
+        sb_puts_rightpad(sb, name_helper.kind.name, 24);
+        sb_puts(sb, $": {v.freqs[i]}\n")
+        write (fd, sb.str);
+    }
+}

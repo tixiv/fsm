@@ -1073,7 +1073,10 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
         NOT_IMPLEMENTED_EC(45, __LOCATION__, $"Type checking {n.kind.name}");
     }
 
-    ASSERT(n.type, $"All nodes should have a type after the type checker. Have {n.kind.name} with null type.");
+    if (!n.type) {
+        type_checker_error(type_checker, n, $"All nodes should have a type after the type checker. Have {n.kind.name} with null type.");
+        n.type => type_checker.type_cache.builtin_undefined;
+    }
 }
 
 fn type_checker_run(root: AST_node&, symbol_cache: SymbolCache&, ast_allocator: AST_Node_Allocator&, endlos: EndlosAllocator&, error_handler: ErrorHandler<AST_node&>& ) {
