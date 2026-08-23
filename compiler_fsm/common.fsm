@@ -7,8 +7,13 @@ struct Location {
     module: ModuleHeader&;
     line: i32; col: i32;
 }
+// SIGSEGV at rip = 0x00000000004095F2
+enum Severity {
+    Error = 1,
+    Warning = 2,
+}
 
 generic T struct ErrorHandler {
-    handler: fn (u8[], T, u8[], any&) : void;
+    handler: fn (u8[], T, u8[], Severity, any&) : void;
     arg: any&;
 }

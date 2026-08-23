@@ -1,5 +1,6 @@
 
 import * from "std";
+import * from "time";
 import * from "endlos";
 import * from "compiler_fsm/common";
 import * from "compiler_fsm/type";
@@ -89,10 +90,11 @@ struct ModuleWalker {
     num_errors;
 }
 
-fn push_diagnostic(mw: ModuleWalker&, location: Location&, message: u8[]) {
+fn push_diagnostic(mw: ModuleWalker&, location: Location&, message: u8[], severity: Severity) {
     let module => <FsmdModule&> location.module;
     let diag => EndlosArr_push~Diagnostic(module.diagnostics);
     diag.message = endlos_copy~u8(message, mw.endlos_compile);
+    diag.severity = severity;
     diag.range.start_line = location.line-1;
     diag.range.end_line = diag.range.start_line;
     diag.range.start_col = location.col-6;
@@ -107,15 +109,15 @@ fn publish_diagnostics(mw: ModuleWalker&) {
     }
 }
 
-fn error_handler_location(facility: u8[], location: Location&, message: u8[], mw: ModuleWalker&) {
+fn error_handler_location(facility: u8[], location: Location&, message: u8[], severity: Severity, mw: ModuleWalker&) {
     write(mw.log_fd, $"{facility} {location.module.filename}:{location.line}:{location.col} Error: {message}\n");
-    push_diagnostic(mw, location, message);
+    push_diagnostic(mw, location, message, severity);
     mw.num_errors++;
 }
 
-fn error_handler_ast_node(facility: u8[], n: AST_node&, message: u8[], mw: ModuleWalker&) {
+fn error_handler_ast_node(facility: u8[], n: AST_node&, message: u8[], severity: Severity, mw: ModuleWalker&) {
     write(mw.log_fd, $"{facility} {n.location.module.filename}:{n.location.line}:{n.location.col} Error: {message}\n");
-    push_diagnostic(mw, n.location, message);
+    push_diagnostic(mw, n.location, message, severity);
     mw.num_errors++;
 }
 
@@ -209,7 +211,11 @@ fn compile_module (mw: ModuleWalker&, module: FsmdModule&) : void {
 
     let last_num_errors = mw.num_errors;
 
+    let start_times:  i64[] = module.statistics.start_times;
+    let finish_times: i64[] = module.statistics.finish_times;
+
     if (verbose) write(2, $"Tokenizing {endlos_rolls_in_use(mw.endlos_compile)}...\n");
+    // start_times[0]
     let tokens = tokenize_module(mw, module.module, module.module.code, mw.endlos_compile);
     if (verbose) write(2, $"Tokenizing finished {endlos_rolls_in_use(mw.endlos_compile)}\n");
     
@@ -329,7 +335,7 @@ fn handle_imports(mw: ModuleWalker&, module_filename: u8[], imports: Import[]) :
                     compile_module(mw, module);
                 }
                 else if (module.state == ModuleState::Compiling) {
-                    error_handler_location("[FSM Modulizer]", imp.location, $"Detected circular import '{imp.name}'", mw);
+                    error_handler_location("[FSM Modulizer]", imp.location, $"Detected circular import '{imp.name}'", Severity::Error, mw);
                 }
                 else if (module.state == ModuleState::Compiled) {
                     write (mw.log_fd, $"Module {sb.str} exists and is already compiled\n")
@@ -353,7 +359,7 @@ fn handle_imports(mw: ModuleWalker&, module_filename: u8[], imports: Import[]) :
             imp.module => module.module;
         }
         else {
-            error_handler_location("[FSM Modulizer]", imp.location, $"Couldn't find import '{imp.name}'", mw);
+            error_handler_location("[FSM Modulizer]", imp.location, $"Couldn't find import '{imp.name}'", Severity::Error, mw);
             imp.module => null;
         }
     }

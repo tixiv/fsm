@@ -7,7 +7,7 @@ import * from "symbol";
 import * from "ast";
 
 fn symbol_cache_error(eh: ErrorHandler<AST_node&>&, n: AST_node&, message: u8[]) {
-    eh.handler("[FSM Resolver]", n, message, eh.arg);
+    eh.handler("[FSM Resolver]", n, message, Severity::Error, eh.arg);
 }
 
 struct SymbolCache {

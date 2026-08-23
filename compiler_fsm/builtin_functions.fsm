@@ -171,6 +171,13 @@ fn_munmap: ; munmap(addr: any&, length: i64) : i64
    syscall
    ret
 
+fn_syscall_2: ; syscall_2(num: i64, arg_1: i64, arg_2: i64)
+    mov rsi, [rsp+8]
+    mov rdi, [rsp+16]
+    mov eax, [rsp+24]
+    syscall
+    ret
+
 fn_syscall_3: ; syscall_3(num: i64, arg_1: i64, arg_2: i64, arg3: i64)
     mov rdx, [rsp+8]
     mov rsi, [rsp+16]

@@ -18,7 +18,7 @@ struct TypeResolverState {
 
 fn type_resolver_error(trs: TypeResolverState&, n: AST_node&, message: u8[]) {
     let eh =>  trs.error_handler;
-    eh.handler("[FSM Type Resolver]", n, message, eh.arg);
+    eh.handler("[FSM Type Resolver]", n, message, Severity::Error, eh.arg);
 }
 
 struct EnumResolverState {

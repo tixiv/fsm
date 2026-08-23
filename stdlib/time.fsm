@@ -1,0 +1,17 @@
+
+struct Timespec {
+    sec;
+    nsec;
+}
+
+fn clock_gettime(clock_id: i64, ts: Timespec&) {
+    let SYS_CLOCK_GETTIME = 228;
+    return syscall_2 (SYS_CLOCK_GETTIME, clock_id, <i64>ts);
+}
+
+fn monotonic_clock_gettime_ns () {
+    let CLOCK_MONOTONIC  = 1;
+    let ts: Timespec;
+    clock_gettime(CLOCK_MONOTONIC, ts);
+    return ts.sec * 1000000000 + ts.nsec;
+}

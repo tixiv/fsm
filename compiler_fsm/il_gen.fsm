@@ -23,11 +23,12 @@ struct IL_gen {
 
 fn il_gen_error(il_gen: IL_gen&, n: AST_node&, message: u8[]) {
     let eh => il_gen.error_handler;
-    eh.handler("[FSM IL Gen]", n, message, eh.arg)
+    eh.handler("[FSM IL Gen]", n, message, Severity::Error, eh.arg)
 }
 
-fn il_gen_warning(l: Location, s: u8[]) {
-    write(2, $"[FSM IL Gen] {l.module.filename}:{l.line} Warning: {s}\n");
+fn il_gen_warning(il_gen: IL_gen&, n: AST_node&, message: u8[]) {
+    let eh => il_gen.error_handler;
+    eh.handler("[FSM IL Gen]", n, message, Severity::Warning, eh.arg)
 }
 
 fn push_opcode_2(gen: IL_gen&, kind: OpKind, value: u8[]&, i64_value_0, i64_value_1, type: Type&, location: Location&) : Opcode& {
@@ -775,9 +776,10 @@ fn il_gen_visitor(n: AST_node&, gen: IL_gen&) : void {
                     |== AST_node::AST_member_access
                     |== AST_node::AST_reference
                     |== AST_node::AST_symbol
-                    |== AST_node::AST_string)
+                    |== AST_node::AST_string
+                    |== AST_node::AST_array_access)
     {
-        il_gen_warning(n.location, "unused code.");
+        il_gen_warning(gen, n, "unused code.");
         ast_visit_children(n, il_gen_visitor, gen);
     }
     

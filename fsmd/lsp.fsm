@@ -82,7 +82,7 @@ fn send_diagnostic_notifications (filename: u8[], diagnostics: Diagnostic[]) {
                         \"character\": {d.range.end_col}
                     }
                 },
-                \"severity\": 1,
+                \"severity\": {<i64>d.severity},
                 \"message\": \"{json_escape_string(d.message, escape_buf)}\",
                 \"source\": \"fsmd\"
             }");

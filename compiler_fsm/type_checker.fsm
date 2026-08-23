@@ -27,12 +27,12 @@ struct TypeChecker {
 
 fn type_checker_error(type_checker: TypeChecker&, n: AST_node&, message: u8[]) {
     let eh => type_checker.error_handler;
-    eh.handler("[FSM Type Checker]", n, message, eh.arg)
+    eh.handler("[FSM Type Checker]", n, message, Severity::Error, eh.arg)
 }
 
-fn type_checker_warning(n: AST_node&, s: u8[]) {
-    let l = n.location;
-    write(2, $"[FSM Type Checker] {l.module.filename}:{l.line} Warning: {s}\n");
+fn type_checker_warning(type_checker: TypeChecker&, n: AST_node&, message: u8[]) {
+    let eh => type_checker.error_handler;
+    eh.handler("[FSM Type Checker]", n, message, Severity::Warning, eh.arg);
 }
 
 fn annotate_used_visitor(n: AST_node&, type_checker: TypeChecker&) {
@@ -186,7 +186,7 @@ fn try_convert_to_type_if_necessary(type_checker: TypeChecker&, n: AST_node&, ta
 
     if (target_type <==> type_checker.type_cache.builtin_bool && is_reference_kind(original_type)) {
         if (dereferenced_type(original_type) <==> type_checker.type_cache.builtin_bool) {
-            type_checker_warning(n,
+            type_checker_warning(type_checker, n,
 "Using 'bool&' in boolean context will dereference the target and not perform a null reference check.
 Suggest to either dereference, when the value is what you want, or to write '... != null' if you wanted,
 or to perform a null reference check.");

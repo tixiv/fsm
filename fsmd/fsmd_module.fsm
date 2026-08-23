@@ -1,5 +1,6 @@
 
 import * from "endlos";
+import * from "compiler_fsm/common";
 import * from "compiler_fsm/module";
 
 
@@ -12,7 +13,13 @@ struct LocationRange {
 
 struct Diagnostic {
     message: u8[];
+    severity: Severity;
     range: LocationRange;
+}
+
+struct Statistics {
+    start_times:  i64[8];
+    finish_times: i64[8];
 }
 
 enum ModuleState {
@@ -22,10 +29,10 @@ enum ModuleState {
     Compiled,
 }
 
-
 struct FsmdModule {
     module: Module;
     state: ModuleState;
     code_buffer: u8[];
     diagnostics: EndlosArr<Diagnostic>;
+    statistics: Statistics;
 }

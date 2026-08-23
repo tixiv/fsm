@@ -23,7 +23,7 @@ struct Resolver {
 
 fn resolver_error(res: Resolver&, n: AST_node&, message: u8[]) {
     let eh => res.error_handler;
-    eh.handler("[FSM Resolver]", n, message, eh.arg);
+    eh.handler("[FSM Resolver]", n, message, Severity::Error, eh.arg);
 }
 
 fn push_symbol(res: Resolver&, arr: EndlosArr<Symbol&>&, s: Symbol&, n: AST_node&) {

@@ -32,7 +32,9 @@ $(FSM): $(FSM_SRCS)
 
 $(FSMD): $(FSMD_SRCS)
 	$(FSM) fsmd/fsmd.fsm
-	fasm out1.asm
+	fasm out1.asm -s symbols/fsmd.fas
+	symbols symbols/fsmd.fas symbols/fsmd.sym
+	listing symbols/fsmd.fas symbols/fsmd.lst
 	cp out1 $(FSMD)
 
 bootstrap: $(CFSM) $(FSM_SRCS)

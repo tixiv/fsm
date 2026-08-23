@@ -19,24 +19,23 @@ import * from "type_checker";
 import * from "calculate_stacks";
 import * from "generator";
 
-
 struct ErrorHandlerArgs {
     stop_on_error: bool;
 }
 
-fn error_handler_location(facility: u8[], location: Location&, message: u8[], args: ErrorHandlerArgs&) {
-    $"{facility} {location.module.filename}:{location.line}:{location.col} Error: ";
+fn error_handler_location(facility: u8[], location: Location&, message: u8[], severity: Severity, args: ErrorHandlerArgs&) {
+    $"{facility} {location.module.filename}:{location.line}:{location.col} {severity.name}: ";
     puts(message);
     putc('\n');
-    if (!args || args.stop_on_error)
+    if (severity == Severity::Error && (!args || args.stop_on_error))
         exit(1);
 }
 
-fn error_handler_ast_node(facility: u8[], n: AST_node&, message: u8[], args: ErrorHandlerArgs&) {
-    $"{facility} {n.location.module.filename}:{n.location.line}:{n.location.col} Error: ";
+fn error_handler_ast_node(facility: u8[], n: AST_node&, message: u8[], severity: Severity, args: ErrorHandlerArgs&) {
+    $"{facility} {n.location.module.filename}:{n.location.line}:{n.location.col} {severity.name}: ";
     puts(message);
     putc('\n');
-    if (!args || args.stop_on_error)
+    if (severity == Severity::Error && (!args || args.stop_on_error))
         exit(1);
 }
 

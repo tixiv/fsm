@@ -15,7 +15,7 @@ struct Parser {
 
 fn parser_error(parser: Parser&, message: u8[]) {
     let eh =>  parser.error_handler;
-    eh.handler("[FSM Parser]", parser.CT.location, message, eh.arg)
+    eh.handler("[FSM Parser]", parser.CT.location, message, Severity::Error, eh.arg)
 }
 
 fn make_location_string(parser: Parser&) : u8[] {
@@ -882,9 +882,10 @@ fn parse_enum(parser: Parser&) : AST_node& {
     let ast_enum => ast_alloc(parser.allocator, AST_node::AST_enum, parser.CT.location);
     MOVE_NEXT(parser);
 
-    expect_token(parser, TokenKind::TOK_identifier);
-    ast_enum.AST_enum.name = parser.CT.value;
-    MOVE_NEXT(parser);
+    if (expect_token(parser, TokenKind::TOK_identifier)) {
+        ast_enum.AST_enum.name = parser.CT.value;
+        MOVE_NEXT(parser);
+    }
 
     take_expected(parser, TokenKind::TOK_lbrace);
 
@@ -901,10 +902,11 @@ fn parse_enum(parser: Parser&) : AST_node& {
                 MOVE_NEXT(parser);
                 let neg = parser.CT.kind == TokenKind::TOK_minus;
                 if (neg) MOVE_NEXT(parser);
-                expect_token(parser, TokenKind::TOK_number);
-                latest_value = parse_integer(parser.CT.value);
-                if (neg) latest_value = -latest_value;
-                MOVE_NEXT(parser);
+                if (expect_token(parser, TokenKind::TOK_number)) {
+                    latest_value = parse_integer(parser.CT.value);
+                    if (neg) latest_value = -latest_value;
+                    MOVE_NEXT(parser);
+                }
             }
             member.AST_enum_member.value = latest_value++;
 

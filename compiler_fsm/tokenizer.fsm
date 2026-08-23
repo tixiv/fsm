@@ -152,7 +152,7 @@ struct Tokenizer {
 
 fn tokenizer_error(tokenizer: Tokenizer&, message: u8[]) {
     let eh =>  tokenizer.error_handler;
-    eh.handler("[FSM Tokenizer]", tokenizer.location, message, eh.arg);
+    eh.handler("[FSM Tokenizer]", tokenizer.location, message, Severity::Error, eh.arg);
 }
 
 fn tokenizer_pop(tokenizer: Tokenizer&) {
