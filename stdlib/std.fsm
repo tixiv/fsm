@@ -56,19 +56,17 @@ fn mmap_anonymous(reserve_size) : any & {
     return ref;
 }
 
-fn is_whitespace(c: i32) { return c == ' ' ||  c == '\t' || c == '\r' }
+fn is_whitespace(c: i32) { return c == ' ' |== '\t' |== '\r' }
 fn is_numeric(c: i32) { return '0' <= c <= '9' }
 fn is_hex_digit(c: i32) { return is_numeric(c) || 'a' <= c <= 'f' || 'A' <= c <= 'F' }
-fn is_alpha(c: i32) { return 'A' <= c <= 'Z' || 'a' <= c <= 'z' }
-fn is_allowed_at_start_of_identifier(c: i32) { return is_alpha(c) || c == '_' }
-fn is_allowed_in_identifier(c: i32) { return is_alpha(c) || is_numeric(c) || c == '_' }
+fn is_alpha(c: i32) { return 'a' <= c <= 'z' || 'A' <= c <= 'Z' }
 
 fn skip_whitespace (s: u8[]&) { while (s.len && is_whitespace(s.begin)) s++ }
 
 fn sv_equal (s1: u8[], s2: u8[]) {
     if (s1.len != s2.len) return false;
-    for (let i = 0; i < s1.len; i = i + 1)
-        if (s1[i] != s2[i]) return false;
+    while (s1.len)
+        if (s1++ != s2++) return false;
     return true;
 }
 
@@ -283,6 +281,12 @@ generic T fn obj_copy(dest: T&, src: T&) : void {
 }
 
 generic T fn obj_zero(dest: T&) : void {
+    if (!bitand(T.sizeof, 7)) {
+        for (let i = 0; i < T.sizeof; i = i + 8) {
+            *<u64&>(<u64>dest + i) = 0;
+        }
+        return;
+    }
     for (let i = 0; i < T.sizeof; i++) {
         *<u8&>(<u64>dest + i) = 0;
     }

@@ -272,7 +272,7 @@ fn ast_alloc(allocator: AST_Node_Allocator&, kind, location: Location) : AST_nod
         exit(1);
     }
     let node => allocator.alloc++;
-    obj_zero~AST_node(node);
+    // obj_zero~AST_node(node);
     node.kind = kind;
     node.location = location;
 
@@ -661,6 +661,7 @@ fn ast_copy_tree(alloc: AllocatorsForTreeCopy&, n: AST_node&) : AST_node& {
                     |== AST_node::AST_string
                     |== AST_node::AST_char_constant
                     |== AST_node::AST_array_len
+                    |== AST_node::AST_undefined
     ) {
     }
     else {

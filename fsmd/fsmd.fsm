@@ -469,7 +469,7 @@ fn handle_document_updated(mw: ModuleWalker&, uri: u8[], content: u8[], changed:
     recompile_all(mw);
     dump_statistics(mw.log_fd, mw.modules.arr);
     dump_mw_statistics(mw.log_fd, mw.statistics);
-    dump_ast_freqs(mw.log_fd, mw.modules.arr);
+    // dump_ast_freqs(mw.log_fd, mw.modules.arr);
 }
 
 fn find_definition(mw: ModuleWalker&, range: LocationRange&, uri: u8[], line, col) : u8[] {
