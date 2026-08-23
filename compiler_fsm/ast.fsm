@@ -272,7 +272,7 @@ fn ast_alloc(allocator: AST_Node_Allocator&, kind, location: Location) : AST_nod
         exit(1);
     }
     let node => allocator.alloc++;
-    // obj_zero~AST_node(node);
+    obj_zero~AST_node(node);
     node.kind = kind;
     node.location = location;
 
