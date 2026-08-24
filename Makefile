@@ -24,14 +24,14 @@ all: $(FSM) $(FSMD)
 cfsm: $(CFSM)
 
 $(FSM): $(FSM_SRCS)
-	$(FSM) compiler_fsm/fsm.fsm
-	fasm out1.asm -s symbols/fsm.fas
+	$(FSM) -O1 compiler_fsm/fsm.fsm
+	fasm out1.asm -m 65536 -s symbols/fsm.fas
 	cp out1 $(FSM)
 	symbols symbols/fsm.fas symbols/fsm.sym
 	listing symbols/fsm.fas symbols/fsm.lst
 
 $(FSMD): $(FSMD_SRCS)
-	$(FSM) fsmd/fsmd.fsm
+	$(FSM) -O1 fsmd/fsmd.fsm
 	fasm out1.asm -s symbols/fsmd.fas
 	symbols symbols/fsmd.fas symbols/fsmd.sym
 	listing symbols/fsmd.fas symbols/fsmd.lst
@@ -77,7 +77,7 @@ TESTS += $(wildcard $(AOC21_DIR)/*.fsm)
 test: $(FSM)
 	@for t in $(TESTS); do \
 		echo "Testing $$t"; \
-		$(FSM) $$t && \
+		$(FSM) -O1 $$t && \
 		fasm out1.asm out > /dev/null && \
 		./out > $$t.out && \
 		diff -u $$t.expected $$t.out || exit 1; \

@@ -1,0 +1,31 @@
+
+import * from "endlos";
+import * from "opcodes";
+
+fn run_il_optimizer(opcodes: Opcode[]) {
+
+    for (let in_idx = 0; in_idx < opcodes.len; in_idx++) {
+        let opcode_0 => opcodes[in_idx];
+        let opcode_1: Opcode& => null;
+        if (in_idx + 1 < opcodes.len) opcode_1 => opcodes[in_idx+1]
+        
+        if (opcode_1 && opcode_0.kind == OpKind::OP_equal && opcode_1.kind == OpKind::OP_if)
+        {
+            let is_chained = opcode_0.i64_value[0];
+            opcode_0.kind = OpKind::OP_if_equal;
+            opcode_0.i64_value[0] = opcode_1.i64_value[0]; // if number
+            opcode_0.i64_value[1] = opcode_1.i64_value[1] + 2 * is_chained; // has else + 2 * is chained
+            opcode_1.kind = OpKind::OP_nop;
+        }
+        else if (opcode_1 && opcode_0.kind == OpKind::OP_member_access && opcode_1.kind == OpKind::OP_member_access) {
+            opcode_1.i64_value[0] = opcode_1.i64_value[0] + opcode_0.i64_value[0];
+            opcode_0.kind = OpKind::OP_nop;
+        }
+        else if (opcode_0.kind == OpKind::OP_member_access) {
+            if (opcode_0.i64_value[0] == 0) opcode_0.kind = OpKind::OP_nop;
+        }
+        else if (opcode_1 && opcode_0.kind == OpKind::OP_to_bool && opcode_1.kind == OpKind::OP_while_check) {
+            opcode_0.kind = OpKind::OP_nop;
+        }
+    }
+}

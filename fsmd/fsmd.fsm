@@ -545,7 +545,10 @@ fn find_all_references(mw: ModuleWalker&, id: u8[], uri: u8[], line, col) {
                     find_member_references_in_ast(other_module.module.ast_root, reference_locations, type, name);
                 }
             }
-        } 
+        }
+        else {
+
+        }
     }
 
     let buffer = endlos_begin~u8(mw.endlos_main);

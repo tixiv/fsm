@@ -59,6 +59,8 @@ enum OpKind {
     OP_pop,
     OP_get_enum_member_name,
     OP_dyn_arr_to_slice,
+    OP_if_equal,
+    OP_nop,
 }
 
 

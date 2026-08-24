@@ -343,6 +343,18 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) 
                 write(file, $"    jmp end_if_{op.i64_value[0]}\n")
             write(file,"@@:\n");
         }
+        else if (op.kind == OpKind::OP_if_equal) {
+            write(file, "    pop rax\n");
+            write(file, "    pop rbx\n");
+            if (bitand(op.i64_value[1], 2)) write(file, "    push rbx\n"); // chaining value: left operand
+            write(file, "    cmp rax, rbx\n");
+            write(file, "    je @f\n");
+            if (bitand(op.i64_value[1], 1))
+                write(file, $"    jmp else_{op.i64_value[0]}\n")
+            else
+                write(file, $"    jmp end_if_{op.i64_value[0]}\n")
+            write(file,"@@:\n");
+        }
         else if (op.kind == OpKind::OP_else) {
             write(file, $"    jmp end_if_{op.i64_value[0]}\n");
             write(file, $"else_{op.i64_value[0]}:\n");
@@ -611,6 +623,8 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) 
             write(file, "    push rax\n");
             write(file, "done:\n");
             write(file, "}\n");
+        }
+        else if (op.kind == OpKind::OP_nop) {
         }
         else {
             NOT_IMPLEMENTED(__LOCATION__, $"Generating {op.kind.name} opcode");
