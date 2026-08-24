@@ -1,0 +1,35 @@
+
+import * from "std";
+import * from "compiler_fsm/type";
+import * from "compiler_fsm/symbol";
+
+struct MemberDefResult {
+    type: Type&;
+    name: u8[]&;
+}
+
+fn find_member_def_at(symbols: Symbol&[], line, col) : MemberDefResult {
+    let result: MemberDefResult;
+    for (let i = 0; i < symbols.len; i++) {
+        let symbol => symbols[i];
+        if (symbol.kind == SymbolKind::SYM_type) {
+            if (is_structlike_kind(symbol.type)) {
+                let members = symbol.type.T_struct.members;
+                while (members.len) {
+                    let member => members++;
+                    let location => member.location;
+                    if (location && location.line == line) {
+                        if (location.col - member.name.len <= col <= location.col) {
+                            write (3, $"Found member def {member.name}\n");
+                            result.type => symbol.type;
+                            result.name => member.name;
+                            return result;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return result;
+}

@@ -27,6 +27,7 @@ import * from "references_visitor";
 import * from "signal_handler";
 import * from "statistics";
 import * from "ast_freq_finder";
+import * from "member_def_finder";
 
 fn open_log_file() {
     let O_WRONLY = 1;
@@ -547,7 +548,15 @@ fn find_all_references(mw: ModuleWalker&, id: u8[], uri: u8[], line, col) {
             }
         }
         else {
-
+            let result = find_member_def_at(module.module.global_symbols, line, col);
+            if (result.type && result.name) {
+                for (let i = 0; i < modules.len; i++) {
+                    let other_module => modules[i];
+                    if (other_module.state == ModuleState::Compiled) {
+                        find_member_references_in_ast(other_module.module.ast_root, reference_locations, result.type, result.name);
+                    }
+                }
+            }
         }
     }
 

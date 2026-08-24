@@ -47,8 +47,9 @@ struct MemberReferencesVisitor {
 fn member_references_visitor(n: AST_node&, v: MemberReferencesVisitor&) : void {
     if (!n) return;
     if (n.kind == AST_node::AST_member_access) {
-        if (n.AST_member_access.body.type <==> v.type_to_find
-            && sv_equal(n.AST_member_access.name, v.member_to_find))
+        if ((n.AST_member_access.body.type <==> v.type_to_find
+              || (is_reference_kind(n.AST_member_access.body.type) && dereferenced_type(n.AST_member_access.body.type) <==> v.type_to_find))
+                && sv_equal(n.AST_member_access.name, v.member_to_find))
         {
             let loc => EndlosArr_push~LSP_Location(v.locations);
             loc.filename         = n.location.module.filename;
@@ -62,6 +63,9 @@ fn member_references_visitor(n: AST_node&, v: MemberReferencesVisitor&) : void {
 }
 
 fn find_member_references_in_ast(root: AST_node&, locations: EndlosArr<LSP_Location>&, type_to_find: Type&, member_to_find: u8[]) {
+    let buf: u8[1024];
+    write (3, $"find_member_references_in_ast {get_type_name_r(buf, type_to_find)} '{member_to_find}'\n")
+        
     let v: MemberReferencesVisitor;
     v.locations => locations;
     v.type_to_find => type_to_find;
