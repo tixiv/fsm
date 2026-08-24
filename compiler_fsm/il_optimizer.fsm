@@ -24,7 +24,9 @@ fn run_il_optimizer(opcodes: Opcode[]) {
         else if (opcode_0.kind == OpKind::OP_member_access) {
             if (opcode_0.i64_value[0] == 0) opcode_0.kind = OpKind::OP_nop;
         }
-        else if (opcode_1 && opcode_0.kind == OpKind::OP_to_bool && opcode_1.kind == OpKind::OP_while_check) {
+        else if (opcode_1 && opcode_0.kind == OpKind::OP_to_bool
+                  && opcode_1.kind == OpKind::OP_while_check |== OpKind::OP_if)
+        {
             opcode_0.kind = OpKind::OP_nop;
         }
     }

@@ -64,7 +64,6 @@ fn member_references_visitor(n: AST_node&, v: MemberReferencesVisitor&) : void {
 
 fn find_member_references_in_ast(root: AST_node&, locations: EndlosArr<LSP_Location>&, type_to_find: Type&, member_to_find: u8[]) {
     let buf: u8[1024];
-    write (3, $"find_member_references_in_ast {get_type_name_r(buf, type_to_find)} '{member_to_find}'\n")
         
     let v: MemberReferencesVisitor;
     v.locations => locations;

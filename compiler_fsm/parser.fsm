@@ -825,6 +825,7 @@ fn parse_union(parser: Parser&) : AST_node& {
             MOVE_NEXT(parser);
 
             if (parser.CT.kind == TokenKind::TOK_identifier) {
+                member.location = parser.CT.location;
                 member.AST_union_member_def.name = parser.CT.value;
                 MOVE_NEXT(parser);
                 if (parser.CT.kind == TokenKind::TOK_equal_assign) {
