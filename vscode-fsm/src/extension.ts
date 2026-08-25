@@ -10,8 +10,16 @@ import {
 let client: LanguageClient | undefined;
 
 function createClient(): LanguageClient {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+
+    if (!workspaceFolder) {
+        throw new Error("FSM language server requires an open workspace");
+    }
+
+    const server = workspaceFolder.uri.fsPath + "/bin/fsmd";
+
     const serverOptions: ServerOptions = {
-        command: "/home/tixiv/work/fsm/bin/fsmd",
+        command: server,
         args: []
     };
 

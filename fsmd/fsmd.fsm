@@ -35,7 +35,7 @@ fn open_log_file() {
     let O_CREAT = 64;
     let O_TRUNC = 512;
 
-    let filename = "/home/tixiv/work/fsm/fsmd1.log";
+    let filename = "fsmd1.log";
 
     let log_fd = open(filename, O_WRONLY + O_CREAT + O_TRUNC);
     if (log_fd < 0) {
@@ -136,7 +136,10 @@ fn publish_diagnostics(mw: ModuleWalker&) {
     for (let i = 0; i < mw.modules.arr.len; i++) {
         let module => mw.modules.arr[i];
         annotate_diagnostic_locations(module.diagnostics.arr, module.module.tokens);
-        send_diagnostic_notifications(module.module.header.filename, module.diagnostics.arr);
+
+        let buffer = endlos_begin~u8(mw.endlos_main);
+        send_diagnostic_notifications(module.module.header.filename, module.diagnostics.arr, mw.project_root, buffer);
+        endlos_ripp_off~u8(mw.endlos_main, buffer);
     }
 }
 
@@ -479,7 +482,7 @@ fn find_definition(mw: ModuleWalker&, range: LocationRange&, uri: u8[], line, co
 
     let sym => find_symbol_at(module.module.ast_root, line, col);
 
-    if (sym) {
+    if (sym && sym.location) {
         write (mw.log_fd, $"Found symbol {sym.name}\n")
         range.start_line = sym.location.line - 1;
         range.end_line = sym.location.line;
@@ -557,7 +560,7 @@ fn find_all_references(mw: ModuleWalker&, id: u8[], uri: u8[], line, col) {
     }
 
     let buffer = endlos_begin~u8(mw.endlos_main);
-    lsp_send_references_response(id, reference_locations.arr, buffer);
+    lsp_send_references_response(id, reference_locations.arr, buffer, mw.project_root);
     endlos_ripp_off~u8(mw.endlos_main, buffer); // free
 
     EndlosArr_free~LSP_Location(reference_locations, mw.endlos_main);
@@ -579,7 +582,6 @@ fn main () {
     mw.error_handler_location.arg => mw;
     mw.error_handler_ast_node.handler => error_handler_ast_node;
     mw.error_handler_ast_node.arg => mw;
-    mw.project_root = "/home/tixiv/work/fsm";
     mw.log_fd = log_fd;
     mw.options.show_steps = false;
     write(log_fd, $"3\n");
@@ -603,7 +605,8 @@ fn main () {
         let print_request = true;
 
         if (sv_equal(method, "initialize")) {
-            write (log_fd, "initialize\n")
+            mw.project_root = $"{json_get_string(params, "rootPath")}";
+            write (log_fd, $"initialize. rootPath = '{mw.project_root}'\n")
             send_initialize_response(id);
             print_request = false;
         }
@@ -621,7 +624,7 @@ fn main () {
             let range: LocationRange;
             let filename = find_definition(mw, range, uri, line, col);
             
-            send_definition_response(id, filename, range);
+            send_definition_response(id, filename, range, mw.project_root);
         }
         else if (sv_equal(method, "textDocument/references")) {
             let textDocument = json_get_element(params, "textDocument");

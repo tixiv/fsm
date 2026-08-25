@@ -27,14 +27,14 @@ write_wrapped (1, $"\{
 }");
 }
 
-fn send_definition_response (id: u8[], filename: u8[], range: LocationRange) {
+fn send_definition_response (id: u8[], filename: u8[], range: LocationRange, project_root: u8[]) {
     if (filename.begin) {
 write_wrapped (1,
 $"\{
     \"jsonrpc\": \"2.0\",
     \"id\": {id},
     \"result\": \{
-        \"uri\": \"file:///home/tixiv/work/fsm/{filename}\",
+        \"uri\": \"file://{project_root}/{filename}\",
         \"range\": \{
             \"start\": \{
                 \"line\": {range.start_line},
@@ -57,16 +57,15 @@ write_wrapped (1, $"\{
     }
 }
 
-fn send_diagnostic_notifications (filename: u8[], diagnostics: Diagnostic[]) {
+fn send_diagnostic_notifications (filename: u8[], diagnostics: Diagnostic[], project_root: u8[], buffer: u8[]) {
     let sb: StringBuilder;
-    let buf: u8[0x100000];
     let escape_buf: u8[1024];
-    sb_init(sb, buf);
+    sb_init(sb, buffer);
     sb_puts(sb, $"\{
     \"jsonrpc\": \"2.0\",
     \"method\": \"textDocument/publishDiagnostics\",
     \"params\": \{
-        \"uri\": \"file:///home/tixiv/work/fsm/{filename}\",
+        \"uri\": \"file://{project_root}/{filename}\",
         \"diagnostics\": [")
 
     for (let i = 0; i < diagnostics.len; i++) {
@@ -102,9 +101,9 @@ struct LSP_Location {
     range: LocationRange;
 }
 
-fn lsp_put_location(sb: StringBuilder&, location: LSP_Location&) {
+fn lsp_put_location(sb: StringBuilder&, location: LSP_Location&, project_root: u8[]) {
     sb_puts(sb, $"    \{
-        \"uri\": \"file:///home/tixiv/work/fsm/{location.filename}\",
+        \"uri\": \"file://{project_root}/{location.filename}\",
         \"range\": \{
             \"start\": \{
                 \"line\": {location.range.start_line},
@@ -118,7 +117,7 @@ fn lsp_put_location(sb: StringBuilder&, location: LSP_Location&) {
     }");
 }
 
-fn lsp_send_references_response (id :u8[], locations: LSP_Location[], buffer: u8[]) {
+fn lsp_send_references_response (id :u8[], locations: LSP_Location[], buffer: u8[], project_root: u8[]) {
     let sb: StringBuilder;
     sb_init(sb, buffer);
 
@@ -128,7 +127,7 @@ fn lsp_send_references_response (id :u8[], locations: LSP_Location[], buffer: u8
     \"result\": [\n");
 
     for (let i = 0; i < locations.len; i++) {
-        lsp_put_location(sb, locations[i]);
+        lsp_put_location(sb, locations[i], project_root);
         if (i < locations.len-1)
             sb_puts(sb, ",\n");
     }

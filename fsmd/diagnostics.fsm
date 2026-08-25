@@ -11,7 +11,9 @@ fn annotate_diagnostic_locations (diagnostics: Diagnostic[], tokens: Token[]) {
             if (tokens[i].location.line == line
                 && tokens[i].location.col == col)
             {
-                diagnostic.range.start_col = col - tokens[i].value.len;
+                let start_col = col - tokens[i].value.len;
+                if (start_col < 1 ) start_col = 1;
+                diagnostic.range.start_col = start_col;
             }
         }
     }
