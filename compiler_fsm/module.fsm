@@ -15,6 +15,7 @@ struct Import {
 struct Module {
     header: ModuleHeader;
     code: u8[];
+    tokens: Token[];
     symbols: Symbol[];
     global_symbols: Symbol&[];
     ast_root: AST_node&;

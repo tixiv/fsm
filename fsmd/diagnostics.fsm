@@ -1,0 +1,18 @@
+
+import * from "fsmd_module";
+import * from "compiler_fsm/tokenizer";
+
+fn annotate_diagnostic_locations (diagnostics: Diagnostic[], tokens: Token[]) {
+    while (diagnostics.len) {
+        let diagnostic => diagnostics++;
+        let line = diagnostic.range.end_line;
+        let col = diagnostic.range.end_col;
+        for (let i = 0; i < tokens.len; i++) {
+            if (tokens[i].location.line == line
+                && tokens[i].location.col == col)
+            {
+                diagnostic.range.start_col = col - tokens[i].value.len;
+            }
+        }
+    }
+}

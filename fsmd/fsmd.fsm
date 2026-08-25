@@ -28,6 +28,7 @@ import * from "signal_handler";
 import * from "statistics";
 import * from "ast_freq_finder";
 import * from "member_def_finder";
+import * from "diagnostics";
 
 fn open_log_file() {
     let O_WRONLY = 1;
@@ -125,16 +126,16 @@ fn push_diagnostic(mw: ModuleWalker&, location: Location&, message: u8[], severi
     let diag => EndlosArr_push~Diagnostic(module.diagnostics);
     diag.message = endlos_copy~u8(message, mw.endlos_compile);
     diag.severity = severity;
-    diag.range.start_line = location.line-1;
-    diag.range.end_line = diag.range.start_line;
-    diag.range.start_col = location.col-6;
-    diag.range.end_col = location.col-1;
-    if (diag.range.start_col < 0) diag.range.start_col = 0;
+    diag.range.start_line = location.line;
+    diag.range.end_line = location.line;
+    diag.range.start_col = location.col;
+    diag.range.end_col = location.col;
 }
 
 fn publish_diagnostics(mw: ModuleWalker&) {
     for (let i = 0; i < mw.modules.arr.len; i++) {
         let module => mw.modules.arr[i];
+        annotate_diagnostic_locations(module.diagnostics.arr, module.module.tokens);
         send_diagnostic_notifications(module.module.header.filename, module.diagnostics.arr);
     }
 }
@@ -207,17 +208,12 @@ fn lookup_external_symbol(name: u8[], mw: ModuleWalker&) : Symbol& {
 
     let imports = mw.current_module.module.imports;
 
-    // write (mw.log_fd, $"Looking up external symbol {name} {imports.len}\n");
-
     for (let i = 0; i < imports.len; i++) {
         if (imports[i].module) {
-            // write (mw.log_fd, $"    Looking in {imports[i].module.module.header.filename}\n");
             sym => lookup_symbol_from_module(name, imports[i].module);
             if (sym) return sym;
         }
     }
-
-    // write (mw.log_fd, $"    Not found\n");
 
     return null;
 }
@@ -244,7 +240,7 @@ fn compile_module (mw: ModuleWalker&, module: FsmdModule&) : void {
 
     if (mw.options.show_steps) write (mw.log_fd, $"Tokenizing {endlos_rolls_in_use(mw.endlos_compile)}...\n");
     start_times[<i64>StatiticsIndex::Tokenizer] = monotonic_clock_gettime_ns();
-    let tokens = tokenize_module(mw, module.module, module.module.code, mw.endlos_compile);
+    module.module.tokens = tokenize_module(mw, module.module, module.module.code, mw.endlos_compile);
     finish_times[<i64>StatiticsIndex::Tokenizer] = monotonic_clock_gettime_ns();
     if (mw.options.show_steps) write (mw.log_fd, $"Tokenizing finished {endlos_rolls_in_use(mw.endlos_compile)}\n");
     
@@ -253,7 +249,7 @@ fn compile_module (mw: ModuleWalker&, module: FsmdModule&) : void {
 
     if (mw.options.show_steps) write (mw.log_fd, $"Parsing {endlos_rolls_in_use(mw.endlos_compile)} ...\n");
     start_times[<i64>StatiticsIndex::Parser] = monotonic_clock_gettime_ns();
-    let root => parse_program(tokens, ast_allocator, mw.endlos_compile, mw.error_handler_location)
+    let root => parse_program(module.module.tokens, ast_allocator, mw.endlos_compile, mw.error_handler_location)
     finish_times[<i64>StatiticsIndex::Parser] = monotonic_clock_gettime_ns();
     if (mw.options.show_steps) write (mw.log_fd, $"Parsing finished {endlos_rolls_in_use(mw.endlos_compile)} \n");
 

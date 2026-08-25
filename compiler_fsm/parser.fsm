@@ -583,8 +583,8 @@ fn parse_statement(parser: Parser&) : AST_node&
         }
     }
     else if (parser.CT.kind == TokenKind::TOK_keyword_let) {
-        n => ast_alloc(parser.allocator, AST_node::AST_var_decl, parser.CT.location);
         MOVE_NEXT(parser);
+        n => ast_alloc(parser.allocator, AST_node::AST_var_decl, parser.CT.location);
         
         if (parser.CT.kind != TokenKind::TOK_identifier) {
             parser_error(parser, $"Expected identifier, but got {parser.CT.kind.name}");
