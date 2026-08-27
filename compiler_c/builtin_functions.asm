@@ -98,12 +98,12 @@ fn_exit: ; exit (exit_code: i64) : void
     mov rdi, [rsp+8]
     syscall
 
-fn___open: ; __open (filename: u8 &, flags: i64) : i64
+fn___open: ; __open (filename: u8 &, flags: i64, permissions: i64) : i64
     mov eax, SYS_OPEN
-    mov rdi, [rsp+16]     ; filename
-    mov rsi, [rsp+8]      ; flags
-    xor rdx, rdx          ; mode
-    syscall                   ; fd is in rax
+    mov rdi, [rsp+24]     ; filename
+    mov rsi, [rsp+16]     ; flags
+    mov rdx, [rsp+8]      ; mode (permissions on newly created file)
+    syscall               ; fd is in rax
     ret
 
 fn_close: ; close (fd: i64) : i64
@@ -168,6 +168,41 @@ fn_munmap: ; munmap(addr: any&, length: i64) : i64
    mov     rsi, [rsp+8]     ; length
    syscall
    ret
+
+fn_syscall_0: ; syscall_0(num: i64)
+    mov eax, [rsp+8]
+    syscall
+    ret
+
+fn_syscall_1: ; syscall_2(num: i64, arg_1: i64)
+    mov rdi, [rsp+8]
+    mov eax, [rsp+16]
+    syscall
+    ret
+
+fn_syscall_2: ; syscall_2(num: i64, arg_1: i64, arg_2: i64)
+    mov rsi, [rsp+8]
+    mov rdi, [rsp+16]
+    mov eax, [rsp+24]
+    syscall
+    ret
+
+fn_syscall_3: ; syscall_3(num: i64, arg_1: i64, arg_2: i64, arg3: i64)
+    mov rdx, [rsp+8]
+    mov rsi, [rsp+16]
+    mov rdi, [rsp+24]
+    mov eax, [rsp+32]
+    syscall
+    ret
+
+fn_syscall_4: ; syscall_4(num: i64, arg_1: i64, arg_2: i64, arg3: i64, arg4: i64)
+    mov r10, [rsp+8]
+    mov rdx, [rsp+16]
+    mov rsi, [rsp+24]
+    mov rdi, [rsp+32]
+    mov eax, [rsp+40]
+    syscall
+    ret
 
 fn_fsize: ; fsize(fd: i64) : i64
    push rbp

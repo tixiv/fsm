@@ -1,0 +1,43 @@
+
+import * from "std";
+import * from "exec";
+
+fn main (argv: u8&[]) {
+
+    let env = get_env(argv);
+    let PATH = get_PATH_from_env(env);
+    let buf: u8[3][1024];
+
+    let echo_exe = find_executeable_in_path(PATH, "echo", buf[0]);
+    let false_exe = find_executeable_in_path(PATH, "false", buf[1]);
+    let sleep_exe = find_executeable_in_path(PATH, "sleep", buf[2]);
+
+    $"echo  = '{echo_exe}'\n"
+    $"false = '{false_exe}'\n"
+    $"sleep = '{false_exe}'\n"
+
+    {
+        let args: u8[2][];
+        args[0] = "Hello,";
+        args[1] = "World!";
+
+        exec_sync_and_report_errors(echo_exe, args);
+    }
+    
+    {
+        let args: u8[0][];
+
+        exec_sync_and_report_errors(false_exe, args);
+    }
+    
+    {
+        let args: u8[1][];
+        args[0] = "3";
+
+        $"Calling 'sleep 3' ...\n";
+
+        exec_sync_and_report_errors(sleep_exe, args);
+        
+        $"We are back\n";
+    }
+}

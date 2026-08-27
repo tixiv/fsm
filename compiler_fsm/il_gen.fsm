@@ -69,12 +69,23 @@ fn il_gen_push_symbol_address(gen: IL_gen&, s: Symbol&, n: AST_node&) {
     }
 }
 
-fn il_gen_push_symbol(gen: IL_gen&, s: Symbol&, location: Location&) {
+fn il_gen_push_symbol(gen: IL_gen&, s: Symbol&, n: AST_node&) {
     if (s.kind == SymbolKind::SYM_arg) {
-        push_opcode(gen, OpKind::OP_push_arg, null, s.offset, s.type, location);
-    } else if (s.kind == SymbolKind::SYM_local) {
-        push_opcode(gen, OpKind::OP_push_local_var, null,  s.offset, s.type, location);
-    } else {
+        push_opcode(gen, OpKind::OP_push_arg, null, s.offset, s.type, n.location);
+    }
+    else if (s.kind == SymbolKind::SYM_local) {
+        push_opcode(gen, OpKind::OP_push_local_var, null,  s.offset, s.type, n.location);
+    }
+    else if (s.kind == SymbolKind::SYM_type) {
+        il_gen_error(gen, n, $"Pushing type symbol '{s.name}' is not supported.");
+    }
+    else if (s.kind == SymbolKind::SYM_function) {
+        il_gen_error(gen, n, $"Pushing function symbol '{s.name}' as value (as opposed to as address) is not supported.");
+    }
+    else if (s.kind == SymbolKind::SYM_undefined) {
+        // The error about the undefined symbol has been reported allready. Do nothing.
+    }
+    else {
         NOT_IMPLEMENTED_EC(3, __LOCATION__, $"Pushing symbol kind {s.kind.name}");
     }
 }
@@ -566,7 +577,7 @@ fn gen_value_visitor(n: AST_node&, gen: IL_gen&) : void {
     else if (n.kind == AST_node::AST_symbol) {
         let s => n.AST_symbol.symbol;
         ASSERT(s, __LOCATION__);
-        il_gen_push_symbol(gen, s, n.location);
+        il_gen_push_symbol(gen, s, n);
     }
 
     else if (n.kind == AST_node::AST_binary) {

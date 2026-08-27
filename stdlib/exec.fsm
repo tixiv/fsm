@@ -1,0 +1,94 @@
+
+import * from "std";
+
+fn exec (program: u8[], args: u8[][]) {
+    ASSERT(args.len <= 30, __LOCATION__)
+
+    let args_cstr: u8&[32];
+
+    let buf: u8[4096]; let sb: StringBuilder;
+    sb_init(sb, buf);
+    args_cstr[0] => sb.buffer.begin;
+    sb_puts(sb, program); sb_putc(sb, 0);
+
+    for (let i = 0; i < args.len; i++) {
+        args_cstr[i+1] => sb.buffer.begin;
+        sb_puts(sb, args[i]); sb_putc(sb, 0);
+    }
+
+    let child_pid = fork();
+    if (!child_pid) {
+        // We are the child
+        execve(args_cstr[0], &args_cstr[0], null);
+    }
+
+    return child_pid;
+}
+
+fn get_env (argv: u8&[]) : u8&[] {
+    let env = argv;
+    env.len = 8192;
+    for (let i = 0; i < argv.len; i++) {
+        env++;
+    }
+    env++;
+    env.len = for (let i = 0; env[i]; i++; i);
+
+    return env;
+}
+
+fn get_PATH_from_env(env: u8&[]) {
+    for (let i = 0; i < env.len; i++) {
+        let env_var = sv_of_c_string(env[i]);
+        if (sv_starts_with(env_var, "PATH=")) {
+            return sv_skip(env_var, 5);
+        }
+    }
+    return "";
+}
+
+fn get_one_path_from_PATH(PATH: u8[]&) {
+    let path = PATH;
+    path.len = for (let i = 0; PATH.len && PATH.begin != ':'; i++; i) PATH++;
+    if (PATH.len) PATH++; // skip ':'
+    return path;
+}
+
+fn find_executeable_in_path (PATH: u8[], name: u8[], buf: u8[]) {
+    let X_OK = 1;
+    while (PATH.len) {
+        let sb: StringBuilder;
+        sb_init(sb, buf);
+        sb_puts (sb, $"{get_one_path_from_PATH(PATH)}/{name}\0");
+        if (access(sb.str.begin, X_OK) == 0) return sb.str;
+    }
+    let r: u8[]; return r;
+}
+
+fn WEXITSTATUS (status) { return bitand(bitshift(status, 8), 0xff) }
+fn WTERMSIG (status) { return bitand(status, 0x7f) }
+fn WCOREDUMP (status) : bool { return bitand(status, 0x80) }
+
+fn exec_sync_and_report_errors (program: u8[], args: u8[][]) : bool {
+    let pid = exec (program, args);
+    
+    let status: u32;
+    waitpid(pid, status, 0)
+    
+    if (status) {
+        let termsig = WTERMSIG(status);
+        if (WCOREDUMP(status)) {
+            write (2, $"Error: '{program}' was terminated with signal {termsig} and coredumped.\n");
+        }
+        else if (termsig) {
+            write (2, $"Error: '{program}' was terminated with signal {termsig}.\n");
+        }
+        else {
+            write (2, $"Error: '{program}' terminated with exit code {WEXITSTATUS(status)}.\n");
+        }
+
+        return false;
+    }
+
+    return true;
+}

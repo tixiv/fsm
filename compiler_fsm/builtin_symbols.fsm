@@ -18,7 +18,7 @@ fn init_builtin_functions(tc: TypeCache&, sr: Symbol[]&) {
     declare_builtin_fn(tc, sr, "exit", tc.builtin_void, tmp_args);
     declare_builtin_fn(tc, sr, "close", tc.builtin_i64, tmp_args);
 
-    tmp_args.len = 2; tmp_args[0] => get_ref_type_for(tc, tc.builtin_u8); tmp_args[1] => tc.builtin_i64;
+    tmp_args.len = 3; tmp_args[0] => get_ref_type_for(tc, tc.builtin_u8); tmp_args[1] => tc.builtin_i64;; tmp_args[2] => tc.builtin_i64;
     declare_builtin_fn(tc, sr, "__open", tc.builtin_i64, tmp_args);
 
     tmp_args.len = 2; tmp_args[0] => tc.builtin_i64; tmp_args[1] => get_slice_type(tc, tc.builtin_u8);
@@ -41,6 +41,8 @@ fn init_builtin_functions(tc: TypeCache&, sr: Symbol[]&) {
     declare_builtin_fn(tc, sr, "munmap", tc.builtin_i64, tmp_args);
 
     tmp_args[0] => tc.builtin_i64; tmp_args[1] => tc.builtin_i64; tmp_args[2] => tc.builtin_i64; tmp_args[3] => tc.builtin_i64; tmp_args[4] => tc.builtin_i64;
+    tmp_args.len = 1; declare_builtin_fn(tc, sr, "syscall_0", tc.builtin_i64, tmp_args);
+    tmp_args.len = 2; declare_builtin_fn(tc, sr, "syscall_1", tc.builtin_i64, tmp_args);
     tmp_args.len = 3; declare_builtin_fn(tc, sr, "syscall_2", tc.builtin_i64, tmp_args);
     tmp_args.len = 4; declare_builtin_fn(tc, sr, "syscall_3", tc.builtin_i64, tmp_args);
     tmp_args.len = 5; declare_builtin_fn(tc, sr, "syscall_4", tc.builtin_i64, tmp_args);

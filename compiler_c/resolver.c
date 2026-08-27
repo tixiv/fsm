@@ -60,7 +60,7 @@ void init_builtin_functions() {
     dyn_array_init(&builtin_functions, sizeof(Symbol*), 8);
 
     declare_builtin_fn(mkSV("exit"), &builtin_void, 1, (Type*[]){&builtin_i64 });
-    declare_builtin_fn(mkSV("__open"), &builtin_i64, 2, (Type*[]){&builtin_u8_reference, &builtin_i64 });
+    declare_builtin_fn(mkSV("__open"), &builtin_i64, 3, (Type*[]){&builtin_u8_reference, &builtin_i64, &builtin_i64});
     declare_builtin_fn(mkSV("close"), &builtin_i64, 1, (Type*[]){&builtin_i64});
     declare_builtin_fn(mkSV("read"), &builtin_i64, 2, (Type*[]){&builtin_i64, &builtin_u8_slice});
     declare_builtin_fn(mkSV("write"), &builtin_i64, 2, (Type*[]){&builtin_i64, &builtin_u8_slice});
@@ -71,6 +71,12 @@ void init_builtin_functions() {
     // mmap(addr: any&, lenght: i64, prot: u64, flags: u64, fd: i64, offset: i64) : any &
     declare_builtin_fn(mkSV("mmap"), get_ref_type_for(&builtin_any), 6, (Type*[]){get_ref_type_for(&builtin_any), &builtin_i64, &builtin_u64, &builtin_u64, &builtin_i64, &builtin_i64});
     declare_builtin_fn(mkSV("munmap"), &builtin_i64, 2, (Type*[]){get_ref_type_for(&builtin_any), &builtin_i64});
+
+    declare_builtin_fn(mkSV("syscall_0"), &builtin_i64, 1, (Type*[]){&builtin_i64});
+    declare_builtin_fn(mkSV("syscall_1"), &builtin_i64, 2, (Type*[]){&builtin_i64, &builtin_i64});
+    declare_builtin_fn(mkSV("syscall_2"), &builtin_i64, 3, (Type*[]){&builtin_i64, &builtin_i64, &builtin_i64});
+    declare_builtin_fn(mkSV("syscall_3"), &builtin_i64, 4, (Type*[]){&builtin_i64, &builtin_i64, &builtin_i64, &builtin_i64});
+    declare_builtin_fn(mkSV("syscall_4"), &builtin_i64, 5, (Type*[]){&builtin_i64, &builtin_i64, &builtin_i64, &builtin_i64, &builtin_i64});
 
     declare_builtin_fn(mkSV("print"), &builtin_void, 1, (Type*[]){&builtin_i64});
     declare_builtin_fn(mkSV("putc"), &builtin_void, 1, (Type*[]){&builtin_u8});

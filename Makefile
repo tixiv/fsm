@@ -24,27 +24,23 @@ all: $(FSM) $(FSMD)
 cfsm: $(CFSM)
 
 $(FSM): $(FSM_SRCS)
-	$(FSM) -O1 compiler_fsm/fsm.fsm
-	fasm out1.asm -m 65536 -s symbols/fsm.fas
-	cp out1 $(FSM)
-	symbols symbols/fsm.fas symbols/fsm.sym
-	listing symbols/fsm.fas symbols/fsm.lst
+	$(FSM) -O1 -S -o build/fsm_new compiler_fsm/fsm.fsm
+	build/fsm_new -O1 -S -o build/fsm compiler_fsm/fsm.fsm
+	cp build/fsm $(FSM)
+	cp build/fsm.lst symbols/fsm.lst
 
 $(FSMD): $(FSMD_SRCS)
-	$(FSM) -O1 fsmd/fsmd.fsm
-	fasm out1.asm -s symbols/fsmd.fas
-	symbols symbols/fsmd.fas symbols/fsmd.sym
-	listing symbols/fsmd.fas symbols/fsmd.lst
-	cp out1 $(FSMD)
+	$(FSM) -O1 -S -o build/fsmd fsmd/fsmd.fsm
+	cp build/fsmd.lst symbols/fsmd.lst
+	cp build/fsmd $(FSMD)
 
 bootstrap: $(CFSM) $(FSM_SRCS)
 	$(CFSM) compiler_fsm/fsm.fsm
 	fasm -m 65536 out.asm
-	./out compiler_fsm/fsm.fsm
-	fasm out1.asm -m 65536 -s symbols/fsm.fas
-	cp out1 $(FSM)
-	symbols symbols/fsm.fas symbols/fsm.sym
-	listing symbols/fsm.fas symbols/fsm.lst
+	./out -o build/fsm_new compiler_fsm/fsm.fsm
+	build/fsm_new -O1 -S -o build/fsm compiler_fsm/fsm.fsm
+	cp build/fsm $(FSM)
+	cp build/fsm.lst symbols/fsm.lst
 
 # Create build dir
 $(BUILD_DIR):
@@ -77,9 +73,8 @@ TESTS += $(wildcard $(AOC21_DIR)/*.fsm)
 test: $(FSM)
 	@for t in $(TESTS); do \
 		echo "Testing $$t"; \
-		$(FSM) -O1 $$t && \
-		fasm out1.asm out > /dev/null && \
-		./out > $$t.out && \
+		$(FSM) -O1 -o $(BUILD_DIR)/test $$t && \
+		$(BUILD_DIR)/test > $$t.out && \
 		diff -u $$t.expected $$t.out || exit 1; \
 	done
 	@echo All tests succeeded.

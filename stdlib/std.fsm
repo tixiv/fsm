@@ -3,6 +3,7 @@ fn strerror (error_code) {
     if (error_code == -1) return "Operation not permitted";
     if (error_code == -2) return "No such file or directory";
     if (error_code == -13) return "Permission denied";
+    if (error_code == -14) return "Bad address";
     if (error_code == -22) return "Invalid argument";
 
     print(error_code)
@@ -11,7 +12,29 @@ fn strerror (error_code) {
 
 fn open (filename: u8[], flags) {
     let filename_zero_delimited = $"{filename}\0";
-    return __open (filename_zero_delimited.begin, flags)
+    let permissions = 0x1A4; // 110 100 100 == octal 644
+    return __open (filename_zero_delimited.begin, flags, permissions);
+}
+
+fn chmod (filename: u8[], permissions) {
+    let filename_zero_delimited = $"{filename}\0";
+    let SYS_CHMOD = 90;
+    return syscall_2(SYS_CHMOD, <i64>filename_zero_delimited.begin, permissions);
+}
+
+fn fork () : i64 {
+    let SYS_FORK = 57;
+    return syscall_0(SYS_FORK);
+}
+
+fn execve (filename: u8&, argv: u8& &, envp: u8& &) : i64 {
+    let SYS_EXECVE = 59;
+    return syscall_3(SYS_EXECVE,<i64>filename, <i64>argv, <i64>envp);
+}
+
+fn waitpid (pid, wstatus: u32&, options) {
+    let SYS_WAIT4 = 61;
+    return syscall_4(SYS_WAIT4, pid, <i64>wstatus, options, 0);
 }
 
 fn read_file (filename: u8[]) : u8[]
