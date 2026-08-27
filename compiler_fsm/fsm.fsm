@@ -92,6 +92,7 @@ struct FsmOptions {
     verbose: bool;
     generate_symbols: bool;
     generate_listing: bool;
+    run_program: bool;
 }
 
 struct ModuleWalker {
@@ -297,6 +298,7 @@ fn print_help () {
 "Usage: fsm [options] <input_file.fsm>
   -o <output> Give output filename
   -O1         Optimize IL
+  -r          Run the generated program
   -c          Continue after errors occurred
   -v          Verbose information about compile steps
   -s          Generate Symbol information file
@@ -326,6 +328,9 @@ fn main (argv: u8&[]) {
             }
             else if (sv_equal(arg, "-S")) {
                 options.generate_listing = true;
+            }
+            else if (sv_equal(arg, "-r")) {
+                options.run_program = true;
             }
             else if (sv_starts_with(arg, "-a")) {
                 options.dump_ast = parse_integer(sv_skip(arg, 2));
@@ -439,5 +444,10 @@ fn main (argv: u8&[]) {
         if (!exec_sync_and_report_errors(listing_exe, listing_args)) {
             exit(1);
         }
+    }
+
+    if (options.run_program) {
+        let program_args: u8[0][];
+        exec(output_exe_filename, program_args);
     }
 }
