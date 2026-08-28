@@ -79,6 +79,18 @@ test: $(FSM)
 	done
 	@echo All tests succeeded.
 
+TESTS_CFSM := $(filter-out tests/dynamic_array.fsm,$(TESTS))
+
+cfsm_test: $(CFSM)
+	@for t in $(TESTS_CFSM); do \
+		echo "Testing $$t"; \
+		$(CFSM) $$t && \
+		fasm out.asm && \
+		./out > $$t.out && \
+		diff -u $$t.expected $$t.out || exit 1; \
+	done
+	@echo All cfsm tests succeeded.
+
 clean:
 	rm -rf $(BUILD_DIR)/*
 

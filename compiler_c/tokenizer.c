@@ -58,7 +58,7 @@ void read_number(SV *num, SV *input) {
         num->len = 2;
         hex = true;
     }
-    while(input->len && hex ? is_hex_digit(*input->begin) : is_numeric(*input->begin)) {
+    while(input->len && hex ? is_hex_digit(*input->begin) : (is_numeric(*input->begin) || *input->begin == '.')) {
         sv_pop(input);
         num->len++;
     }

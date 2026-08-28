@@ -513,7 +513,12 @@ static void ast_dump_visitor (AST_node *n, void *spaces_vp) {
             ast_visit_children(n, (AstVisitor)ast_dump_visitor, (void*)(spaces + 4));
             break;
         case AST_number:
-            printf("%.*s%s '%.*s' (%s)\n", (int)spaces, spc, kind_name, SV_prnt(n->number.value), get_type_name_r(buf, n->type));
+            if (n->number.is_double) {
+                printf("%.*s%s %f (%s)\n", (int)spaces, spc, kind_name, n->number.dvalue, get_type_name_r(buf, n->type));
+            }
+            else {
+                printf("%.*s%s %lu (%s)\n", (int)spaces, spc, kind_name, n->number.value, get_type_name_r(buf, n->type));
+            }
             break;
         case AST_bool:
             printf("%.*s%s '%d' (%s)\n", (int)spaces, spc, kind_name, n->boolean.value, get_type_name_r(buf, n->type));

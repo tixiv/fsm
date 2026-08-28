@@ -14,9 +14,10 @@ typedef struct {
 
 #define mkSV(s) (SV){s, sizeof(s)-1}
 
-bool sv_starts_with(SV *sv, const char *start);
+bool sv_starts_with(const SV *sv, const char *start);
 bool sv_compare_cstr(const SV *sv, const char *cstr);
 bool sv_equal(const SV *sv1, const SV *sv2);
+int sv_find_cstr(SV sv1, const char *cstr);
 char sv_pop(SV *sv);
 
 void sv_clone(SV *dst, const SV *src);

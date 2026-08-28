@@ -16,6 +16,7 @@ typedef enum {
     T_void,
     T_unsigned_integer,
     T_signed_integer,
+    T_float,
     T_boolean,
     T_function,
     T_reference,
@@ -57,6 +58,10 @@ typedef struct Type_s {
         struct {
             size_t num_bits;
         } integer;
+
+        struct {
+            size_t num_bits;
+        } _float;
         
         struct {
             struct Type_s *target_type;
@@ -110,6 +115,8 @@ extern Type builtin_i16;
 extern Type builtin_u8;
 extern Type builtin_i8;
 
+extern Type builtin_f64;
+
 extern Type builtin_u8_reference;
 extern Type builtin_u8_slice;
 
@@ -126,6 +133,7 @@ const char *get_type_name_encoded_r(char print_buf[1024], Type *type);
 bool is_null_kind(Type *t);
 bool is_integer_kind(Type *t);
 bool is_signed_integer(Type *t);
+bool is_float_kind(Type *t);
 bool is_boolean_kind(Type *t);
 bool is_array_kind(Type *t);
 bool is_structlike_kind(Type *t);

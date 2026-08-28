@@ -41,6 +41,8 @@
     X(OP_while_end) \
     X(OP_to_bool) \
     X(OP_sign_extend) \
+    X(OP_float_to_int) \
+    X(OP_int_to_float) \
     X(OP_array_access) \
     X(OP_member_access) \
     X(OP_load) \

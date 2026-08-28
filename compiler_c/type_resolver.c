@@ -36,6 +36,7 @@ Type *get_builtin_type_by_name(const SV *name) {
     if (sv_compare_cstr(name,"i16")) return &builtin_i16;
     if (sv_compare_cstr(name,"u8"))  return &builtin_u8;
     if (sv_compare_cstr(name,"i8"))  return &builtin_i8;
+    if (sv_compare_cstr(name,"f64")) return &builtin_f64;
 
     return nullptr;
 }

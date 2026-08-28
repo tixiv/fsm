@@ -140,7 +140,9 @@ typedef struct AST_node_s {
         } symbol;
 
         struct {
-            SV value;
+            int64_t value;
+            double dvalue;
+            bool is_double;
         } number;
 
         struct {

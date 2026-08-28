@@ -24,6 +24,8 @@ Type builtin_i16 = (Type){T_signed_integer,   .storage_size = 2, .integer.num_bi
 Type builtin_u8 =  (Type){T_unsigned_integer, .storage_size = 1, .integer.num_bits =  8};
 Type builtin_i8 =  (Type){T_signed_integer,   .storage_size = 1, .integer.num_bits =  8};
 
+Type builtin_f64 = (Type){T_float,            .storage_size = 8, ._float.num_bits = 64};
+
 Type builtin_u8_reference = (Type){T_reference, .storage_size = 8, .reference.target_type = &builtin_u8};
 static StructMember builtin_u8_slice_members[2] = {{.name = mkSV("begin"), .type = &builtin_u8_reference}, {.name = mkSV("len"), .type = &builtin_i64}};
 Type builtin_u8_slice = (Type){T_struct, .storage_size = 16, ._struct.kind = SL_slice, ._struct.num_members = 2, ._struct.members = builtin_u8_slice_members};
@@ -69,6 +71,7 @@ static const char *get_type_name_r_impl(char print_buf[1024], Type *type, bool e
     if (type == &builtin_i16)  return "i16";
     if (type == &builtin_u8)   return "u8";
     if (type == &builtin_i8)   return "i8";
+    if (type == &builtin_f64)  return "f64";
 
     SB sb;
     sb_init(&sb, print_buf, 1024);
@@ -163,6 +166,10 @@ bool is_signed_integer(Type *t) {
     return t && (t->kind == T_signed_integer);
 }
 
+bool is_float_kind(Type *t) {
+    return t && (t->kind == T_float);
+}
+
 bool is_array_kind(Type *t) {
     return t->kind == T_array;
 }
@@ -239,7 +246,7 @@ bool types_are_equivalent(Type *t1, Type *t2) {
 bool is_castable_to_integer(Type *t, const char **out_warn) {
     if (out_warn) *out_warn = nullptr;
 
-    if (t->kind == T_unsigned_integer || t->kind == T_signed_integer || t->kind == T_boolean)
+    if (is_integer_kind(t) || is_boolean_kind(t) || is_enum_kind(t) || is_enumerator_kind(t))
     {
         return true;
     }

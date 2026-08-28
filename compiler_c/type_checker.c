@@ -249,6 +249,33 @@ void try_convert_to_type_if_necessary(AST_node *n, Type *target_type, const char
     }
 }
 
+void try_to_convert_to_numeric_if_necessary(AST_node *n, const char* desc) {
+    char buf_1[1024];
+    Type *original_type = n->type;
+
+    auto_dereference(n);
+    if (is_integer_kind(n->type) || is_float_kind(n->type))
+        return;
+
+    if (is_boolean_kind(n->type) || is_enum_kind(n->type) || is_enumerator_kind(n->type)) {
+        ast_insert_node(n, make_cast(&builtin_i64, n->type));
+        return;
+    }
+
+    type_checker_error(n->location, "Can't convert %s of type '%s' to numeric.\n",
+        desc, get_type_name_r(buf_1, original_type));
+}
+
+Type *check_types_for_binary_math_operators(AST_node *n, const char* left_desc, const char* right_desc) {
+    try_to_convert_to_numeric_if_necessary(n->binary.left, left_desc);
+    try_to_convert_to_numeric_if_necessary(n->binary.right, right_desc);
+
+    if (is_float_kind(n->binary.left->type) || is_float_kind(n->binary.right->type))
+        return &builtin_f64;
+
+    return &builtin_i64;
+}
+
 void type_propagate_binary_operator(AST_node *n) {
     char buf_1[1024];
     char buf_2[1024];
@@ -298,22 +325,17 @@ void type_propagate_binary_operator(AST_node *n) {
             case TOK_slash:
             case TOK_percent:
             case TOK_up_arrow:
-                try_convert_to_type_if_necessary(n->binary.left, &builtin_i64, sb_left.buffer);
-                try_convert_to_type_if_necessary(n->binary.right, &builtin_i64, sb_right.buffer);
-
-                n->type = &builtin_i64;
+                n->type = check_types_for_binary_math_operators(n, sb_left.buffer, sb_right.buffer);
                 break;
 
             case TOK_greater:
             case TOK_lower:
             case TOK_greater_equal:
             case TOK_lower_equal:
-                try_convert_to_type_if_necessary(n->binary.left, &builtin_i64, sb_left.buffer);
-                try_convert_to_type_if_necessary(n->binary.right, &builtin_i64, sb_right.buffer);
-
+                check_types_for_binary_math_operators(n, sb_left.buffer, sb_right.buffer);
                 n->type = &builtin_bool;
                 break;
-            
+
             case TOK_boolean_and:
             case TOK_boolean_or:
                 try_convert_to_type_if_necessary(n->binary.left, &builtin_bool, sb_left.buffer);
@@ -568,7 +590,8 @@ void type_check_user_cast(AST_node *n) {
     char buf_1[1024]; char buf_2[1024];
     Type *t_to   = n->user_cast.typedecl->type;
     Type *t_from = n->user_cast.body->type;
-    if (is_integer_kind(t_to) && (is_reference_kind(t_from) || is_integer_kind(t_from) || is_boolean_kind(t_from) || is_enumerator_kind(t_from) || is_enum_kind(t_from))) return;
+    if (is_integer_kind(t_to) && (is_reference_kind(t_from) || is_integer_kind(t_from) || is_boolean_kind(t_from) || is_enumerator_kind(t_from) || is_enum_kind(t_from) || is_float_kind(t_from))) return;
+    if (is_float_kind(t_to) && is_integer_kind(t_from)) return;
     if (is_reference_kind(t_to) && (is_reference_kind(t_from) || is_integer_kind(t_from) || is_null_kind(t_from))) return;
     if (is_boolean_kind(t_to) && (is_integer_kind(t_from) || is_boolean_kind(t_from))) return;
     type_checker_error(n->location, "Can't cast '%s' to '%s'.", get_type_name_r(buf_1, t_from), get_type_name_r(buf_2, t_to));
@@ -659,7 +682,7 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
     // actions while traversing the tree up
     switch (n->kind) {
         case AST_number:
-            n->type = &builtin_i64;
+            n->type = n->number.is_double ? &builtin_f64 : &builtin_i64;
             n->addressable = false;
             break;
         case AST_bool:
@@ -862,8 +885,13 @@ void type_propagation_visitor(AST_node *n, PropagationVisitorData *prop) {
                 n->type = &builtin_bool;
             }
             else if (n->unary.token_kind == TOK_minus) {
-                try_convert_to_type_if_necessary(n->unary.body, &builtin_i64, "Argument of unary '-'");
-                n->type = &builtin_i64;
+                try_to_convert_to_numeric_if_necessary(n->unary.body, "Argument of unary '-'");
+                if (is_float_kind(n->unary.body->type)) {
+                    n->type = n->unary.body->type;
+                }
+                else {
+                    n->type = &builtin_i64;
+                }
             }
             else NOT_IMPLEMENTED("Type checking unary operator %s is not implemented yet.\n", token_kind_printable(n->unary.token_kind));
             n->addressable = false;

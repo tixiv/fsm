@@ -69,6 +69,59 @@ const char *make_movx(const char*reg, size_t size, bool _sigend) {
     return buf;
 }
 
+void output_comaprison(FILE *file, Opcode *op) {
+    fprintf(file, "\t" "mov rcx, 0\n");
+    fprintf(file, "\t" "mov rdx, 1\n");
+    fprintf(file, "\t" "pop rbx\n");
+    fprintf(file, "\t" "pop rax\n");
+    
+    if (op->i64_value[0]) { // chained
+        if (op->kind == OP_equal || op->kind == OP_unequal) {
+            fprintf(file, "\t" "push rax\n"); // chaining value: left operand
+        }
+        else {
+            fprintf(file, "\t" "push rbx\n"); // chaining value: right operand
+        }
+    }
+
+    if (is_float_kind(op->type)) {
+        fprintf(file, "\t" "movq xmm0, rax\n");
+        fprintf(file, "\t" "movq xmm1, rbx\n");
+        fprintf(file, "\t" "ucomisd xmm0, xmm1\n");
+    }
+    else if (is_integer_kind(op->type) || is_enum_kind(op->type) || is_enumerator_kind(op->type)
+             || is_boolean_kind(op->type) || is_reference_kind(op->type))
+    {
+        fprintf(file, "\t" "cmp rax, rbx\n");
+    }
+    else {
+        char buf [1024];
+        NOT_IMPLEMENTED("Generating comparison for type '%s' is not implemented.\n", get_type_name_r(buf, op->type));
+    }
+
+    if      (op->kind == OP_equal)      {  fprintf(file, "\t" "cmove  rcx, rdx\n"); }
+    else if (op->kind == OP_unequal)    {  fprintf(file, "\t" "cmovne rcx, rdx\n"); }
+    else if (is_signed_integer(op->type)) {
+        if      (op->kind == OP_compare_GT) {  fprintf(file, "\t" "cmovg  rcx, rdx\n"); }
+        else if (op->kind == OP_compare_LT) {  fprintf(file, "\t" "cmovl  rcx, rdx\n"); }
+        else if (op->kind == OP_compare_GE) {  fprintf(file, "\t" "cmovge rcx, rdx\n"); }
+        else if (op->kind == OP_compare_LE) {  fprintf(file, "\t" "cmovle rcx, rdx\n"); }
+        else ASSERT(false, "Not a comparison opcode.\n");
+    }
+    else {
+        if      (op->kind == OP_compare_GT) {  fprintf(file, "\t" "cmova  rcx, rdx\n"); }
+        else if (op->kind == OP_compare_LT) {  fprintf(file, "\t" "cmovb  rcx, rdx\n"); }
+        else if (op->kind == OP_compare_GE) {  fprintf(file, "\t" "cmovae rcx, rdx\n"); }
+        else if (op->kind == OP_compare_LE) {  fprintf(file, "\t" "cmovbe rcx, rdx\n"); }
+        else ASSERT(false, "Not a comparison opcode.\n");
+        // if (is_float_kind(op->type)) {
+            // setp   dl
+        // }
+    }
+
+    fprintf(file, "\t" "push rcx\n");
+}
+
 extern const char *builtin_functions_asm;
 
 void output_asm(const char *asm_file_name) {
@@ -123,24 +176,64 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file, "\t" "ret\n");
                 break;
             case OP_add:
-                fprintf(file, "\t" "pop rax\n");
-                fprintf(file, "\t" "add [rsp], rax\n");
+                if (is_integer_kind(op->type)) {
+                    fprintf(file, "\t" "pop rax\n");
+                    fprintf(file, "\t" "add [rsp], rax\n");
+                } else if (is_float_kind(op->type)) {
+                    fprintf(file, "\t" "movsd xmm0, [rsp+8]\n");
+                    fprintf(file, "\t" "movsd xmm1, [rsp]\n");
+                    fprintf(file, "\t" "addsd xmm0, xmm1\n");
+                    fprintf(file, "\t" "add rsp, 8\n");
+                    fprintf(file, "\t" "movsd [rsp], xmm0\n");
+                } else {
+                    NOT_IMPLEMENTED("%s for other than integer or float is not implemented.\n", opcode_name(op->kind))
+                }
                 break;
             case OP_sub:
-                fprintf(file, "\t" "pop rax\n");
-                fprintf(file, "\t" "sub [rsp], rax\n");
+                if (is_integer_kind(op->type)) {
+                    fprintf(file, "\t" "pop rax\n");
+                    fprintf(file, "\t" "sub [rsp], rax\n");
+                } else if (is_float_kind(op->type)) {
+                    fprintf(file, "\t" "movsd xmm0, [rsp+8]\n");
+                    fprintf(file, "\t" "movsd xmm1, [rsp]\n");
+                    fprintf(file, "\t" "subsd xmm0, xmm1\n");
+                    fprintf(file, "\t" "add rsp, 8\n");
+                    fprintf(file, "\t" "movsd [rsp], xmm0\n");
+                } else {
+                    NOT_IMPLEMENTED("%s for other than integer or float is not implemented.\n", opcode_name(op->kind))
+                }
                 break;
             case OP_mul:
-                fprintf(file, "\t" "pop rax\n");
-                fprintf(file, "\t" "mul QWORD [rsp]\n");
-                fprintf(file, "\t" "mov [rsp], rax\n");
+                if (is_integer_kind(op->type)) {
+                    fprintf(file, "\t" "pop rax\n");
+                    fprintf(file, "\t" "mul QWORD [rsp]\n");
+                    fprintf(file, "\t" "mov [rsp], rax\n");
+                } else if (is_float_kind(op->type)) {
+                    fprintf(file, "\t" "movsd xmm0, [rsp+8]\n");
+                    fprintf(file, "\t" "movsd xmm1, [rsp]\n");
+                    fprintf(file, "\t" "mulsd xmm0, xmm1\n");
+                    fprintf(file, "\t" "add rsp, 8\n");
+                    fprintf(file, "\t" "movsd [rsp], xmm0\n");
+                } else {
+                    NOT_IMPLEMENTED("%s for other than integer or float is not implemented.\n", opcode_name(op->kind))
+                }
                 break;
             case OP_div:
-                fprintf(file, "\t" "pop rbx\n");
-                fprintf(file, "\t" "pop rax\n");
-                fprintf(file, "\t" "cqo\n");
-                fprintf(file, "\t" "idiv rbx\n");
-                fprintf(file, "\t" "push rax\n");
+                if (is_integer_kind(op->type)) {
+                    fprintf(file, "\t" "pop rbx\n");
+                    fprintf(file, "\t" "pop rax\n");
+                    fprintf(file, "\t" "cqo\n");
+                    fprintf(file, "\t" "idiv rbx\n");
+                    fprintf(file, "\t" "push rax\n");
+                } else if (is_float_kind(op->type)) {
+                    fprintf(file, "\t" "movsd xmm0, [rsp+8]\n");
+                    fprintf(file, "\t" "movsd xmm1, [rsp]\n");
+                    fprintf(file, "\t" "divsd xmm0, xmm1\n");
+                    fprintf(file, "\t" "add rsp, 8\n");
+                    fprintf(file, "\t" "movsd [rsp], xmm0\n");
+                } else {
+                    NOT_IMPLEMENTED("%s for other than integer or float is not implemented.\n", opcode_name(op->kind))
+                }
                 break;
             case OP_mod:
                 fprintf(file, "\t" "pop rbx\n");
@@ -183,67 +276,21 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file, "\t" "xor QWORD [rsp], 1\n");
                 break;
             case OP_neg:
-                fprintf(file, "\t" "neg QWORD [rsp]\n");
+                if (is_float_kind(op->type)) {
+                    fprintf(file, "\t" "mov rax, 0x8000000000000000\n");
+                    fprintf(file, "\t" "xor QWORD [rsp], rax\n");
+                }
+                else {
+                    fprintf(file, "\t" "neg QWORD [rsp]\n");
+                }
                 break;
             case OP_equal:
-                fprintf(file, "\t" "mov rcx, 0\n");
-                fprintf(file, "\t" "mov rdx, 1\n");
-                fprintf(file, "\t" "pop rax\n");
-                fprintf(file, "\t" "pop rbx\n");
-                fprintf(file, "\t" "cmp rax, rbx\n");
-                fprintf(file, "\t" "cmove rcx, rdx\n");
-                if (op->i64_value[0]) fprintf(file, "\t" "push rbx\n"); // chaining value: left operand
-                fprintf(file, "\t" "push rcx\n");
-                break;
             case OP_unequal:
-                fprintf(file, "\t" "mov rcx, 1\n");
-                fprintf(file, "\t" "mov rdx, 0\n");
-                fprintf(file, "\t" "pop rax\n");
-                fprintf(file, "\t" "pop rbx\n");
-                fprintf(file, "\t" "cmp rax, rbx\n");
-                fprintf(file, "\t" "cmove rcx, rdx\n");
-                if (op->i64_value[0]) fprintf(file, "\t" "push rbx\n"); // chaining value: left operand
-                fprintf(file, "\t" "push rcx\n");
-                break;
             case OP_compare_GT:
-                fprintf(file, "\t" "mov rcx, 0\n");
-                fprintf(file, "\t" "mov rdx, 1\n");
-                fprintf(file, "\t" "pop rbx\n");
-                fprintf(file, "\t" "pop rax\n");
-                fprintf(file, "\t" "cmp rax, rbx\n");
-                fprintf(file, "\t" "cmovg rcx, rdx\n");
-                if (op->i64_value[0]) fprintf(file, "\t" "push rbx\n"); // chaining value: right operand
-                fprintf(file, "\t" "push rcx\n");
-                break;
             case OP_compare_LT:
-                fprintf(file, "\t" "mov rcx, 0\n");
-                fprintf(file, "\t" "mov rdx, 1\n");
-                fprintf(file, "\t" "pop rbx\n");
-                fprintf(file, "\t" "pop rax\n");
-                fprintf(file, "\t" "cmp rax, rbx\n");
-                fprintf(file, "\t" "cmovl rcx, rdx\n");
-                if (op->i64_value[0]) fprintf(file, "\t" "push rbx\n"); // chaining value: right operand
-                fprintf(file, "\t" "push rcx\n");
-                break;
             case OP_compare_GE:
-                fprintf(file, "\t" "mov rcx, 0\n");
-                fprintf(file, "\t" "mov rdx, 1\n");
-                fprintf(file, "\t" "pop rbx\n");
-                fprintf(file, "\t" "pop rax\n");
-                fprintf(file, "\t" "cmp rax, rbx\n");
-                fprintf(file, "\t" "cmovge rcx, rdx\n");
-                if (op->i64_value[0]) fprintf(file, "\t" "push rbx\n"); // chaining value: right operand
-                fprintf(file, "\t" "push rcx\n");
-                break;
             case OP_compare_LE:
-                fprintf(file, "\t" "mov rcx, 0\n");
-                fprintf(file, "\t" "mov rdx, 1\n");
-                fprintf(file, "\t" "pop rbx\n");
-                fprintf(file, "\t" "pop rax\n");
-                fprintf(file, "\t" "cmp rax, rbx\n");
-                fprintf(file, "\t" "cmovle rcx, rdx\n");
-                if (op->i64_value[0]) fprintf(file, "\t" "push rbx\n"); // chaining value: right operand
-                fprintf(file, "\t" "push rcx\n");
+                output_comaprison(file, op);
                 break;
             case OP_push_literal:
                 fprintf(file, "\t" "mov rax,%lu\n", op->string_value.begin ? strtoul(op->string_value.begin, 0, 0) : (uint64_t)op->i64_value[0]);
@@ -575,6 +622,18 @@ void output_asm(const char *asm_file_name) {
                 fprintf(file, "\t" "push rax\n");
                 fprintf(file, "done:\n");
                 fprintf(file, "}\n");
+                break;
+            }
+            case OP_float_to_int: {
+                fprintf(file, "\t" "movsd xmm0, [rsp]\n");
+                fprintf(file, "\t" "cvttsd2si rax, xmm0\n");
+                fprintf(file, "\t" "mov [rsp], rax\n");
+                break;
+            }
+            case OP_int_to_float: {
+                fprintf(file, "\t" "mov rax, [rsp]\n");
+                fprintf(file, "\t" "cvtsi2sd xmm0, rax\n");
+                fprintf(file, "\t" "movsd [rsp], xmm0\n");
                 break;
             }
             default:

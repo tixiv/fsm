@@ -190,6 +190,7 @@ fn read_word(tokenizer: Tokenizer&) {
 
 fn read_number(tokenizer: Tokenizer&) {
     let num: u8[];
+    let code => tokenizer.code;
     num.begin => tokenizer.code.begin;
     num.len = 0;
     let hex = false;
@@ -199,7 +200,7 @@ fn read_number(tokenizer: Tokenizer&) {
         num.len = 2
         hex = true
     }
-    while(tokenizer.code.len && if (hex) is_hex_digit(tokenizer.code.begin) else is_numeric(tokenizer.code.begin)) {
+    while(code.len && if (hex) is_hex_digit(code.begin) else is_numeric(code.begin) || code.begin == '.' ) {
         tokenizer_pop(tokenizer)
         num.len++;
     }

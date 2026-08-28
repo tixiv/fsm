@@ -358,7 +358,15 @@ static AST_node *parse_primary()
 
     if (CT->kind == TOK_number) {
         n = ast_alloc(AST_number, &CT->location);
-        n->number.value = CT->value;
+        if (sv_find_cstr(CT->value, ".") != -1) {
+            n->number.dvalue = strtod(CT->value.begin, nullptr);
+            n->number.is_double = true;
+        }
+        else {
+            n->number.value = strtoul (CT->value.begin, nullptr, 0);
+            n->number.is_double = false;
+        }
+        
         MOVE_NEXT();
     }
     else if (CT->kind == TOK_keyword_true) {

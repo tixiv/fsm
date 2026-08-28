@@ -50,6 +50,9 @@ union Type enum kind {
         num_bits;
         signed: bool;
     }
+    struct T_float {
+        num_bits;
+    }
     struct T_reference {
         target_type: Type&;
     }
@@ -137,6 +140,7 @@ struct TypeCache {
     builtin_i16: Type;
     builtin_u8: Type;
     builtin_i8: Type;
+    builtin_f64: Type;
 }
 
 fn TypeCache_init(cache: TypeCache&, endlos: EndlosAllocator&) {
@@ -167,6 +171,7 @@ fn TypeCache_init(cache: TypeCache&, endlos: EndlosAllocator&) {
     t => cache.builtin_i16;          t.kind = Type::T_integer;   t.storage_size = 2; t.allignof = 2; t.T_integer.signed = true;   t.T_integer.num_bits = 16;
     t => cache.builtin_u8;           t.kind = Type::T_integer;   t.storage_size = 1; t.allignof = 1; t.T_integer.signed = false;  t.T_integer.num_bits =  8;
     t => cache.builtin_i8;           t.kind = Type::T_integer;   t.storage_size = 1; t.allignof = 1; t.T_integer.signed = true;   t.T_integer.num_bits =  8;
+    t => cache.builtin_f64;          t.kind = Type::T_float;     t.storage_size = 8; t.allignof = 8;                              t.T_float.num_bits =  8;
 }
 
 fn type_ref_roll_take (cache: TypeCache&, len) : Type&[] {

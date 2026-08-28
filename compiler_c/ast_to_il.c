@@ -137,23 +137,25 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen, bool result_used) {
         if (result_used)
             ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
         else
-            ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);;
+            ast_visit_children(n, (AstVisitor)il_gen_visitor, gen);
+
+        Type *operand_type = n->binary.left->type;
 
         switch (n->binary.token_kind) {
-            case TOK_plus:          if (result_used) push_opcode(OP_add,                nullptr, 0, nullptr, n->location); break;
-            case TOK_minus:         if (result_used) push_opcode(OP_sub,                nullptr, 0, nullptr, n->location); break;
-            case TOK_asterisk:      if (result_used) push_opcode(OP_mul,                nullptr, 0, nullptr, n->location); break;
-            case TOK_slash:         if (result_used) push_opcode(OP_div,                nullptr, 0, nullptr, n->location); break;
-            case TOK_percent:       if (result_used) push_opcode(OP_mod,                nullptr, 0, nullptr, n->location); break;
-            case TOK_up_arrow:      if (result_used) push_opcode(OP_ipow,               nullptr, 0, nullptr, n->location); break;
-            case TOK_equal:         if (result_used) push_opcode(OP_equal,              nullptr, 0, nullptr, n->location); break;
-            case TOK_unequal:       if (result_used) push_opcode(OP_unequal,            nullptr, 0, nullptr, n->location); break;
-            case TOK_greater:       if (result_used) push_opcode(OP_compare_GT,         nullptr, 0, nullptr, n->location); break;
-            case TOK_lower:         if (result_used) push_opcode(OP_compare_LT,         nullptr, 0, nullptr, n->location); break;
-            case TOK_greater_equal: if (result_used) push_opcode(OP_compare_GE,         nullptr, 0, nullptr, n->location); break;
-            case TOK_lower_equal:   if (result_used) push_opcode(OP_compare_LE,         nullptr, 0, nullptr, n->location); break;
-            case TOK_reference_target_equal:   if (result_used) push_opcode(OP_equal,   nullptr, 0, nullptr, n->location); break;
-            case TOK_reference_target_unequal: if (result_used) push_opcode(OP_unequal, nullptr, 0, nullptr, n->location); break;
+            case TOK_plus:          if (result_used) push_opcode(OP_add,                nullptr, 0, operand_type, n->location); break;
+            case TOK_minus:         if (result_used) push_opcode(OP_sub,                nullptr, 0, operand_type, n->location); break;
+            case TOK_asterisk:      if (result_used) push_opcode(OP_mul,                nullptr, 0, operand_type, n->location); break;
+            case TOK_slash:         if (result_used) push_opcode(OP_div,                nullptr, 0, operand_type, n->location); break;
+            case TOK_percent:       if (result_used) push_opcode(OP_mod,                nullptr, 0, operand_type, n->location); break;
+            case TOK_up_arrow:      if (result_used) push_opcode(OP_ipow,               nullptr, 0, operand_type, n->location); break;
+            case TOK_equal:         if (result_used) push_opcode(OP_equal,              nullptr, 0, operand_type, n->location); break;
+            case TOK_unequal:       if (result_used) push_opcode(OP_unequal,            nullptr, 0, operand_type, n->location); break;
+            case TOK_greater:       if (result_used) push_opcode(OP_compare_GT,         nullptr, 0, operand_type, n->location); break;
+            case TOK_lower:         if (result_used) push_opcode(OP_compare_LT,         nullptr, 0, operand_type, n->location); break;
+            case TOK_greater_equal: if (result_used) push_opcode(OP_compare_GE,         nullptr, 0, operand_type, n->location); break;
+            case TOK_lower_equal:   if (result_used) push_opcode(OP_compare_LE,         nullptr, 0, operand_type, n->location); break;
+            case TOK_reference_target_equal:   if (result_used) push_opcode(OP_equal,   nullptr, 0, operand_type, n->location); break;
+            case TOK_reference_target_unequal: if (result_used) push_opcode(OP_unequal, nullptr, 0, operand_type, n->location); break;
 
             default:
                 NOT_IMPLEMENTED("Generating IL for binary operator %s is not implemented yet.\n", token_kind_name(n->binary.token_kind));
@@ -164,13 +166,15 @@ static void gen_binary_operators(AST_node *n, IL_gen *gen, bool result_used) {
 static void gen_variadic_operator_members_and(AST_node *n, IL_gen *gen, size_t i) {
     gen_value_visitor(n->variadic_operator.members[i].right, gen);
 
+    Type *operand_type = n->variadic_operator.left->type;
+
     switch (n->variadic_operator.members[i].token_kind) {
-        case TOK_greater:       push_opcode(OP_compare_GT, nullptr, 1, nullptr, n->location); break;
-        case TOK_lower:         push_opcode(OP_compare_LT, nullptr, 1, nullptr, n->location); break;
-        case TOK_greater_equal: push_opcode(OP_compare_GE, nullptr, 1, nullptr, n->location); break;
-        case TOK_lower_equal:   push_opcode(OP_compare_LE, nullptr, 1, nullptr, n->location); break;
+        case TOK_greater:       push_opcode(OP_compare_GT, nullptr, 1, operand_type, n->location); break;
+        case TOK_lower:         push_opcode(OP_compare_LT, nullptr, 1, operand_type, n->location); break;
+        case TOK_greater_equal: push_opcode(OP_compare_GE, nullptr, 1, operand_type, n->location); break;
+        case TOK_lower_equal:   push_opcode(OP_compare_LE, nullptr, 1, operand_type, n->location); break;
         case TOK_and_not_equal_to:
-        case TOK_unequal:       push_opcode(OP_unequal, nullptr, 1, nullptr, n->location); break;
+        case TOK_unequal:       push_opcode(OP_unequal, nullptr, 1, operand_type, n->location); break;
 
         default: ASSERT(false, "Illegal comparison operator.\n");
     }
@@ -195,10 +199,12 @@ static void gen_variadic_operator_members_and(AST_node *n, IL_gen *gen, size_t i
 static void gen_variadic_operator_members_or(AST_node *n, IL_gen *gen, size_t i) {
     gen_value_visitor(n->variadic_operator.members[i].right, gen);
 
+    Type *operand_type = n->variadic_operator.left->type;
+
     switch (n->variadic_operator.members[i].token_kind) {
         case TOK_equal:
         case TOK_or_equal_to:
-            push_opcode(OP_equal, nullptr, 1, nullptr, n->location);
+            push_opcode(OP_equal, nullptr, 1, operand_type, n->location);
             break;
         default: ASSERT(false, "Illegal comparison operator.\n");
     }
@@ -292,13 +298,23 @@ static void gen_cast(AST_node *n, IL_gen *gen, bool result_used) {
         // cast pointer to integer
         ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
     }
-    else if (is_integer_kind(to) && is_enumerator_kind(from) && n->kind == AST_user_cast) {
+    else if (is_integer_kind(to) && is_enumerator_kind(from)) {
         // cast enumerator to integer
         ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
     }
-    else if (is_integer_kind(to) && is_enum_kind(from) && n->kind == AST_user_cast) {
+    else if (is_integer_kind(to) && is_enum_kind(from)) {
         // cast enum value to integer
         ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+    }
+    else if (is_integer_kind(to) && is_float_kind(from) && n->kind == AST_user_cast) {
+        // cast float to integer
+        ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+        push_opcode(OP_float_to_int, nullptr, 0, from, n->location);
+    }
+    else if (is_float_kind(to) && is_integer_kind(from) && n->kind == AST_user_cast) {
+        // cast integer to float
+        ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
+        push_opcode(OP_int_to_float, nullptr, 0, from, n->location);
     }
     else if (is_reference_kind(to) && is_reference_kind(from) && n->kind == AST_user_cast) {
         // cast one reference type to another
@@ -479,7 +495,7 @@ static void gen_builder_string_put_struct (Symbol *s_sb, AST_node *arg, IL_gen *
             push_opcode(OP_push_local_var_address, nullptr, s_sb->offset, nullptr, arg->location);
             gen_address_visitor(arg, gen);
             push_opcode(OP_push_literal, nullptr, offset, nullptr, arg->location);
-            push_opcode(OP_add, nullptr, 0, nullptr, arg->location);
+            push_opcode(OP_add, nullptr, 0, &builtin_i64, arg->location);
             push_opcode(OP_load, nullptr, 0, member->type, arg->location);
             push_opcode(OP_call, &sb_puti_symbol->name, 0, sb_puti_symbol->type, arg->location);
         }
@@ -487,7 +503,7 @@ static void gen_builder_string_put_struct (Symbol *s_sb, AST_node *arg, IL_gen *
             push_opcode(OP_push_local_var_address, nullptr, s_sb->offset, nullptr, arg->location);
             gen_address_visitor(arg, gen);
             push_opcode(OP_push_literal, nullptr, offset, nullptr, arg->location);
-            push_opcode(OP_add, nullptr, 0, nullptr, arg->location);
+            push_opcode(OP_add, nullptr, 0, &builtin_i64, arg->location);
             push_opcode(OP_load, nullptr, 0, member->type, arg->location);
             push_opcode(OP_call, &sb_puts_symbol->name, 0, sb_puts_symbol->type, arg->location);
         }
@@ -549,9 +565,17 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
             gen_call(n, gen, true);
             break;
 
-        case AST_number:
-            push_opcode(OP_push_literal, &n->number.value, 0, nullptr, n->location);
+        case AST_number: {
+            uint64_t value;
+            if (n->number.is_double) {
+                value = *(uint64_t *)&n->number.dvalue;
+            }
+            else {
+                value = n->number.value;
+            }
+            push_opcode(OP_push_literal, nullptr, value, n->type, n->location);
             break;
+        }
 
         case AST_bool:
             push_opcode(OP_push_literal, nullptr, n->boolean.value, nullptr, n->location);
@@ -596,7 +620,7 @@ static void gen_value_visitor(AST_node *n, IL_gen *gen) {
         case AST_unary:
             ast_visit_children(n, (AstVisitor)gen_value_visitor, gen);
             if (n->unary.token_kind == TOK_exclam) push_opcode(OP_not, nullptr, 0, nullptr, n->location);
-            else if (n->unary.token_kind == TOK_minus) push_opcode(OP_neg, nullptr, 0, nullptr, n->location);
+            else if (n->unary.token_kind == TOK_minus) push_opcode(OP_neg, nullptr, 0, n->type, n->location);
             else NOT_IMPLEMENTED("Generating IL for unary operator %s is not implemented yet.\n", token_kind_printable(n->unary.token_kind));
             break;
 
