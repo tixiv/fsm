@@ -12,6 +12,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <math.h>
 
 static const bool enable_debug_parser = false;
 
@@ -367,6 +368,12 @@ static AST_node *parse_primary()
             n->number.is_double = false;
         }
         
+        MOVE_NEXT();
+    }
+    else if (CT->kind == TOK_pi) {
+        n = ast_alloc(AST_number, &CT->location);
+        n->number.dvalue = M_PI;
+        n->number.is_double = true;
         MOVE_NEXT();
     }
     else if (CT->kind == TOK_keyword_true) {

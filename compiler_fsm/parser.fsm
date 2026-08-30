@@ -351,6 +351,12 @@ fn parse_primary(parser: Parser&) : AST_node&
         
         MOVE_NEXT(parser);
     }
+    else if (parser.CT.kind == TokenKind::TOK_pi) {
+        n => ast_alloc(parser.allocator, AST_node::AST_number, parser.CT.location);
+        n.AST_number.fvalue = π;
+        n.AST_number.is_float = true;
+        MOVE_NEXT(parser);
+    }
     else if (parser.CT.kind == TokenKind::TOK_keyword_true) {
         n => ast_alloc(parser.allocator, AST_node::AST_bool, parser.CT.location);
         n.AST_bool.value = true;

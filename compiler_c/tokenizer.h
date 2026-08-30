@@ -65,6 +65,7 @@
     X(TOK_identifier) \
     X(TOK_string) \
     X(TOK_number) \
+    X(TOK_pi) \
     X(TOK_char_constant) \
     X(TOK_eof) \
     X(TOK_builder_string_begin) \

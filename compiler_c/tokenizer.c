@@ -180,6 +180,7 @@ const char *token_kind_printable(TokenKind kind) {
         case TOK_identifier: return("identifier");
         case TOK_string: return("string constant");
         case TOK_number: return("number");
+        case TOK_pi: return("π");
         case TOK_char_constant: return ("char constant");
         case TOK_eof: return("EOF");
         case TOK_builder_string_begin: return "'$\"'";
@@ -485,6 +486,11 @@ void tokenize_fsm (Tokenizer *tok) {
         else if (c == '~') {
             sv_pop(code);
             push_token(TOK_tilde, nullptr, tok->location);
+        }
+        else if (sv_starts_with(code, "π")) {
+            sv_pop(code);
+            sv_pop(code);
+            push_token(TOK_pi, nullptr, tok->location);
         }
         else if (sv_starts_with(code, "$\"")) {
             read_builder_string(tok);

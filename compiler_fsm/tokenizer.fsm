@@ -63,6 +63,7 @@ enum TokenKind {
     TOK_string,
     TOK_number,
     TOK_char_constant,
+    TOK_pi,
     TOK_eof,
     TOK_builder_string_begin,
     TOK_builder_string_end,
@@ -128,6 +129,7 @@ fn token_kind_printable(kind: TokenKind) : u8[] {
     if (kind == TokenKind::TOK_identifier) return("identifier");
     if (kind == TokenKind::TOK_string) return("string constant");
     if (kind == TokenKind::TOK_number) return("number");
+    if (kind == TokenKind::TOK_pi) return("π");
     if (kind == TokenKind::TOK_char_constant) return ("char constant");
     if (kind == TokenKind::TOK_eof) return("EOF");
     if (kind == TokenKind::TOK_builder_string_begin) return "'$\"'";
@@ -532,6 +534,9 @@ fn tokenize_fsm (tokenizer: Tokenizer&) : void {
         }
         else if (c == '<') {
             push_token(tokenizer, TokenKind::TOK_lower, tokenizer_pop_n(tokenizer, 1));
+        }
+        else if (sv_starts_with(code, "π")) {
+            push_token(tokenizer, TokenKind::TOK_pi, tokenizer_pop_n(tokenizer, 2));
         }
         else if (sv_starts_with(code, "$\"")) {
             read_builder_string(tokenizer);
