@@ -71,6 +71,59 @@ fn make_movx(buf: u8[32]&, reg: u8[], size, _sigend: bool) :u8[] {
     return sb.str;
 }
 
+fn output_comaprison(sb_file: StringBuilder &, op: Opcode&) {
+    sb_puts(sb_file,  "    mov rcx, 0\n");
+    sb_puts(sb_file,  "    mov rdx, 1\n");
+    sb_puts(sb_file,  "    pop rbx\n");
+    sb_puts(sb_file,  "    pop rax\n");
+    
+    if (op.i64_value[0]) { // chained
+        if (op.kind == OpKind::OP_equal || op.kind == OpKind::OP_unequal) {
+            sb_puts(sb_file,  "    push rax\n"); // chaining value: left operand
+        }
+        else {
+            sb_puts(sb_file,  "    push rbx\n"); // chaining value: right operand
+        }
+    }
+
+    if (is_float_kind(op.type)) {
+        sb_puts(sb_file,  "    movq xmm0, rax\n");
+        sb_puts(sb_file,  "    movq xmm1, rbx\n");
+        sb_puts(sb_file,  "    ucomisd xmm0, xmm1\n");
+    }
+    else if (is_integer_kind(op.type) || is_enum_kind(op.type) || is_enumerator_kind(op.type)
+             || is_boolean_kind(op.type) || is_reference_kind(op.type))
+    {
+        sb_puts(sb_file,  "    cmp rax, rbx\n");
+    }
+    else {
+        let buf: u8[1024];
+        NOT_IMPLEMENTED(__LOCATION__, $"Generating comparison for type '{get_type_name_r(buf, op.type)}'");
+    }
+
+    if      (op.kind == OpKind::OP_equal)      {  sb_puts(sb_file,  "    cmove  rcx, rdx\n"); }
+    else if (op.kind == OpKind::OP_unequal)    {  sb_puts(sb_file,  "    cmovne rcx, rdx\n"); }
+    else if (is_signed_integer(op.type)) {
+        if      (op.kind == OpKind::OP_compare_GT) {  sb_puts(sb_file,  "    cmovg  rcx, rdx\n"); }
+        else if (op.kind == OpKind::OP_compare_LT) {  sb_puts(sb_file,  "    cmovl  rcx, rdx\n"); }
+        else if (op.kind == OpKind::OP_compare_GE) {  sb_puts(sb_file,  "    cmovge rcx, rdx\n"); }
+        else if (op.kind == OpKind::OP_compare_LE) {  sb_puts(sb_file,  "    cmovle rcx, rdx\n"); }
+        else ASSERT(false, "Not a comparison opcode.\n");
+    }
+    else {
+        if      (op.kind == OpKind::OP_compare_GT) {  sb_puts(sb_file,  "    cmova  rcx, rdx\n"); }
+        else if (op.kind == OpKind::OP_compare_LT) {  sb_puts(sb_file,  "    cmovb  rcx, rdx\n"); }
+        else if (op.kind == OpKind::OP_compare_GE) {  sb_puts(sb_file,  "    cmovae rcx, rdx\n"); }
+        else if (op.kind == OpKind::OP_compare_LE) {  sb_puts(sb_file,  "    cmovbe rcx, rdx\n"); }
+        else ASSERT(false, "Not a comparison opcode.\n");
+        // if (is_float_kind(op.type)) {
+            // setp   dl
+        // }
+    }
+
+    sb_puts(sb_file,  "    push rcx\n");
+}
+
 fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) {
     let O_WRONLY = 1;
     let O_CREAT = 64;
@@ -90,7 +143,7 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) 
 
     sb_puts(sb_file, get_builtin_functions_asm());
     
-    let buf: u8[32];
+    let movx_buf: u8[32];
 
     for (let i = 0; i < opcodes.len; i++) {
         let op => opcodes[i];
@@ -145,24 +198,64 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) 
             sb_puts(sb_file, "    ret\n");
         }
         else if (op.kind == OpKind::OP_add) {
-            sb_puts(sb_file, "    pop rax\n");
-            sb_puts(sb_file, "    add [rsp], rax\n");
+            if (is_integer_kind(op.type)) {
+                sb_puts(sb_file, "    pop rax\n");
+                sb_puts(sb_file, "    add [rsp], rax\n");
+            } else if (is_float_kind(op.type)) {
+                sb_puts(sb_file, "    movsd xmm0, [rsp+8]\n");
+                sb_puts(sb_file, "    movsd xmm1, [rsp]\n");
+                sb_puts(sb_file, "    addsd xmm0, xmm1\n");
+                sb_puts(sb_file, "    add rsp, 8\n");
+                sb_puts(sb_file, "    movsd [rsp], xmm0\n");
+            } else {
+                NOT_IMPLEMENTED(__LOCATION__, $"{op.kind.name} for other than integer or float");
+            }
         }
         else if (op.kind == OpKind::OP_sub) {
-            sb_puts(sb_file, "    pop rax\n");
-            sb_puts(sb_file, "    sub [rsp], rax\n");
+            if (is_integer_kind(op.type)) {
+                sb_puts(sb_file, "    pop rax\n");
+                sb_puts(sb_file, "    sub [rsp], rax\n");
+            } else if (is_float_kind(op.type)) {
+                sb_puts(sb_file, "    movsd xmm0, [rsp+8]\n");
+                sb_puts(sb_file, "    movsd xmm1, [rsp]\n");
+                sb_puts(sb_file, "    subsd xmm0, xmm1\n");
+                sb_puts(sb_file, "    add rsp, 8\n");
+                sb_puts(sb_file, "    movsd [rsp], xmm0\n");
+            } else {
+                NOT_IMPLEMENTED(__LOCATION__, $"{op.kind.name} for other than integer or float.");
+            }
         }
         else if (op.kind == OpKind::OP_mul) {
-            sb_puts(sb_file, "    pop rax\n");
-            sb_puts(sb_file, "    mul QWORD [rsp]\n");
-            sb_puts(sb_file, "    mov [rsp], rax\n");
+            if (is_integer_kind(op.type)) {
+                sb_puts(sb_file, "    pop rax\n");
+                sb_puts(sb_file, "    mul QWORD [rsp]\n");
+                sb_puts(sb_file, "    mov [rsp], rax\n");
+            } else if (is_float_kind(op.type)) {
+                sb_puts(sb_file, "    movsd xmm0, [rsp+8]\n");
+                sb_puts(sb_file, "    movsd xmm1, [rsp]\n");
+                sb_puts(sb_file, "    mulsd xmm0, xmm1\n");
+                sb_puts(sb_file, "    add rsp, 8\n");
+                sb_puts(sb_file, "    movsd [rsp], xmm0\n");
+            } else {
+                NOT_IMPLEMENTED(__LOCATION__, $"{op.kind.name} for other than integer or float");
+            }
         }
         else if (op.kind == OpKind::OP_div) {
-            sb_puts(sb_file, "    pop rbx\n");
-            sb_puts(sb_file, "    pop rax\n");
-            sb_puts(sb_file, "    cqo\n");
-            sb_puts(sb_file, "    idiv rbx\n");
-            sb_puts(sb_file, "    push rax\n");
+            if (is_integer_kind(op.type)) {
+                sb_puts(sb_file, "    pop rbx\n");
+                sb_puts(sb_file, "    pop rax\n");
+                sb_puts(sb_file, "    cqo\n");
+                sb_puts(sb_file, "    idiv rbx\n");
+                sb_puts(sb_file, "    push rax\n");
+            } else if (is_float_kind(op.type)) {
+                sb_puts(sb_file, "    movsd xmm0, [rsp+8]\n");
+                sb_puts(sb_file, "    movsd xmm1, [rsp]\n");
+                sb_puts(sb_file, "    divsd xmm0, xmm1\n");
+                sb_puts(sb_file, "    add rsp, 8\n");
+                sb_puts(sb_file, "    movsd [rsp], xmm0\n");
+            } else {
+                NOT_IMPLEMENTED(__LOCATION__, $"{op.kind.name} for other than integer or float");
+            }
         }
         else if (op.kind == OpKind::OP_mod) {
             sb_puts(sb_file, "    pop rbx\n");
@@ -205,67 +298,22 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) 
             sb_puts(sb_file, "    xor QWORD [rsp], 1\n");
         }
         else if (op.kind == OpKind::OP_neg) {
-            sb_puts(sb_file, "    neg QWORD [rsp]\n");
+            if (is_float_kind(op.type)) {
+                sb_puts(sb_file, "    mov rax, 0x8000000000000000\n");
+                sb_puts(sb_file, "    xor QWORD [rsp], rax\n");
+            }
+            else {
+                sb_puts(sb_file, "    neg QWORD [rsp]\n");
+            }            
         }
-        else if (op.kind == OpKind::OP_equal) {
-            sb_puts(sb_file, "    mov rcx, 0\n");
-            sb_puts(sb_file, "    mov rdx, 1\n");
-            sb_puts(sb_file, "    pop rax\n");
-            sb_puts(sb_file, "    pop rbx\n");
-            sb_puts(sb_file, "    cmp rax, rbx\n");
-            sb_puts(sb_file, "    cmove rcx, rdx\n");
-            if (op.i64_value[0]) sb_puts(sb_file, "    push rbx\n"); // chaining value: left operand
-            sb_puts(sb_file, "    push rcx\n");
-        }
-        else if (op.kind == OpKind::OP_unequal) {
-            sb_puts(sb_file, "    mov rcx, 1\n");
-            sb_puts(sb_file, "    mov rdx, 0\n");
-            sb_puts(sb_file, "    pop rax\n");
-            sb_puts(sb_file, "    pop rbx\n");
-            sb_puts(sb_file, "    cmp rax, rbx\n");
-            sb_puts(sb_file, "    cmove rcx, rdx\n");
-            if (op.i64_value[0]) sb_puts(sb_file, "    push rbx\n"); // chaining value: left operand
-            sb_puts(sb_file, "    push rcx\n");
-        }
-        else if (op.kind == OpKind::OP_compare_GT) {
-            sb_puts(sb_file, "    mov rcx, 0\n");
-            sb_puts(sb_file, "    mov rdx, 1\n");
-            sb_puts(sb_file, "    pop rbx\n");
-            sb_puts(sb_file, "    pop rax\n");
-            sb_puts(sb_file, "    cmp rax, rbx\n");
-            sb_puts(sb_file, "    cmovg rcx, rdx\n");
-            if (op.i64_value[0]) sb_puts(sb_file, "    push rbx\n"); // chaining value: right operand
-            sb_puts(sb_file, "    push rcx\n");
-        }
-        else if (op.kind == OpKind::OP_compare_LT) {
-            sb_puts(sb_file, "    mov rcx, 0\n");
-            sb_puts(sb_file, "    mov rdx, 1\n");
-            sb_puts(sb_file, "    pop rbx\n");
-            sb_puts(sb_file, "    pop rax\n");
-            sb_puts(sb_file, "    cmp rax, rbx\n");
-            sb_puts(sb_file, "    cmovl rcx, rdx\n");
-            if (op.i64_value[0]) sb_puts(sb_file, "    push rbx\n"); // chaining value: right operand
-            sb_puts(sb_file, "    push rcx\n");
-        }
-        else if (op.kind == OpKind::OP_compare_GE) {
-            sb_puts(sb_file, "    mov rcx, 0\n");
-            sb_puts(sb_file, "    mov rdx, 1\n");
-            sb_puts(sb_file, "    pop rbx\n");
-            sb_puts(sb_file, "    pop rax\n");
-            sb_puts(sb_file, "    cmp rax, rbx\n");
-            sb_puts(sb_file, "    cmovge rcx, rdx\n");
-            if (op.i64_value[0]) sb_puts(sb_file, "    push rbx\n"); // chaining value: right operand
-            sb_puts(sb_file, "    push rcx\n");
-        }
-        else if (op.kind == OpKind::OP_compare_LE) {
-            sb_puts(sb_file, "    mov rcx, 0\n");
-            sb_puts(sb_file, "    mov rdx, 1\n");
-            sb_puts(sb_file, "    pop rbx\n");
-            sb_puts(sb_file, "    pop rax\n");
-            sb_puts(sb_file, "    cmp rax, rbx\n");
-            sb_puts(sb_file, "    cmovle rcx, rdx\n");
-            if (op.i64_value[0]) sb_puts(sb_file, "    push rbx\n"); // chaining value: right operand
-            sb_puts(sb_file, "    push rcx\n");
+        else if (op.kind == OpKind::OP_equal
+                        |== OpKind::OP_unequal
+                        |== OpKind::OP_compare_GT
+                        |== OpKind::OP_compare_LT
+                        |== OpKind::OP_compare_GE
+                        |== OpKind::OP_compare_LE
+        ) {
+            output_comaprison(sb_file, op);
         }
         else if (op.kind == OpKind::OP_push_literal) {
             sb_puts(sb_file, $"    mov rax, {if (op.string_value.begin) parse_integer(op.string_value) else op.i64_value[0]}\n");
@@ -300,7 +348,7 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) 
         }
         else if (op.kind == OpKind::OP_push_arg) {
             if (size <= 8) {
-                sb_puts(sb_file, $"    {make_movx(buf, "rax", size, is_signed_integer(op.type))} [rbp+{16 + op.i64_value[0]}]\n");
+                sb_puts(sb_file, $"    {make_movx(movx_buf, "rax", size, is_signed_integer(op.type))} [rbp+{16 + op.i64_value[0]}]\n");
                 sb_puts(sb_file, "    push rax\n");
             }
             else if (size <= 16) {
@@ -313,7 +361,7 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) 
         }
         else if (op.kind == OpKind::OP_push_local_var) {
             if (size <= 8) {
-                sb_puts(sb_file, $"    {make_movx(buf, "rax", size, is_signed_integer(op.type))} [rbp-{op.i64_value[0]}]\n");
+                sb_puts(sb_file, $"    {make_movx(movx_buf, "rax", size, is_signed_integer(op.type))} [rbp-{op.i64_value[0]}]\n");
                 sb_puts(sb_file, "    push rax\n");
             }
             else if (size <= 16) {
@@ -534,7 +582,7 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) 
             sb_puts(sb_file, "    pop rax\n"); // bit index
             sb_puts(sb_file, "    cqo\n");
             sb_puts(sb_file, "    mov rbx, 8\n");
-            sb_puts(sb_file, "    div rbx\n"); // . rax: byte offset, rdx: bit index
+            sb_puts(sb_file, "    div rbx\n"); // rax: byte offset, rdx: bit index
             sb_puts(sb_file, "    pop rbx\n"); // rbx: mem address
             sb_puts(sb_file, "    add rbx, rax\n"); // rbx: byte address
             sb_puts(sb_file, "    bt [rbx], rdx\n"); // test the bit
@@ -547,7 +595,7 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) 
             sb_puts(sb_file, "    pop rax\n"); // bit index
             sb_puts(sb_file, "    cqo\n");
             sb_puts(sb_file, "    mov rbx, 8\n");
-            sb_puts(sb_file, "    div rbx\n"); // . rax: byte offset, rdx: bit index
+            sb_puts(sb_file, "    div rbx\n"); // rax: byte offset, rdx: bit index
             sb_puts(sb_file, "    pop rsi\n"); // rsi: mem address
             sb_puts(sb_file, "    add rsi, rax\n"); // rsi: byte address
             sb_puts(sb_file, "    mov al, [rsi]\n"); // load the byte
@@ -626,6 +674,16 @@ fn output_asm(asm_file_name: u8[], opcodes: Opcode[], endlos: EndlosAllocator&) 
             sb_puts(sb_file, "    push rax\n");
             sb_puts(sb_file, "done:\n");
             sb_puts(sb_file, "}\n");
+        }
+        else if (op.kind == OpKind::OP_float_to_int) {
+            sb_puts(sb_file, "    movsd xmm0, [rsp]\n");
+            sb_puts(sb_file, "    cvttsd2si rax, xmm0\n");
+            sb_puts(sb_file, "    mov [rsp], rax\n");
+        }
+        else if (op.kind == OpKind::OP_int_to_float) {
+            sb_puts(sb_file, "    mov rax, [rsp]\n");
+            sb_puts(sb_file, "    cvtsi2sd xmm0, rax\n");
+            sb_puts(sb_file, "    movsd [rsp], xmm0\n");
         }
         else if (op.kind == OpKind::OP_nop) {
         }

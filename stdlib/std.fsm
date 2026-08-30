@@ -112,6 +112,14 @@ fn sv_ends_with (s: u8[], end: u8[]) {
     return sv_equal(s, end)
 }
 
+fn sv_find(s: u8[], needle: u8[]) {
+    for (let i = 0; s.len >= needle.len ; { i++ s++ }) {
+        if (sv_starts_with(s, needle))
+            return i;
+    }
+    return -1;
+}
+
 fn sv_split(str: u8[]&, splitter: u8[]) : u8[] {
     let start = str;
     for (start.len = 0; str.len; {str++ start.len++}) {
@@ -278,6 +286,76 @@ fn sb_puts_rightpad(sb: StringBuilder&, s: u8[], pad_to_len) {
         sb.str.len++;
         s_len++;
     }
+}
+
+fn sb_putf (sb: StringBuilder&, f: f64) {
+    if (f < 0.0) {
+        f = -f;
+        sb_putc(sb, '-');
+    }
+
+    let e = 17;
+    while (f >= 1000000000000000000.0) {
+        f = f / 10.0;
+        e++;
+    }
+    while (f <   100000000000000000.0) {
+        f = f * 10.0;
+        e--;
+    }
+
+    let num_str = $"{<i64> f}"
+
+    if (e >= 0) {
+        for (let i = 0; i <= e; i++) {
+            if (i < 17) {
+                sb_putc (sb, num_str[i])
+            }
+            else {
+                sb_putc (sb, '0')
+            }
+        }
+        if (e < 16) {
+            sb_putc (sb, '.')
+            for (let i = e+1; i < 17; i++) {
+                sb_putc (sb, num_str[i]);
+            }
+        }
+    }
+    else {
+        sb_puts (sb, "0.");
+        for (let i = -1; i > e; i--) {
+            sb_putc (sb, '0');
+        }
+        for (let i = 0; i < 17; i++) {
+            sb_putc (sb, num_str[i]);
+        }
+    }
+}
+
+fn parse_float(s: u8[]) : f64 {
+    let neg = s.begin == '-';
+    if (neg) s++;
+
+    let after_point = false;
+    let divisor = 1;
+
+    let num = for (let f = 0.0; s.len && (is_numeric(s.begin) || s.begin == '.') ; s++; f) {
+        if (s.begin != '.') {
+            f = (f * 10.0) + <f64>digit_value(s.begin);
+            if (after_point) divisor = divisor * 10;
+        }
+        else {
+            after_point = true;
+        }
+    }
+
+    if (divisor != 1) {
+        num = num / <f64> divisor;
+    }
+
+    if (neg) return -num;
+    return num;
 }
 
 fn NOT_IMPLEMENTED(location: u8[], what:u8[]) {

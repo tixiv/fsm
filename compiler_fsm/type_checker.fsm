@@ -267,6 +267,34 @@ or to perform a null reference check.");
     }
 }
 
+fn try_to_convert_to_numeric_if_necessary(type_checker: TypeChecker&, n: AST_node&, desc: u8[]) {
+    let buf_1: u8[1024];
+    let original_type => n.type;
+
+    auto_dereference(type_checker, n);
+    if (is_integer_kind(n.type) || is_float_kind(n.type))
+        return;
+
+    if (is_boolean_kind(n.type) || is_enum_kind(n.type) || is_enumerator_kind(n.type)) {
+        ast_insert_node(type_checker.ast_allocator, n, make_cast(type_checker, type_checker.type_cache.builtin_i64, n.type));
+        return;
+    }
+
+    type_checker_error(type_checker, n, $"Can't convert {desc} of type '{get_type_name_r(buf_1, original_type)}' to numeric.");
+}
+
+fn check_types_for_binary_math_operators(type_checker: TypeChecker&, n: AST_node&, left_desc: u8[], right_desc: u8[]) : Type& {
+    try_to_convert_to_numeric_if_necessary(type_checker, n.AST_binary.left, left_desc);
+    try_to_convert_to_numeric_if_necessary(type_checker, n.AST_binary.right, right_desc);
+
+    if (is_float_kind(n.AST_binary.left.type) || is_float_kind(n.AST_binary.right.type)) {
+        return type_checker.type_cache.builtin_f64;
+    }
+        
+    return type_checker.type_cache.builtin_i64;
+}
+
+
 fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
     let buf_1: u8[1024]; let buf_2: u8[1024];
     let tk = n.AST_binary.token_kind;
@@ -305,8 +333,8 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
         n.type => n.AST_binary.right.type;
     }
     else {
-        let sb_left  = $"left argument of binary operator {token_kind_printable(tk)}";
-        let sb_right = $"right argument of binary operator {token_kind_printable(tk)}";
+        let left_desc = $"left argument of binary operator {token_kind_printable(tk)}";
+        let right_desc = $"right argument of binary operator {token_kind_printable(tk)}";
 
         if (tk == TokenKind::TOK_plus
               |== TokenKind::TOK_minus
@@ -315,10 +343,7 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
               |== TokenKind::TOK_percent
               |== TokenKind::TOK_up_arrow)
         {
-            try_convert_to_type_if_necessary(type_checker, n.AST_binary.left, type_checker.type_cache.builtin_i64, sb_left);
-            try_convert_to_type_if_necessary(type_checker, n.AST_binary.right, type_checker.type_cache.builtin_i64, sb_right);
-
-            n.type => type_checker.type_cache.builtin_i64;
+            n.type => check_types_for_binary_math_operators(type_checker, n, left_desc, right_desc);
         }
 
         else if (tk == TokenKind::TOK_greater
@@ -326,16 +351,15 @@ fn type_propagate_binary_operator(type_checker: TypeChecker&, n: AST_node&) {
                    |== TokenKind::TOK_greater_equal
                    |== TokenKind::TOK_lower_equal)
         {
-            try_convert_to_type_if_necessary(type_checker, n.AST_binary.left, type_checker.type_cache.builtin_i64, sb_left);
-            try_convert_to_type_if_necessary(type_checker, n.AST_binary.right, type_checker.type_cache.builtin_i64, sb_right);
+            check_types_for_binary_math_operators(type_checker, n, left_desc, right_desc);
 
             n.type => type_checker.type_cache.builtin_bool;
         }
         
         else if (tk == TokenKind::TOK_boolean_and
                    |== TokenKind::TOK_boolean_or) {
-            try_convert_to_type_if_necessary(type_checker, n.AST_binary.left, type_checker.type_cache.builtin_bool, sb_left);
-            try_convert_to_type_if_necessary(type_checker, n.AST_binary.right, type_checker.type_cache.builtin_bool, sb_right);
+            try_convert_to_type_if_necessary(type_checker, n.AST_binary.left, type_checker.type_cache.builtin_bool, left_desc);
+            try_convert_to_type_if_necessary(type_checker, n.AST_binary.right, type_checker.type_cache.builtin_bool, right_desc);
             n.type => type_checker.type_cache.builtin_bool;            
         }
         
@@ -682,7 +706,12 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
 
     // actions while traversing the tree up
     if (n.kind == AST_node::AST_number) {
-        n.type => type_checker.type_cache.builtin_i64;
+        if (n.AST_number.is_float) {
+            n.type => type_checker.type_cache.builtin_f64;
+        }
+        else {
+            n.type => type_checker.type_cache.builtin_i64;
+        }
         n.addressable = false;
     }
     else if (n.kind == AST_node::AST_bool) {
@@ -894,8 +923,13 @@ fn type_propagation_visitor(n: AST_node&, type_checker: TypeChecker&) : void {
             n.type => type_checker.type_cache.builtin_bool;
         }
         else if (n.AST_unary.token_kind == TokenKind::TOK_minus) {
-            try_convert_to_type_if_necessary(type_checker, n.AST_unary.body, type_checker.type_cache.builtin_i64, "Argument of unary '-'");
-            n.type => type_checker.type_cache.builtin_i64;
+            try_to_convert_to_numeric_if_necessary(type_checker, n.AST_unary.body, "Argument of unary '-'");
+            if (is_float_kind(n.AST_unary.body.type)) {
+                n.type => n.AST_unary.body.type;
+            }
+            else {
+                n.type => type_checker.type_cache.builtin_i64;
+            }
         }
         else NOT_IMPLEMENTED_EC(43, __LOCATION__, $"Type checking unary operator {token_kind_printable(n.AST_unary.token_kind)}");
         n.addressable = false;

@@ -79,7 +79,9 @@ union AST_node enum kind {
     }
 
     struct AST_number {
-        value: u8[];
+        value: u64;
+        fvalue: f64;
+        is_float: bool;
     }
 
     struct AST_bool {

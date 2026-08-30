@@ -96,7 +96,7 @@ fn make_builtin_symbols(type_cache: TypeCache&, endlos: EndlosAllocator&) {
     make_type_symbol(symbol_roll, "i16", type_cache.builtin_i16);
     make_type_symbol(symbol_roll,  "u8", type_cache.builtin_u8);
     make_type_symbol(symbol_roll,  "i8", type_cache.builtin_i8);
-    make_type_symbol(symbol_roll, "f64", type_cache.builtin_i8);
+    make_type_symbol(symbol_roll, "f64", type_cache.builtin_f64);
 
     init_builtin_functions(type_cache, symbol_roll);
 

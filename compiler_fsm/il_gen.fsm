@@ -144,36 +144,39 @@ fn gen_binary_operators(n: AST_node&, gen: IL_gen&, result_used: bool) {
             ast_visit_children(n, il_gen_visitor, gen)
 
         let tk = n.AST_binary.token_kind;
+        let operand_type => n.AST_binary.left.type;
 
-             if (tk == TokenKind::TOK_plus) {          if (result_used) push_opcode(gen, OpKind::OP_add,                null, 0, null, n.location); }
-        else if (tk == TokenKind::TOK_minus) {         if (result_used) push_opcode(gen, OpKind::OP_sub,                null, 0, null, n.location); }
-        else if (tk == TokenKind::TOK_asterisk) {      if (result_used) push_opcode(gen, OpKind::OP_mul,                null, 0, null, n.location); }
-        else if (tk == TokenKind::TOK_slash) {         if (result_used) push_opcode(gen, OpKind::OP_div,                null, 0, null, n.location); }
-        else if (tk == TokenKind::TOK_percent) {       if (result_used) push_opcode(gen, OpKind::OP_mod,                null, 0, null, n.location); }
-        else if (tk == TokenKind::TOK_up_arrow) {      if (result_used) push_opcode(gen, OpKind::OP_ipow,               null, 0, null, n.location); }
-        else if (tk == TokenKind::TOK_equal) {         if (result_used) push_opcode(gen, OpKind::OP_equal,              null, 0, null, n.location); }
-        else if (tk == TokenKind::TOK_unequal) {       if (result_used) push_opcode(gen, OpKind::OP_unequal,            null, 0, null, n.location); }
-        else if (tk == TokenKind::TOK_greater) {       if (result_used) push_opcode(gen, OpKind::OP_compare_GT,         null, 0, null, n.location); }
-        else if (tk == TokenKind::TOK_lower) {         if (result_used) push_opcode(gen, OpKind::OP_compare_LT,         null, 0, null, n.location); }
-        else if (tk == TokenKind::TOK_greater_equal) { if (result_used) push_opcode(gen, OpKind::OP_compare_GE,         null, 0, null, n.location); }
-        else if (tk == TokenKind::TOK_lower_equal) {   if (result_used) push_opcode(gen, OpKind::OP_compare_LE,         null, 0, null, n.location); }
-        else if (tk == TokenKind::TOK_reference_target_equal) {   if (result_used) push_opcode(gen, OpKind::OP_equal,   null, 0, null, n.location); }
-        else if (tk == TokenKind::TOK_reference_target_unequal) { if (result_used) push_opcode(gen, OpKind::OP_unequal, null, 0, null, n.location); }
+             if (tk == TokenKind::TOK_plus) {          if (result_used) push_opcode(gen, OpKind::OP_add,                null, 0, operand_type, n.location); }
+        else if (tk == TokenKind::TOK_minus) {         if (result_used) push_opcode(gen, OpKind::OP_sub,                null, 0, operand_type, n.location); }
+        else if (tk == TokenKind::TOK_asterisk) {      if (result_used) push_opcode(gen, OpKind::OP_mul,                null, 0, operand_type, n.location); }
+        else if (tk == TokenKind::TOK_slash) {         if (result_used) push_opcode(gen, OpKind::OP_div,                null, 0, operand_type, n.location); }
+        else if (tk == TokenKind::TOK_percent) {       if (result_used) push_opcode(gen, OpKind::OP_mod,                null, 0, operand_type, n.location); }
+        else if (tk == TokenKind::TOK_up_arrow) {      if (result_used) push_opcode(gen, OpKind::OP_ipow,               null, 0, operand_type, n.location); }
+        else if (tk == TokenKind::TOK_equal) {         if (result_used) push_opcode(gen, OpKind::OP_equal,              null, 0, operand_type, n.location); }
+        else if (tk == TokenKind::TOK_unequal) {       if (result_used) push_opcode(gen, OpKind::OP_unequal,            null, 0, operand_type, n.location); }
+        else if (tk == TokenKind::TOK_greater) {       if (result_used) push_opcode(gen, OpKind::OP_compare_GT,         null, 0, operand_type, n.location); }
+        else if (tk == TokenKind::TOK_lower) {         if (result_used) push_opcode(gen, OpKind::OP_compare_LT,         null, 0, operand_type, n.location); }
+        else if (tk == TokenKind::TOK_greater_equal) { if (result_used) push_opcode(gen, OpKind::OP_compare_GE,         null, 0, operand_type, n.location); }
+        else if (tk == TokenKind::TOK_lower_equal) {   if (result_used) push_opcode(gen, OpKind::OP_compare_LE,         null, 0, operand_type, n.location); }
+        else if (tk == TokenKind::TOK_reference_target_equal) {   if (result_used) push_opcode(gen, OpKind::OP_equal,   null, 0, operand_type, n.location); }
+        else if (tk == TokenKind::TOK_reference_target_unequal) { if (result_used) push_opcode(gen, OpKind::OP_unequal, null, 0, operand_type, n.location); }
 
         else NOT_IMPLEMENTED_EC(4, __LOCATION__, $"Generating IL for binary operator {n.AST_binary.token_kind.name}");
     }
 }
 
 fn gen_variadic_operator_members_and(n: AST_node&, gen: IL_gen&, i) : void {
+    let operand_type =>n.AST_variadic_operator.left.type;
+
     gen_value_visitor(n.AST_variadic_operator.members[i].right, gen);
 
     let tk = n.AST_variadic_operator.members[i].token_kind;
-         if (tk == TokenKind::TOK_greater) {       push_opcode(gen, OpKind::OP_compare_GT, null, 1, null, n.location); }
-    else if (tk == TokenKind::TOK_lower) {         push_opcode(gen, OpKind::OP_compare_LT, null, 1, null, n.location); }
-    else if (tk == TokenKind::TOK_greater_equal) { push_opcode(gen, OpKind::OP_compare_GE, null, 1, null, n.location); }
-    else if (tk == TokenKind::TOK_lower_equal) {   push_opcode(gen, OpKind::OP_compare_LE, null, 1, null, n.location); }
+         if (tk == TokenKind::TOK_greater) {       push_opcode(gen, OpKind::OP_compare_GT, null, 1, operand_type, n.location); }
+    else if (tk == TokenKind::TOK_lower) {         push_opcode(gen, OpKind::OP_compare_LT, null, 1, operand_type, n.location); }
+    else if (tk == TokenKind::TOK_greater_equal) { push_opcode(gen, OpKind::OP_compare_GE, null, 1, operand_type, n.location); }
+    else if (tk == TokenKind::TOK_lower_equal) {   push_opcode(gen, OpKind::OP_compare_LE, null, 1, operand_type, n.location); }
     else if (tk == TokenKind::TOK_and_not_equal_to
-                |== TokenKind::TOK_unequal) {       push_opcode(gen, OpKind::OP_unequal, null, 1, null, n.location); }
+                |== TokenKind::TOK_unequal) {       push_opcode(gen, OpKind::OP_unequal, null, 1, operand_type, n.location); }
 
     else ASSERT(false, $"{__LOCATION__} Illegal comparison operator.\n");
     
@@ -195,11 +198,13 @@ fn gen_variadic_operator_members_and(n: AST_node&, gen: IL_gen&, i) : void {
 }
 
 fn gen_variadic_operator_members_or(n: AST_node&, gen: IL_gen&, i) : void {
+    let operand_type =>n.AST_variadic_operator.left.type;
+
     gen_value_visitor(n.AST_variadic_operator.members[i].right, gen);
 
     let tk = n.AST_variadic_operator.members[i].token_kind;
     if (tk == TokenKind::TOK_equal |== TokenKind::TOK_or_equal_to) {
-        push_opcode(gen, OpKind::OP_equal, null, 1, null, n.location);
+        push_opcode(gen, OpKind::OP_equal, null, 1, operand_type, n.location);
     }
     else ASSERT(false, "Illegal comparison operator.\n");
     
@@ -288,17 +293,27 @@ fn gen_cast(n: AST_node&, gen: IL_gen&, result_used: bool) {
         push_opcode(gen, OpKind::OP_push_literal, null, get_storage_size(from), null, n.location);
         ast_visit_children(n, gen_address_visitor, gen);
     }
-    else if (is_integer_kind(to) && is_reference_kind(from) && n.kind == AST_node::AST_user_cast) {
+    else if (is_integer_kind(to) && is_reference_kind(from)) {
         // cast pointer to integer
         ast_visit_children(n, gen_value_visitor, gen);
     }
-    else if (is_integer_kind(to) && is_enumerator_kind(from) && n.kind == AST_node::AST_user_cast) {
+    else if (is_integer_kind(to) && is_enumerator_kind(from)) {
         // cast enumerator to integer
         ast_visit_children(n, gen_value_visitor, gen);
     }
-    else if (is_integer_kind(to) && is_enum_kind(from) && n.kind == AST_node::AST_user_cast) {
+    else if (is_integer_kind(to) && is_enum_kind(from)) {
         // cast enum value to integer
         ast_visit_children(n, gen_value_visitor, gen);
+    }
+    else if (is_integer_kind(to) && is_float_kind(from) && n.kind == AST_node::AST_user_cast) {
+        // cast float to integer
+        ast_visit_children(n, gen_value_visitor, gen);
+        push_opcode(gen, OpKind::OP_float_to_int, null, 0, from, n.location);
+    }
+    else if (is_float_kind(to) && is_integer_kind(from) && n.kind == AST_node::AST_user_cast) {
+        // cast integer to float
+        ast_visit_children(n, gen_value_visitor, gen);
+        push_opcode(gen, OpKind::OP_int_to_float, null, 0, from, n.location);
     }
     else if (is_reference_kind(to) && is_reference_kind(from) && n.kind == AST_node::AST_user_cast) {
         // cast one reference type to another
@@ -482,7 +497,7 @@ fn gen_builder_string_put_struct (s_sb: Symbol&, arg: AST_node&, gen: IL_gen&) {
                 push_opcode(gen, OpKind::OP_push_local_var_address, null, s_sb.offset, null, arg.location);
                 gen_address_visitor(arg, gen);
                 push_opcode(gen, OpKind::OP_push_literal, null, offset, null, arg.location);
-                push_opcode(gen, OpKind::OP_add, null, 0, null, arg.location);
+                push_opcode(gen, OpKind::OP_add, null, 0, gen.type_cache.builtin_i64, arg.location);
                 push_opcode(gen, OpKind::OP_load, null, 0, member.type, arg.location);
                 push_opcode(gen, OpKind::OP_call, &sb_puti_symbol.name, 0, sb_puti_symbol.type, arg.location);
             }
@@ -490,7 +505,7 @@ fn gen_builder_string_put_struct (s_sb: Symbol&, arg: AST_node&, gen: IL_gen&) {
                 push_opcode(gen, OpKind::OP_push_local_var_address, null, s_sb.offset, null, arg.location);
                 gen_address_visitor(arg, gen);
                 push_opcode(gen, OpKind::OP_push_literal, null, offset, null, arg.location);
-                push_opcode(gen, OpKind::OP_add, null, 0, null, arg.location);
+                push_opcode(gen, OpKind::OP_add, null, 0, gen.type_cache.builtin_i64, arg.location);
                 push_opcode(gen, OpKind::OP_load, null, 0, member.type, arg.location);
                 push_opcode(gen, OpKind::OP_call, &sb_puts_symbol.name, 0, sb_puts_symbol.type, arg.location);
             }
@@ -559,7 +574,12 @@ fn gen_value_visitor(n: AST_node&, gen: IL_gen&) : void {
     }
 
     else if (n.kind == AST_node::AST_number) {
-        push_opcode(gen, OpKind::OP_push_literal, &n.AST_number.value, 0, null, n.location);
+        if (n.AST_number.is_float) {
+            push_opcode(gen, OpKind::OP_push_literal, null, *<u64&>&n.AST_number.fvalue, null, n.location);
+        }
+        else {
+            push_opcode(gen, OpKind::OP_push_literal, null, n.AST_number.value, null, n.location);
+        }
     }
 
     else if (n.kind == AST_node::AST_bool) {
@@ -605,7 +625,7 @@ fn gen_value_visitor(n: AST_node&, gen: IL_gen&) : void {
     else if (n.kind == AST_node::AST_unary) {
         ast_visit_children(n, gen_value_visitor, gen);
              if (n.AST_unary.token_kind == TokenKind::TOK_exclam) push_opcode(gen, OpKind::OP_not, null, 0, null, n.location)
-        else if (n.AST_unary.token_kind == TokenKind::TOK_minus) push_opcode(gen, OpKind::OP_neg, null, 0, null, n.location)
+        else if (n.AST_unary.token_kind == TokenKind::TOK_minus) push_opcode(gen, OpKind::OP_neg, null, 0, n.type, n.location)
         else NOT_IMPLEMENTED_EC(9, __LOCATION__, $"Generating IL for unary operator {token_kind_printable(n.AST_unary.token_kind)}");
     }
 

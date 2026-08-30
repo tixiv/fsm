@@ -211,6 +211,7 @@ fn get_type_name_r_impl(print_buf: u8[1024]&, type: Type&, encoded: bool) : u8[]
     if (type.kind == Type::T_any)       return "any";
     if (type.kind == Type::T_generic)   return "generic";
     if (type.kind == Type::T_undefined) return "undefined";
+    if (type.kind == Type::T_float)     return "f64";
     if (type.kind == Type::T_integer) {
         if (type.T_integer.num_bits == 64) return if (type.T_integer.signed) "i64" else "u64";
         if (type.T_integer.num_bits == 32) return if (type.T_integer.signed) "i32" else "u32";
@@ -321,6 +322,10 @@ fn is_unsigned_integer(t: Type&) : bool {
     return t && t.kind == Type::T_integer && !t.T_integer.signed;
 }
 
+fn is_float_kind(t: Type&) : bool {
+    return t && t.kind == Type::T_float;
+}
+
 fn is_array_kind(t: Type&) : bool {
     return t && t.kind == Type::T_array;
 }
@@ -395,7 +400,7 @@ fn types_are_equivalent(t1: Type&, t2: Type&) : bool {
 }
 
 fn is_castable_to_integer(t: Type&) : bool {
-    return t.kind == Type::T_integer |== Type::T_integer |== Type::T_boolean;
+    return t.kind == Type::T_integer |== Type::T_integer |== Type::T_boolean |== Type::T_enum |== Type::T_enumerator;
 }
 
 fn is_castable_to(cache: TypeCache&, to: Type&, from: Type&, ) {

@@ -340,7 +340,15 @@ fn parse_primary(parser: Parser&) : AST_node&
 
     if (parser.CT.kind == TokenKind::TOK_number) {
         n => ast_alloc(parser.allocator, AST_node::AST_number, parser.CT.location);
-        n.AST_number.value = parser.CT.value;
+        if (sv_find(parser.CT.value, ".") != -1) {
+            n.AST_number.fvalue = parse_float(parser.CT.value);
+            n.AST_number.is_float = true;
+        }
+        else {
+            n.AST_number.value = parse_integer(parser.CT.value);
+            n.AST_number.is_float = false;
+        }
+        
         MOVE_NEXT(parser);
     }
     else if (parser.CT.kind == TokenKind::TOK_keyword_true) {

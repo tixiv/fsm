@@ -40,6 +40,8 @@ enum OpKind {
     OP_while_end,
     OP_to_bool,
     OP_sign_extend,
+    OP_float_to_int,
+    OP_int_to_float,
     OP_array_access,
     OP_member_access,
     OP_load,
