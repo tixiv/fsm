@@ -25,6 +25,11 @@ fn find_symbol_visitor (n: AST_node&, finder: SymbolFinder&) : void {
                 finder.best_symbol => n.AST_typename.symbol;
             }
         }
+        else if (n.kind == AST_node::AST_function) {
+            if (n.location.col - n.AST_function.name.len <= finder.col <= n.location.col) {
+                finder.best_symbol => n.AST_function.symbol;
+            }
+        }
     }
 
     if (n.kind != AST_node::AST_generic_implementation) {
