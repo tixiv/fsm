@@ -1,0 +1,40 @@
+
+fn sin_core(x: f64){
+    let x2 = x * x;
+    return x * (1.0 + x2 * (-1.0/6.0 + x2 * (1.0/120.0 + x2 * (-1.0/5040.0))));
+}
+
+fn cos_core(x: f64) {
+    let x2 = x * x;
+    return 1.0 + x2 * (-1.0/2.0 + x2 * (1.0/24.0 + x2 * (-1.0/720.0)));
+}
+
+// normalize to -π..π
+fn normalize_angle(x: f64) {
+    let neg = x < 0.0;
+    if (neg) x = -x;
+
+    let n = <i64>(x / (2.0 * π));
+    x = x - 2.0 * π * <f64>n;
+
+    if (x > π) {
+        x = x - 2.0 * π;
+    }
+
+    if (neg) return -x;
+    return x;
+}
+
+fn sin(x: f64) {
+    x = normalize_angle(x);
+    if (x < -π / 2.0) return (sin_core(-π - x));
+    if (x < π / 2.0) return (sin_core(x));
+    return sin_core(π - x)
+}
+
+fn cos(x: f64) {
+    x = normalize_angle(x);
+    if (x < -π / 2.0) return (-cos_core(-π - x));
+    if (x < π / 2.0) return (cos_core(x));
+    return -cos_core(π - x)
+}

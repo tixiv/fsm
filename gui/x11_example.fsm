@@ -1,0 +1,30 @@
+
+import * from "std";
+import * from "x11";
+
+fn main () {
+    let context: FSM_X11_context;
+    x11_connect(context);
+
+    let window = x11_open_window(context);
+
+    let points: Point[3];
+    points[0].x = 15;
+    points[0].y = 15;
+    points[1].x = 400;
+    points[1].y = 400;
+    points[2].x = 0;
+    points[2].y = 400;
+
+    while(1)
+    {
+        let buf: u8[0x10000];
+        let len = read(context.fd, buf);
+        if (len == 0) exit(0);
+        print(len);
+        let s: u8[] = buf;
+        s.len = len;
+        hexdump(s);
+        x11_poly_line(window, points);
+    }
+}

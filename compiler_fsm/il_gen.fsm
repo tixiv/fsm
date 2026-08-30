@@ -808,7 +808,9 @@ fn il_gen_visitor(n: AST_node&, gen: IL_gen&) : void {
                     |== AST_node::AST_reference
                     |== AST_node::AST_symbol
                     |== AST_node::AST_string
-                    |== AST_node::AST_array_access)
+                    |== AST_node::AST_array_access
+                    |== AST_node::AST_char_constant
+                    |== AST_node::AST_user_cast)
     {
         il_gen_warning(gen, n, "unused code.");
         ast_visit_children(n, il_gen_visitor, gen);

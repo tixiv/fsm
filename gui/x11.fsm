@@ -11,24 +11,6 @@ fn take_from (_to: u8[], _from: u8[]&) {
 fn pad_size(size, pad) {
     return bitand(size + pad - 1, bitnot(pad - 1))
 }
-fn to_hex_digit (n) {
-    if (n < 10) return n + '0';
-    return n - 10 + 'A';
-}
-
-fn hexdump(d: u8[]) {
-    for (let i = 0; d.len; { i++ d++ }) {
-        if (i % 16 == 0) {
-            if (i) putc('\n');
-        }
-        else {
-            putc(' ');
-        }
-        putc(to_hex_digit(bitand(bitshift(d.begin, 4), 0x0f)));
-        putc(to_hex_digit(bitand(d.begin, 0x0f)));
-    }
-    putc('\n')
-}
 
 record SockaddrUnix
 {
@@ -471,7 +453,7 @@ fn x11_create_pixmap (context: FSM_X11_context&, drawable: u32) {
     return cp.pid;
 }
 
-record X11_PolyLine {
+record X11_PolyPoint {
     opcode          :  u8; // 65
     coordinate_mode :  u8; // 0: Origin 1: Previous
     request_length  : u16; // 3+n
@@ -485,10 +467,9 @@ record Point {
     y : u16;
 }
 
-
-fn x11_poly_line(drawable: Drawable, points: Point[]) {
-    let pl: X11_PolyLine;
-    pl.opcode = 65;
+fn x11_poly_point_impl(drawable: Drawable, points: Point[], opcode) {
+    let pl: X11_PolyPoint;
+    pl.opcode = opcode;
     pl.coordinate_mode = 0;
     pl.request_length = 3 + points.len;
     pl.drawable = drawable.drawable_id;
@@ -500,29 +481,10 @@ fn x11_poly_line(drawable: Drawable, points: Point[]) {
     }
 }
 
-fn main () {
-    let context: FSM_X11_context;
-    x11_connect(context);
+fn x11_poly_point(drawable: Drawable, points: Point[]) {
+    x11_poly_point_impl(drawable, points, 64);
+}
 
-    let window = x11_open_window(context);
-
-    let points: Point[3];
-    points[0].x = 15;
-    points[0].y = 15;
-    points[1].x = 400;
-    points[1].y = 400;
-    points[2].x = 0;
-    points[2].y = 400;
-
-    while(1)
-    {
-        let buf: u8[0x10000];
-        let len = read(context.fd, buf);
-        if (len == 0) exit(0);
-        print(len);
-        let s: u8[] = buf;
-        s.len = len;
-        hexdump(s);
-        x11_poly_line(window, points);
-    }
+fn x11_poly_line(drawable: Drawable, points: Point[]) {
+    x11_poly_point_impl(drawable, points, 65);
 }

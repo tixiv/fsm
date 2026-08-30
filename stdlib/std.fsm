@@ -139,6 +139,10 @@ fn sv_of_c_string(c_str: u8&) : u8[] {
     return sv;
 }
 
+fn to_hex_digit (n) {
+    return if (n < 10) n + '0' else n - 10 + 'A';
+}
+
 fn is_digit_in_base(digit: i32, base) {
     if (base == 16) return is_hex_digit(digit);
     return '0' <= digit < '0' + base
@@ -180,7 +184,7 @@ fn print_hex(num: u64) {
     let a: u8[16];
     for (let i = 15; i >= 0; i--) {
         let d = bitand(bitshift(num, 60 - i * 4), 0x0f);
-        a[i] = if (d < 10) d + '0' else d + 'A' - 10;
+        a[i] = to_hex_digit(d);
     }
     puts(a)
 }
@@ -357,6 +361,21 @@ fn parse_float(s: u8[]) : f64 {
     if (neg) return -num;
     return num;
 }
+
+fn hexdump(d: u8[]) {
+    for (let i = 0; d.len; { i++ d++ }) {
+        if (i % 16 == 0) {
+            if (i) putc('\n');
+        }
+        else {
+            putc(' ');
+        }
+        putc(to_hex_digit(bitand(bitshift(d.begin, 4), 0x0f)));
+        putc(to_hex_digit(bitand(d.begin, 0x0f)));
+    }
+    putc('\n')
+}
+
 
 fn NOT_IMPLEMENTED(location: u8[], what:u8[]) {
     write (2, $"{location}: {what} is not implemented yet.\n");
