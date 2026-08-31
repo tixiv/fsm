@@ -30,7 +30,12 @@ fn push_symbol(res: Resolver&, arr: EndlosArr<Symbol&>&, s: Symbol&, n: AST_node
     if (s.name.len) {
         let conflicting => resolver_lookup_symbol(res,  s.name, n, false);
         if (conflicting) {
-            resolver_error(res, n, $"Symbol '{s.name}' redefined which was previously defined in {conflicting.location.module.filename}:{conflicting.location.line}");
+            if (conflicting.location) {
+                resolver_error(res, n, $"Symbol '{s.name}' redefined which was previously defined in {conflicting.location.module.filename}:{conflicting.location.line}");
+            }
+            else {
+                resolver_error(res, n, $"Bultin symbol '{s.name}' redefined.");
+            }
             return;
         }
     }

@@ -1,0 +1,94 @@
+
+import * from "std";
+import * from "x11";
+
+
+fn epoll_create1(flags) {
+    let SYS_EPOLL_CREATE1 = 291;
+    return syscall_1(SYS_EPOLL_CREATE1, flags);
+}
+
+record EpollEvent {
+    events: u32;
+    fd:     i64;
+}
+
+fn epoll_wait(epfd, buffer: EpollEvent[], timeout) : EpollEvent[] {
+    let SYS_EPOLL_WAIT = 232;
+    let events = buffer;
+    events.len = syscall_4(SYS_EPOLL_WAIT, epfd, <i64>buffer.begin, buffer.len, timeout);
+
+    return events;
+}
+
+fn epoll_ctl (epfd, op, fd, event: EpollEvent&) {
+    // op: EPOLL_CTL_ADD = 1, EPOLL_CTL_DEL = 2, EPOLL_CTL_MOD = 3
+    let SYS_EPOLL_CTL = 233;
+    return syscall_4(SYS_EPOLL_CTL, epfd, op, fd, <i64>event);
+}
+
+fn handle_x11_event(window: Drawable&, buf: u8[32]&) {
+    let code: X11_EventCode = buf[0];
+    if (code == X11_EventCode::Error) {
+        let e => <X11_Error&> buf;
+        write (2, $"X11 Error: {e.error_code} value = {e.value} on opcode {e.major_opcode}.{e.minor_opcode}\n");
+    }
+    else if (code == X11_EventCode::KeyPress) {
+        $"{code.name} {buf[1]}\n"
+    }
+    else if (code == X11_EventCode::KeyRelease) {
+        $"{code.name} {buf[1]}\n"
+    }
+    else if (code == X11_EventCode::Expose) {
+        $"{code.name}\n"
+        let rectangles: Rectangle[1];
+        rectangles[0].x = 15;
+        rectangles[0].y = 15;
+        rectangles[0].x_size = 150;
+        rectangles[0].y_size = 150;
+
+        x11_poly_fill_rectangle(window, rectangles);
+        x11_image_text_8(window, 200, 200, "Hello, World!");
+    }    
+    else {
+        $"{code.name}\n";
+        hexdump(buf);
+    }
+}
+
+fn main () {
+    let context: FSM_X11_context;
+    x11_connect(context);
+
+    let fid = x11_open_font(context, "*");
+    x11_gc_set_font(context, fid);
+
+    let window = x11_open_window(context);
+
+
+    let epfd = epoll_create1(0);
+    let EPOLL_CTL_ADD = 1;
+    let EPOLLIN = 0x001;
+    {
+        let event: EpollEvent;
+        event.events = EPOLLIN;
+        event.fd = context.fd
+        epoll_ctl(epfd, EPOLL_CTL_ADD, event.fd, event);
+    }
+
+    
+    while(1)
+    {
+        let event_buffer: EpollEvent[16];
+        let events = epoll_wait(epfd, event_buffer, 0);
+        for (let i = 0; i < events.len; i++) {
+            let event => events[i];
+            if (event.fd == context.fd) {
+                let buf: u8[32];
+                let len = read(context.fd, buf);
+                if (len != 32) exit(0);
+                handle_x11_event(window, buf);
+            }
+        }
+    }
+}

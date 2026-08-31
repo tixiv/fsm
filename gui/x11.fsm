@@ -51,19 +51,19 @@ fn open_x11_socket() {
 enum X11_EventMask {
     KeyPress             = 0x00000001;
     KeyRelease           = 0x00000002;
-    OwnerGrabButton      = 0x00000004;
-    ButtonPress          = 0x00000008;
-    ButtonRelease        = 0x00000010;
-    EnterWindow          = 0x00000020;
-    LeaveWindow          = 0x00000040;
-    PointerMotion        = 0x00000080;
-    PointerMotionHint    = 0x00000100;
-    Button1Motion        = 0x00000200;
-    Button2Motion        = 0x00000400;
-    Button3Motion        = 0x00000800;
-    Button4Motion        = 0x00001000;
-    Button5Motion        = 0x00002000;
-    ButtonMotion         = 0x00004000;
+    ButtonPress          = 0x00000004;
+    ButtonRelease        = 0x00000008;
+    EnterWindow          = 0x00000010;
+    LeaveWindow          = 0x00000020;
+    PointerMotion        = 0x00000040;
+    PointerMotionHint    = 0x00000080;
+    Button1Motion        = 0x00000100;
+    Button2Motion        = 0x00000200;
+    Button3Motion        = 0x00000400;
+    Button4Motion        = 0x00000800;
+    Button5Motion        = 0x00001000;
+    ButtonMotion         = 0x00002000;
+    KeymapState          = 0x00004000;
     Exposure             = 0x00008000;
     VisibilityChange     = 0x00010000;
     StructureNotify      = 0x00020000;
@@ -73,8 +73,8 @@ enum X11_EventMask {
     FocusChange          = 0x00200000;
     PropertyChange       = 0x00400000;
     ColormapChange       = 0x00800000;
-    KeymapState          = 0x01000000;
-} 
+    OwnerGrabButton      = 0x01000000;
+}
 
 record X11_SetupRequest {
     endian         : u8;
@@ -302,20 +302,46 @@ fn x11_create_gc(context: FSM_X11_context&) {
     create_gc.request_length = 4 + 2;
     create_gc.cid = context.current_id++;
     create_gc.drawable = context.root_window;
-    create_gc.value_mask = X11_ValueMask::background
-                         + X11_ValueMask::foreground;
+    create_gc.value_mask = X11_ValueMask::foreground
+                         + X11_ValueMask::background;
 
-    write(context.fd, create_gc);
-
-    let background_color: X11_CARD32;
-    background_color.value = 0xffffff;
     let foreground_color: X11_CARD32;
     foreground_color.value = 0xffffff;
+    let background_color: X11_CARD32;
+    background_color.value = 0x80;;
 
-    write(context.fd, background_color);
-    write(context.fd, foreground_color);
+    let iov: u8[3][];
+    iov[0] = create_gc;
+    iov[1] = foreground_color;
+    iov[2] = background_color;
+    writev(context.fd, iov);
 
     return create_gc.cid;
+}
+
+record X11_ChangeGC {
+    opcode          : u8; // 56
+    _               : u8;
+    request_length  : u16; // 3+n
+    gc              : u32;
+    value_mask      : u32; // Which values we want to append
+    // 4n LISTofVALUE value_list
+}
+
+fn x11_gc_set_font(context: FSM_X11_context&, fid: u32) {
+    let change_gc: X11_ChangeGC;
+    change_gc.opcode = 56;
+    change_gc.request_length = 3 + 1;
+    change_gc.gc = context.gc;
+    change_gc.value_mask = X11_ValueMask::font
+
+    let fid_r: X11_CARD32;
+    fid_r.value = fid;
+
+    let iov: u8[2][];
+    iov[0] = change_gc;
+    iov[1] = fid_r;
+    writev(context.fd, iov);
 }
 
 record X11_MapRequest {
@@ -408,7 +434,10 @@ fn x11_open_window(context: FSM_X11_context&) : Drawable {
     border.value   = 0x404080;
     events.value = X11_EventMask::Exposure
                  + X11_EventMask::KeyPress
-                 + X11_EventMask::KeyRelease;
+                 + X11_EventMask::KeyRelease
+                 + X11_EventMask::ButtonPress
+                 + X11_EventMask::ButtonRelease
+                 + X11_EventMask::PointerMotion;
                  
     write (context.fd, bg);
     write (context.fd, border);
@@ -454,7 +483,7 @@ fn x11_create_pixmap (context: FSM_X11_context&, drawable: u32) {
 }
 
 record X11_PolyPoint {
-    opcode          :  u8; // 65
+    opcode          :  u8; // 64: PolyPoint, 65: PolyLine
     coordinate_mode :  u8; // 0: Origin 1: Previous
     request_length  : u16; // 3+n
     drawable        : u32;
@@ -475,10 +504,12 @@ fn x11_poly_point_impl(drawable: Drawable, points: Point[], opcode) {
     pl.drawable = drawable.drawable_id;
     pl.gc = drawable.context.gc;
 
-    write (drawable.context.fd, pl);
-    for (; points.len; points++) {
-        write (drawable.context.fd, points.begin)
-    }
+    let iov: u8[2][];
+    iov[0] = pl;
+    iov[1].begin => <u8&>points.begin;
+    iov[1].len = points.len * Point.sizeof;
+
+    writev(drawable.context.fd, iov);
 }
 
 fn x11_poly_point(drawable: Drawable, points: Point[]) {
@@ -487,4 +518,127 @@ fn x11_poly_point(drawable: Drawable, points: Point[]) {
 
 fn x11_poly_line(drawable: Drawable, points: Point[]) {
     x11_poly_point_impl(drawable, points, 65);
+}
+
+record Rectangle {
+    x      : u16;
+    y      : u16;
+    x_size : u16;
+    y_size : u16;
+}
+
+record X11_PolyFillRectangle {
+    opcode          :  u8; // 70
+    _               :  u8;
+    request_length  : u16; // 3+2n
+    drawable        : u32;
+    gc              : u32;
+    // 8n LISTofRECTANGLE rectangles
+}
+
+fn x11_poly_fill_rectangle(drawable: Drawable, rectangles: Rectangle[]) {
+    let pl: X11_PolyFillRectangle;
+    pl.opcode = 70;
+    pl.request_length = 3 + rectangles.len * 2;
+    pl.drawable = drawable.drawable_id;
+    pl.gc = drawable.context.gc;
+
+    let iov: u8[2][];
+    iov[0] = pl;
+    iov[1].begin => <u8&>rectangles.begin;
+    iov[1].len = rectangles.len * Rectangle.sizeof;
+
+    writev(drawable.context.fd, iov);
+}
+
+record X11_OpenFont {
+    opcode          :  u8; // 45
+    _               :  u8;
+    request_length  : u16; // 3+(n+p)/4
+    fid             : u32;
+    length_of_name  : u16; // n
+    _               : u16;
+    // n STRING8 name
+    // p unused, p=pad(n)
+}
+
+
+fn x11_open_font(context: FSM_X11_context&, name: u8[]) : u32 {
+    let pl: X11_OpenFont;
+    pl.opcode = 45;
+    pl.request_length = 3 + pad_size(name.len, 4) / 4;
+    pl.fid = context.current_id++;
+    pl.length_of_name = name.len;
+
+    let padding: u8[4];
+    let iov: u8[3][];
+    iov[0] = pl;
+    iov[1] = name;
+    iov[2].begin => padding[0];
+    iov[2].len = pad_size(name.len, 4) - name.len;
+
+    writev(context.fd, iov);
+
+    return pl.fid;
+}
+
+record X11_ImageText8 {
+    opcode            :  u8; // 76                              
+    length_of_string  :  u8; // n                               
+    request_length    : u16; // 4+(n+p)/4                       
+    drawable        : u32;
+    gc              : u32;
+    x      : u16;
+    y      : u16;
+    // n STRING8 string
+    // p unused, p=pad(n)
+}
+
+fn x11_image_text_8(drawable: Drawable, x: u16, y: u16, string: u8[]) {
+    let pl: X11_ImageText8;
+    pl.opcode = 76;
+    pl.length_of_string = string.len;
+    pl.request_length = 4 + pad_size(string.len, 4) / 4;
+    pl.drawable = drawable.drawable_id;
+    pl.gc = drawable.context.gc;
+    pl.x = x;
+    pl.y = y;
+
+    let padding: u8[4];
+    let iov: u8[3][];
+    iov[0] = pl;
+    iov[1] = string
+    iov[2].begin => padding[0];
+    iov[2].len = pad_size(string.len, 4) - string.len;
+
+    writev(drawable.context.fd, iov);
+}
+
+enum X11_EventCode {
+    Error         = 0,
+    KeyPress      = 2,
+    KeyRelease    = 3,
+    ButtonPress   = 4,
+    ButtonRelease = 5,
+    MotionNotify  = 6,
+    EnterNotify   = 7,
+    LeaveNotify   = 8,
+    FocusIn       = 9,
+    FocusOut      = 10,
+    KeymapNotify  = 11,
+    Expose        = 12,
+}
+
+record X11_Error {
+    event_code      :  u8; // 0 == Error event
+    error_code      :  u8;
+    sequence_number : u16;
+    value           : u32;
+    minor_opcode    : u16;
+    major_opcode    :  u8;
+    _               : u8[21];
+}
+
+fn x11_get_event() {
+
 }

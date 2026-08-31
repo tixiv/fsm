@@ -16,6 +16,11 @@ fn open (filename: u8[], flags) {
     return __open (filename_zero_delimited.begin, flags, permissions);
 }
 
+fn writev(fd, iov: u8[][]) {
+    let SYS_WRITEV = 20;
+    return syscall_3(SYS_WRITEV, fd, <i64>iov.begin, iov.len);
+}
+
 fn chmod (filename: u8[], permissions) {
     let filename_zero_delimited = $"{filename}\0";
     let SYS_CHMOD = 90;
