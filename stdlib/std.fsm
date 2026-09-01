@@ -42,6 +42,35 @@ fn waitpid (pid, wstatus: u32&, options) {
     return syscall_4(SYS_WAIT4, pid, <i64>wstatus, options, 0);
 }
 
+fn epoll_create1(flags) {
+    let SYS_EPOLL_CREATE1 = 291;
+    return syscall_1(SYS_EPOLL_CREATE1, flags);
+}
+
+record EpollEvent {
+    events: u32;
+    fd:     i64;
+}
+
+fn epoll_wait(epfd, buffer: EpollEvent[], timeout) : EpollEvent[] {
+    let SYS_EPOLL_WAIT = 232;
+    let events = buffer;
+    events.len = syscall_4(SYS_EPOLL_WAIT, epfd, <i64>buffer.begin, buffer.len, timeout);
+
+    return events;
+}
+
+enum EpollOp {
+    EPOLL_CTL_ADD = 1,
+    EPOLL_CTL_DEL = 2,
+    EPOLL_CTL_MOD = 3
+}
+
+fn epoll_ctl (epfd, op: EpollOp, fd, event: EpollEvent&) {
+    let SYS_EPOLL_CTL = 233;
+    return syscall_4(SYS_EPOLL_CTL, epfd, op, fd, <i64>event);
+}
+
 fn read_file (filename: u8[]) : u8[]
 {
     let O_RDONLY = 0

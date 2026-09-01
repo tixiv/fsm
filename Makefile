@@ -37,6 +37,7 @@ $(FSMD): $(FSMD_SRCS)
 bootstrap: $(CFSM) $(FSM_SRCS)
 	$(CFSM) compiler_fsm/fsm.fsm
 	fasm -m 65536 out.asm
+	chmod u+x out
 	./out -o build/fsm_new compiler_fsm/fsm.fsm
 	build/fsm_new -O1 -S -o build/fsm compiler_fsm/fsm.fsm
 	cp build/fsm $(FSM)
