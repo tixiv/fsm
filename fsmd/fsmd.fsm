@@ -2,6 +2,8 @@
 import * from "std";
 import * from "time";
 import * from "endlos";
+import * from "streamreader";
+
 import * from "compiler_fsm/common";
 import * from "compiler_fsm/type";
 import * from "compiler_fsm/ast";

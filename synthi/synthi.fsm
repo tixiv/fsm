@@ -1,0 +1,185 @@
+
+import * from "std";
+import * from "math";
+import * from "streamreader";
+import * from "gui/x11";
+
+fn output_audio_samples(fd, samples: i16[]) {
+    let s8: u8[];
+    s8.begin => <u8&>samples.begin;
+    s8.len = samples.len * 2;
+    write(fd, s8);
+}
+
+struct Synthi {
+    window   : Drawable&;
+    audio_fd : i64;
+    time     : i64;
+    freq     : f64;
+    note_table : f64[96];
+
+}
+
+fn calc_note_table (s: Synthi&) {
+    let _12_root_2 = 1.0594630943592952;
+
+    let f = 440.0;
+    for (let i = 69; i < 96; i++) {
+        s.note_table[i] = f;
+        f = f * _12_root_2;
+    }
+
+    f = 440.0;
+    for (let i = 68; i >= 0; i--) {
+        f = f / _12_root_2;
+        s.note_table[i] = f;
+    }
+}
+
+fn handle_audio_output (s: Synthi&) {
+    let samples: i16[256];
+    for (let i = 0; i < 256; i++) {
+        if (s.freq != 0.0) {
+            let seconds = <f64>s.time / 44100.0
+            samples[i] = <i64>(4000.0 * sin(2.0 * π * s.freq * seconds));
+        }
+        s.time++;
+
+        if (s.time % 44100 == 0) puts("second\n");
+    }
+
+    output_audio_samples(s.audio_fd, samples);
+}
+
+
+fn handle_x11_event(synthi: Synthi&, buf: u8[32]&) {
+    let code: X11_EventCode = buf[0];
+    if (code == X11_EventCode::Error) {
+        let e => <X11_Error&> buf;
+        write (2, $"X11 Error: {e.error_code} value = {e.value} on opcode {e.major_opcode}.{e.minor_opcode}\n");
+    }
+    else if (code == X11_EventCode::KeyPress) {
+        let keycode = buf[1];
+        $"{code.name} {buf[1]}\n"
+        if      (keycode == 52) { synthi.freq = synthi.note_table[60] }
+        else if (keycode == 53) { synthi.freq = synthi.note_table[62] }
+        else if (keycode == 54) { synthi.freq = synthi.note_table[64] }
+        else if (keycode == 55) { synthi.freq = synthi.note_table[65] }
+        else if (keycode == 56) { synthi.freq = synthi.note_table[67] }
+        else if (keycode == 57) { synthi.freq = synthi.note_table[69] }
+        else if (keycode == 58) { synthi.freq = synthi.note_table[71] }
+        else if (keycode == 59) { synthi.freq = synthi.note_table[72] }
+    }
+    else if (code == X11_EventCode::KeyRelease) {
+        $"{code.name} {buf[1]}\n"
+        synthi.freq = 0.0;
+    }
+    else if (code == X11_EventCode::Expose) {
+        $"{code.name}\n"
+        let rectangles: Rectangle[1];
+        rectangles[0].x = 15;
+        rectangles[0].y = 15;
+        rectangles[0].x_size = 150;
+        rectangles[0].y_size = 150;
+
+        x11_poly_fill_rectangle(synthi.window, rectangles);
+        x11_image_text_8(synthi.window, 200, 200, "Hello, World!");
+    }    
+    else {
+        $"{code.name}\n";
+        hexdump(buf);
+    }
+}
+
+fn main () {
+    let context: FSM_X11_context;
+    x11_connect(context);
+
+    let fid = x11_open_font(context, "*");
+    x11_gc_set_font(context, fid);
+
+    let window = x11_open_window(context);
+
+    let x11_fd = window.context.fd;
+
+    let O_WRONLY = 1
+    let audio_fd = open("/tmp/audio.pipe", O_WRONLY)
+
+    let midi_fd = open ("/dev/snd/midiC1D0", 2);
+    let midi_sr: StreamReader;
+    let midi_buf: u8[128];
+    sr_init(midi_sr, midi_buf, midi_fd);
+
+    let synthi: Synthi;
+    synthi.audio_fd = audio_fd;
+    synthi.window => window;
+
+    calc_note_table(synthi);
+
+    let epfd = epoll_create1(0);
+    let EPOLLIN  = 0x001;
+    let EPOLLOUT = 0x004;
+    {
+        let event: EpollEvent;
+        event.events = EPOLLIN;
+        event.fd = x11_fd;
+        epoll_ctl(epfd, EpollOp::EPOLL_CTL_ADD, event.fd, event);
+    }
+    {
+        let event: EpollEvent;
+        event.events = EPOLLIN;
+        event.fd = midi_fd;
+        epoll_ctl(epfd, EpollOp::EPOLL_CTL_ADD, event.fd, event);
+    }
+    {
+        let event: EpollEvent;
+        event.events = EPOLLOUT;
+        event.fd = audio_fd;
+        epoll_ctl(epfd, EpollOp::EPOLL_CTL_ADD, event.fd, event);
+    }
+    
+    while(1)
+    {
+        let event_buffer: EpollEvent[16];
+        let events = epoll_wait(epfd, event_buffer, 0);
+        for (let i = 0; i < events.len; i++) {
+            let event => events[i];
+            if (event.fd == x11_fd) {
+                let buf: u8[32];
+                let len = read(x11_fd, buf);
+                if (len != 32) exit(0);
+                handle_x11_event(synthi, buf);
+            }
+            else if (event.fd == audio_fd) {
+                handle_audio_output(synthi);
+            }
+            else if (event.fd == midi_fd) {
+                sr_read_some(midi_sr);
+                while (midi_sr.arr.len) {
+                    if (midi_sr.arr.len >= 3 && midi_sr.arr[0] == 0x90 |== 0x80 |== 0xb0) {
+                        let m = sr_read_exact(midi_sr, 3);
+                        if (m[0] == 0x90) {
+                            if (m[2] != 0) {
+                                synthi.freq = synthi.note_table[m[1]];
+                            }
+                            else {
+                                synthi.freq = 0.0;
+                            }
+                        }
+
+                        $"Midi: {m[0]}, {m[1]}, {m[2]}\n"
+                    }
+                    else if (midi_sr.arr.len && midi_sr.arr[0] == 0xFE) {
+                        // Active sensing
+                        sr_read_exact(midi_sr, 1);
+                    }
+                    else if (midi_sr.arr.len) {
+                        write (2, $"unhandled midi byte {midi_sr.arr[0]}\n");
+                        sr_read_exact(midi_sr, 1);
+                    }
+                }
+                sr_defrag(midi_sr, midi_buf);
+            }
+        }
+    }
+}

@@ -1,6 +1,7 @@
 
 import * from "std";
 import * from "json";
+import * from "streamreader";
 import * from "compiler_fsm/common";
 import * from "fsmd_module";
 
@@ -135,47 +136,6 @@ fn lsp_send_references_response (id :u8[], locations: LSP_Location[], buffer: u8
     sb_puts(sb, "]\n}\n");
 
     write_wrapped(1, sb.str);
-}
-
-struct StreamReader {
-    buffer: u8[];
-    arr: u8[];
-    fd;
-}
-
-fn sr_init(sr: StreamReader&, buffer: u8[], fd) {
-    sr.buffer = buffer;
-    sr.arr = buffer;
-    sr.arr.len = 0;
-    sr.fd = fd;
-}
-
-fn sr_defrag(sr: StreamReader&, buffer: u8[]) {
-  sr.buffer = buffer;
-  for (let i = 0; i < sr.arr.len; i++) {
-    sr.buffer++ = sr.arr[i];
-  }
-  sr.arr.begin => buffer.begin;
-}
-
-fn sr_read_some(sr: StreamReader&) {
-    let len = read(sr.fd, sr.buffer);
-    if (len > 0) {
-        sr.arr.len = sr.arr.len + len;
-        sr.buffer = sv_skip(sr.buffer, len);
-    }
-}
-
-fn sr_read_exact(sr: StreamReader&, num_bytes) : u8[] {
-    while (sr.arr.len < num_bytes) {
-        sr_read_some(sr);
-    }
-    let r = sr.arr;
-    r.len = num_bytes;
-    
-    sr.arr = sv_skip(sr.arr, num_bytes);
-
-    return r;
 }
 
 fn get_content_length(sr: StreamReader&) : i64 {
