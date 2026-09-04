@@ -1,0 +1,39 @@
+
+import * from "math";
+
+fn tan(x: f64) {
+    return sin(x) / cos(x);
+}
+
+// Simple state-variable filter (TPT-style-ish, compact version)
+struct SVF {
+    ic1eq : f64;
+    ic2eq : f64;
+    g : f64;
+    k : f64;
+
+}
+
+fn svf_set_cutoff(svf: SVF&, cutoff: f64) {
+    let sampleRate = 44100.0;
+    let w = π * cutoff / sampleRate;
+    svf.g = tan(w);
+}
+
+fn svf_set_resonance(svf: SVF&, resonance: f64) {
+    // resonance: 0..1 typical UI range
+    svf.k = 2.0 * (1.0 - resonance);
+}
+
+// returns low-pass; band/high-pass can also be computed
+fn svf_low_pass(svf: SVF&, x: f64) {
+    let v3 = x - svf.ic2eq;
+    let v1 = (svf.g * v3 + svf.ic1eq) / (1.0 + svf.g * (svf.g + svf.k));
+    let v2 = svf.g * v1 + svf.ic2eq;
+
+    svf.ic1eq = 2.0 * v1 - svf.ic1eq;
+    svf.ic2eq = 2.0 * v2 - svf.ic2eq;
+
+    return v2; // low-pass
+    // return v1; // band-pass
+}

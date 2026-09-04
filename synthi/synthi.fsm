@@ -4,6 +4,8 @@ import * from "math";
 import * from "streamreader";
 import * from "gui/x11";
 
+import * from "svf";
+
 fn output_audio_samples(fd, samples: i16[]) {
     let s8: u8[];
     s8.begin => <u8&>samples.begin;
@@ -17,6 +19,8 @@ struct Synthi {
     time     : i64;
     freq     : f64;
     note_table : f64[96];
+
+    svf: SVF;
 
 }
 
@@ -38,11 +42,17 @@ fn calc_note_table (s: Synthi&) {
 
 fn handle_audio_output (s: Synthi&) {
     let samples: i16[256];
+    let v: f64;
     for (let i = 0; i < 256; i++) {
         if (s.freq != 0.0) {
             let seconds = <f64>s.time / 44100.0
-            samples[i] = <i64>(4000.0 * sin(2.0 * π * s.freq * seconds));
+            v = sin(2.0 * π * s.freq * seconds);
         }
+
+        v = svf_low_pass(s.svf, v);
+
+        samples[i] = <i64>(4000.0 * v);
+
         s.time++;
 
         if (s.time % 44100 == 0) puts("second\n");
@@ -137,6 +147,9 @@ fn main () {
         event.fd = audio_fd;
         epoll_ctl(epfd, EpollOp::EPOLL_CTL_ADD, event.fd, event);
     }
+
+    svf_set_cutoff(synthi.svf, 440.0);
+    svf_set_resonance(synthi.svf, 1.0);
     
     while(1)
     {
@@ -165,6 +178,13 @@ fn main () {
                             else {
                                 synthi.freq = 0.0;
                             }
+                        }
+
+                        if (m[0] == 0xb0) {
+                            if (m[1] == 74)
+                                svf_set_cutoff(synthi.svf, <f64>(m[2] * 8));
+                            if (m[1] == 71)
+                                svf_set_resonance(synthi.svf, <f64>m[2] / 127.0);
                         }
 
                         $"Midi: {m[0]}, {m[1]}, {m[2]}\n"
